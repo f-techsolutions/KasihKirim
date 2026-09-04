@@ -1,0 +1,190 @@
+name: KasihKirim Verification Gate
+
+# Runtime verification only. The authoritative evidence for any claim that the
+# database works is THIS JOB LOG — not static review, and not the existence of
+# this file.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/**'
+      - 'scripts/**'
+      - '.github/workflows/kasihkirim-verification.yml'
+      - '.nvmrc'
+  pull_request:
+    paths:
+      - 'supabase/**'
+      - 'scripts/**'
+      - '.github/workflows/kasihkirim-verification.yml'
+      - '.nvmrc'
+  workflow_dispatch:
+
+permissions:
+  # VERIFICATION ONLY. This workflow must never gain deploy capability.
+  # Least privilege: it reads the repo and writes nothing.
+  contents: read
+
+concurrency:
+  group: verification-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Pinned for reproducibility. Bump deliberately, never floating.
+  SUPABASE_CLI_VERSION: "2.2.1"
+  DENO_VERSION: "v2.1.4"
+  PG_CLIENT_MAJOR: "16"
+
+jobs:
+  verify:
+    name: Database verification gate
+    # ubuntu-24.04 provides a working Docker daemon, which the Claude sandbox
+    # could not. That is the entire reason this workflow exists.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      # ── 1. Source ────────────────────────────────────────────────────────
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── 2. Node 20 — .nvmrc is authoritative ─────────────────────────────
+      - name: Set up Node from .nvmrc
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: GATE — Node is version 20
+        run: |
+          set -euo pipefail
+          WANT="$(tr -d 'v \n' < .nvmrc)"
+          HAVE="$(node --version | tr -d 'v')"
+          echo "  .nvmrc wants : $WANT"
+          echo "  installed    : $HAVE"
+          echo "  npm          : $(npm --version)"
+          if [ "${HAVE%%.*}" != "${WANT%%.*}" ]; then
+            echo "::error::Node major ${HAVE%%.*} != required ${WANT%%.*}."
+            echo "The ambient version is not adopted merely because it is present."
+            exit 1
+          fi
+          echo "NODE 20        PASS"
+
+      # ── 3. Toolchain ─────────────────────────────────────────────────────
+      # Supabase CLI comes from the official GitHub release .deb, not npm:
+      # the npm global package is deprecated and adds a registry dependency
+      # this gate does not need.
+      - name: Install Supabase CLI (official release, pinned)
+        run: |
+          set -euo pipefail
+          curl -fsSL -o /tmp/supabase.deb \
+            "https://github.com/supabase/cli/releases/download/v${SUPABASE_CLI_VERSION}/supabase_${SUPABASE_CLI_VERSION}_linux_amd64.deb"
+          sudo dpkg -i /tmp/supabase.deb
+          rm -f /tmp/supabase.deb
+
+      - name: Install PostgreSQL client
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq "postgresql-client-${PG_CLIENT_MAJOR}" || \
+            sudo apt-get install -y -qq postgresql-client
+
+      - name: Set up Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: ${{ env.DENO_VERSION }}
+
+      # ── 4. Docker gate — the primary gate ────────────────────────────────
+      # If Docker fails the workflow stops. It is never mocked, and migrations
+      # are never removed to compensate.
+      - name: GATE — Docker
+        run: |
+          set -euo pipefail
+          docker --version
+          docker info > /dev/null
+          echo "  daemon reachable"
+          docker run --rm hello-world > /dev/null
+          echo "  container runtime working"
+          echo "DOCKER         PASS"
+
+      - name: Runner capacity
+        run: |
+          echo "  cpus : $(nproc)"
+          echo "  mem  : $(free -g | awk '/^Mem:/{print $2}') GB"
+          echo "  disk : $(df -BG --output=avail / | tail -1 | tr -d ' ')"
+
+      # ── 5. Environment gate — the doctor reports, it does not flatter ────
+      - name: GATE — Environment doctor
+        run: |
+          chmod +x scripts/*.sh
+          ./scripts/kasihkirim-doctor.sh --profile=cloud
+
+      # ── 6. Supabase gate ─────────────────────────────────────────────────
+      - name: GATE — Toolchain versions
+        run: |
+          set -euo pipefail
+          supabase --version && echo "SUPABASE CLI   PASS"
+          psql --version     && echo "POSTGRESQL     PASS"
+          deno --version     && echo "DENO           PASS"
+
+      - name: GATE — supabase start
+        id: supabase_start
+        run: |
+          set -euo pipefail
+          supabase start
+          supabase status
+          echo "SUPABASE START PASS"
+
+      # ── 7. FIRST AUTHORITATIVE MIGRATION VERIFICATION ────────────────────
+      # Nine migrations meet Postgres for the first time here.
+      - name: GATE — supabase db reset
+        id: db_reset
+        run: |
+          set -euo pipefail
+          supabase db reset --debug 2>&1 | tee db-reset.log
+          echo "DB RESET       PASS"
+
+      # ── 8. FIRST AUTHORITATIVE ASSERTION RUN ─────────────────────────────
+      # Failures here are fixed by correcting the defect, never by weakening
+      # or deleting an assertion.
+      - name: GATE — supabase test db
+        id: db_tests
+        run: |
+          set -euo pipefail
+          supabase test db 2>&1 | tee db-tests.log
+          echo "DB TESTS       PASS"
+
+      - name: Test summary
+        if: always()
+        run: |
+          if [ -f db-tests.log ]; then
+            echo "### Database test result" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            tail -60 db-tests.log >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      # ── 9. Artifacts — evidence, never secrets ───────────────────────────
+      - name: Collect Supabase logs on failure
+        if: failure()
+        run: |
+          mkdir -p ci-logs
+          cp -f db-reset.log db-tests.log ci-logs/ 2>/dev/null || true
+          supabase status > ci-logs/supabase-status.txt 2>&1 || true
+          for c in $(docker ps -aq --filter "name=supabase" 2>/dev/null); do
+            docker logs "$c" > "ci-logs/container-$c.log" 2>&1 || true
+          done
+          # Defensive scrub. No production secrets are used by this workflow,
+          # but logs are never uploaded without a redaction pass.
+          find ci-logs -type f -exec sed -i -E \
+            's/(service_role|anon|SUPABASE_[A-Z_]*KEY|password|secret)[^[:space:]]*/[REDACTED]/gI' {} + || true
+
+      - name: Upload logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verification-logs-${{ github.run_id }}
+          path: ci-logs/
+          retention-days: 7
+
+      - name: Stop Supabase
+        if: always()
+        run: supabase stop --no-backup || true
