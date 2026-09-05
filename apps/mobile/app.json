@@ -1,0 +1,56 @@
+{
+  "expo": {
+    "name": "KasihKirim",
+    "slug": "kasihkirim",
+    "version": "1.0.0",
+    "scheme": "kasihkirim",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "platforms": ["android"],
+    "backgroundColor": "#FDF7EA",
+    "splash": { "backgroundColor": "#123D28", "resizeMode": "contain" },
+    "android": {
+      "package": "my.kasihkirim.app",
+      "versionCode": 1,
+      "adaptiveIcon": { "backgroundColor": "#123D28" },
+      "permissions": [
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.CAMERA",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_LOCATION",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.VIBRATE"
+      ],
+      "blockedPermissions": [
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.READ_SMS",
+        "android.permission.RECEIVE_SMS",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.QUERY_ALL_PACKAGES",
+        "android.permission.READ_PHONE_STATE"
+      ]
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      ["expo-camera", { "cameraPermission": "Untuk imbas QR dan ambil gambar bukti penghantaran." }],
+      ["expo-location", { "locationAlwaysAndWhenInUsePermission": "Untuk sahkan lokasi semasa serah dan terima barang." }],
+      ["expo-image-picker", { "photosPermission": "Untuk pilih gambar produk dan bukti." }],
+      ["expo-build-properties", {
+        "android": {
+          "minSdkVersion": 24,
+          "compileSdkVersion": 36,
+          "targetSdkVersion": 36,
+          "enableProguardInReleaseBuilds": true,
+          "enableShrinkResourcesInReleaseBuilds": true
+        }
+      }]
+    ],
+    "updates": { "fallbackToCacheTimeout": 0 },
+    "runtimeVersion": { "policy": "fingerprint" },
+    "experiments": { "typedRoutes": true }
+  }
+}

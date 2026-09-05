@@ -1,0 +1,42 @@
+project_id = "kasihkirim"
+
+[api]
+enabled = true
+port = 54321
+# CRITICAL: internal, audit and ref are NOT exposed. The ledger is unreachable
+# from any client JWT regardless of RLS. See SECURITY.md §2.
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 200
+
+[db]
+port = 54322
+major_version = 17
+
+[auth]
+enabled = true
+site_url = "kasihkirim://"
+additional_redirect_urls = ["kasihkirim://auth/callback"]
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+refresh_token_reuse_interval = 10
+enable_signup = true
+
+[auth.sms]
+enable_signup = true
+enable_confirmations = true
+template = "Kod KasihKirim anda: {{ .Code }}. Sah 5 minit. Jangan kongsi kod ini."
+max_frequency = "30s"
+otp_length = 6
+otp_expiry = 300
+
+[auth.hook.custom_access_token]
+enabled = true
+uri = "pg-functions://postgres/auth/custom_access_token_hook"
+
+[storage]
+enabled = true
+file_size_limit = "5MiB"
+
+[analytics]
+enabled = false

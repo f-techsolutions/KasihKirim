@@ -1,0 +1,19 @@
+# One supported option among several. The requirement is platform-independent:
+# any Linux environment with a working Docker daemon and adequate resources.
+image: gitpod/workspace-full:latest
+tasks:
+  - name: provision
+    init: |
+      nvm install 20 && nvm alias default 20
+      curl -fsSL -o /tmp/supabase.deb \
+        https://github.com/supabase/cli/releases/download/v2.2.1/supabase_2.2.1_linux_amd64.deb
+      sudo dpkg -i /tmp/supabase.deb
+      ./scripts/kasihkirim-doctor.sh --profile=cloud || true
+    command: echo "Run ./scripts/verify-gate.sh"
+ports:
+  - port: 54321
+    name: Supabase API
+  - port: 54322
+    name: Postgres
+  - port: 54323
+    name: Supabase Studio

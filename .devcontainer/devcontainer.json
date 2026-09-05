@@ -1,0 +1,40 @@
+{
+  "name": "KasihKirim — backend verification",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu-22.04",
+
+  "features": {
+    // Docker-in-Docker is the load-bearing feature. Without a reachable
+    // daemon, `supabase start` cannot run and the verification gate is
+    // impossible. A terminal alone is not sufficient.
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {
+      "version": "latest",
+      "moby": true
+    },
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "20"
+    },
+    "ghcr.io/devcontainers/features/java:1": {
+      "version": "17",
+      "installGradle": true
+    },
+    "ghcr.io/devcontainers-contrib/features/deno:1": {},
+    "ghcr.io/devcontainers-contrib/features/postgres-client:1": {}
+  },
+
+  "postCreateCommand": "bash .devcontainer/setup.sh",
+
+  "hostRequirements": {
+    "cpus": 4,
+    "memory": "8gb",
+    "storage": "32gb"
+  },
+
+  "forwardPorts": [54321, 54322, 54323],
+  "portsAttributes": {
+    "54321": { "label": "Supabase API" },
+    "54322": { "label": "Postgres" },
+    "54323": { "label": "Supabase Studio" }
+  },
+
+  "remoteUser": "vscode"
+}

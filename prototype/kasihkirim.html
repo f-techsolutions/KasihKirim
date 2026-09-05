@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>KasihKirim — Prototaip</title>
+<style>
+:root{
+  --green-900:#123D28; --green-700:#1B5E3F; --green-600:#2D7A52; --green-100:#E3F0E8;
+  --gold:#F5C542; --orange:#E8811E; --cream:#FDF7EA; --ink:#12261C;
+  --grey:#6B7B72; --line:#DCE6DF; --red:#C2401F; --white:#fff;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  background:var(--green-900);color:var(--ink);display:flex;justify-content:center}
+#phone{width:100%;max-width:430px;min-height:100vh;background:var(--cream);
+  display:flex;flex-direction:column;position:relative;overflow:hidden}
+
+header{background:var(--green-900);color:var(--cream);padding:10px 14px;
+  display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.brand{font-weight:800;font-size:17px;letter-spacing:-.3px}
+.brand span{color:var(--gold)}
+.spacer{flex:1}
+.chip{background:rgba(255,255,255,.13);border:0;color:var(--cream);font-size:11px;
+  padding:5px 9px;border-radius:20px;cursor:pointer;font-weight:600}
+.chip.on{background:var(--gold);color:var(--green-900)}
+.chip.off{background:var(--red);color:#fff}
+
+main{flex:1;overflow-y:auto;padding:14px 14px 84px}
+h2{font-size:20px;margin:0 0 3px;letter-spacing:-.4px}
+.sub{color:var(--grey);font-size:12.5px;margin:0 0 14px;line-height:1.45}
+
+.card{background:var(--white);border:1px solid var(--line);border-radius:14px;
+  padding:13px;margin-bottom:10px}
+.card.tap{cursor:pointer}
+.card.tap:active{transform:scale(.99)}
+.row{display:flex;align-items:center;gap:9px}
+.between{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.tag{font-size:10px;font-weight:800;padding:3px 8px;border-radius:6px;
+  background:var(--green-100);color:var(--green-700);text-transform:uppercase;letter-spacing:.4px}
+.tag.gold{background:#FDF0C9;color:#8A6200}
+.tag.orange{background:#FCE6D0;color:#A2530C}
+.tag.red{background:#F8DFD8;color:var(--red)}
+.tag.grey{background:#EDF1EE;color:var(--grey)}
+
+button{font-family:inherit}
+.btn{width:100%;padding:14px;border:0;border-radius:11px;background:var(--orange);
+  color:#fff;font-weight:800;font-size:15px;cursor:pointer;margin-top:8px}
+.btn:disabled{background:#CFD8D2;color:#8C9A92;cursor:not-allowed}
+.btn.sec{background:var(--green-700)}
+.btn.ghost{background:transparent;color:var(--green-700);border:1.5px solid var(--green-600)}
+.btn.sm{padding:10px;font-size:13.5px;width:auto;flex:1}
+
+label{display:block;font-size:10.5px;font-weight:800;color:var(--grey);
+  text-transform:uppercase;letter-spacing:.6px;margin:12px 0 6px}
+input,textarea,select{width:100%;padding:12px;border:1.5px solid var(--line);
+  border-radius:10px;font-size:15px;font-family:inherit;background:var(--white);color:var(--ink)}
+textarea{min-height:74px;resize:vertical}
+input:focus,textarea:focus{outline:0;border-color:var(--green-600)}
+
+.cats{display:flex;gap:7px;flex-wrap:wrap}
+.cat{padding:9px 13px;border:1.5px solid var(--line);border-radius:20px;
+  background:var(--white);font-size:13px;cursor:pointer;font-weight:600}
+.cat.on{background:var(--green-700);color:#fff;border-color:var(--green-700)}
+
+.stepper{display:flex;align-items:center;gap:14px;justify-content:center;
+  background:var(--white);border:1.5px solid var(--line);border-radius:11px;padding:9px}
+.stepbtn{width:40px;height:40px;border-radius:50%;border:0;background:var(--green-100);
+  color:var(--green-700);font-size:23px;font-weight:800;cursor:pointer;line-height:1}
+.stepval{font-size:23px;font-weight:800;min-width:96px;text-align:center}
+
+.money{font-size:31px;font-weight:800;letter-spacing:-1px;color:var(--green-900)}
+.brk{display:flex;justify-content:space-between;padding:7px 0;font-size:13.5px;
+  border-bottom:1px dashed var(--line)}
+.brk:last-child{border:0}
+.brk.tot{font-weight:800;font-size:16px;padding-top:11px;border-top:2px solid var(--green-900);border-bottom:0}
+.brk .g{color:var(--grey)}
+.brk .refund{color:var(--green-600);font-weight:700}
+
+.prog{display:flex;gap:5px;margin-bottom:16px}
+.prog i{flex:1;height:4px;background:var(--line);border-radius:3px}
+.prog i.on{background:var(--orange)}
+
+nav{position:absolute;bottom:0;left:0;right:0;background:var(--white);
+  border-top:1px solid var(--line);display:flex;padding:7px 0 10px}
+nav button{flex:1;background:0;border:0;font-size:10.5px;font-weight:700;color:var(--grey);
+  cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;padding:5px 0}
+nav button.on{color:var(--green-700)}
+nav .ic{font-size:19px;line-height:1}
+
+.banner{padding:10px 12px;border-radius:10px;font-size:12.5px;margin-bottom:11px;line-height:1.5}
+.banner.warn{background:#FDF0C9;color:#6B4C00;border-left:3px solid var(--gold)}
+.banner.err{background:#F8DFD8;color:#7A2A13;border-left:3px solid var(--red)}
+.banner.ok{background:var(--green-100);color:var(--green-700);border-left:3px solid var(--green-600)}
+.banner.info{background:#E4EDF6;color:#1B4569;border-left:3px solid #3A78B5}
+
+.tl{position:relative;padding-left:22px}
+.tl:before{content:'';position:absolute;left:6px;top:5px;bottom:5px;width:2px;background:var(--line)}
+.ev{position:relative;padding:7px 0;font-size:13px}
+.ev:before{content:'';position:absolute;left:-20px;top:12px;width:9px;height:9px;
+  border-radius:50%;background:var(--line);border:2px solid var(--cream)}
+.ev.done:before{background:var(--green-600)}
+.ev.now:before{background:var(--orange);box-shadow:0 0 0 4px #FCE6D0}
+.ev small{display:block;color:var(--grey);font-size:11px;margin-top:1px}
+
+.modal{position:absolute;inset:0;background:rgba(10,30,20,.55);display:flex;
+  align-items:flex-end;z-index:50}
+.sheet{background:var(--cream);width:100%;border-radius:18px 18px 0 0;padding:18px;
+  max-height:90%;overflow-y:auto}
+.grab{width:38px;height:4px;background:var(--line);border-radius:3px;margin:0 auto 14px}
+
+.qr{width:180px;height:180px;margin:14px auto;background:#fff;padding:10px;
+  border-radius:12px;border:1px solid var(--line)}
+.otp{font-size:38px;font-weight:800;letter-spacing:10px;text-align:center;
+  color:var(--green-900);font-variant-numeric:tabular-nums;margin:10px 0}
+.otpin{font-size:26px;letter-spacing:9px;text-align:center;font-weight:800}
+
+.ledger{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;line-height:1.75}
+.ledger .d{color:var(--green-900)} .ledger .c{color:var(--green-600);padding-left:18px}
+
+.badge{display:inline-flex;flex-direction:column;align-items:center;gap:4px;width:70px}
+.badge .b{width:46px;height:46px;border-radius:50%;background:var(--gold);display:flex;
+  align-items:center;justify-content:center;font-size:21px}
+.badge.lock .b{background:#EDF1EE;filter:grayscale(1);opacity:.5}
+.badge small{font-size:9.5px;text-align:center;color:var(--grey);font-weight:700;line-height:1.2}
+
+.score{width:38px;height:38px;border-radius:50%;background:var(--green-700);color:#fff;
+  display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex-shrink:0}
+.cap{height:7px;background:var(--line);border-radius:4px;overflow:hidden;margin-top:6px}
+.cap i{display:block;height:100%;background:var(--green-600)}
+.cap i.full{background:var(--red)}
+.empty{text-align:center;padding:38px 18px;color:var(--grey);font-size:13.5px}
+.empty .ic{font-size:38px;display:block;margin-bottom:10px;opacity:.35}
+</style>
+</head>
+<body>
+<div id="phone">
+  <header>
+    <div class="brand">Kasih<span>Kirim</span></div>
+    <div class="spacer"></div>
+    <button class="chip" id="roleBtn"></button>
+    <button class="chip" id="netBtn"></button>
+  </header>
+  <main id="app"></main>
+  <nav id="nav"></nav>
+  <div id="modal"></div>
+</div>
+
+<script>
+/* ══════════════════════════════════════════════════════════════════
+   KasihKirim prototype
+   Implements the real invariants from the architecture docs:
+     BR-900 server-side money    BR-903 no overbooking
+     BR-907 recipient confirms   BR-913 budget cap
+     BR-915 unspent budget refunded
+     25% platform commission of order total
+   ══════════════════════════════════════════════════════════════════ */
+
+const CFG = {
+  commission_bps: 2500,
+  max_budget_sen: 25000,          // RM250 ceiling (C-03)
+  base_fare_sen: 500,
+  per_kg_sen: 150,
+  included_kg: 1,
+  // Corridor BANDS, not per-km. See findings note in the review.
+  band_sen: { local:0, district:300, regional:500, long_haul:800 },
+  handling_sen: { PERISHABLE:100, COLD_CHAIN:300, FRAGILE:200, LIVE_ANIMAL:500 },
+};
+
+const CATS = [
+  {id:'sayur', ms:'Sayur', h:['PERISHABLE']},
+  {id:'buah', ms:'Buah', h:['PERISHABLE']},
+  {id:'laut', ms:'Hasil Laut', h:['PERISHABLE','COLD_CHAIN']},
+  {id:'kraf', ms:'Kraf', h:['FRAGILE']},
+  {id:'lain', ms:'Lain-lain', h:[]},
+];
+
+const CORRIDOR = ['Beluran','Telupid','Ranau','Tamparuli','Tuaran','Kota Kinabalu'];
+
+let S = {
+  role:'customer', online:true, tab:'home', screen:null, modal:null,
+  outbox:[], applied:new Set(), toast:null,
+  me:{ customer:{name:'Aisyah', place:'Kg Kepayan Baru', rating:4.9, badges:['first']},
+       carrier:{name:'Rahman', place:'Beluran', rating:4.8, float_limit:50000, held:0} },
+  wizard:null, quote:null,
+  trips:[{ id:'T1', route:'Beluran → Kota Kinabalu', depart:'Esok, 6:00 pagi',
+           band:'long_haul', cap_g:50000, cap_p:8, res_g:0, res_p:0,
+           vehicle:'Toyota Hilux', status:'ANNOUNCED', returnLeg:false }],
+  kirims:[], ledger:[], seq:1,
+};
+
+const sen = n => 'RM ' + (n/100).toFixed(2);
+const uid = p => p + (S.seq++);
+const bps = (a,b) => Math.round(a*b/10000);
+const cat = id => CATS.find(c=>c.id===id);
+
+/* ── Pricing engine (server-side in production; BR-900) ───────────── */
+function quote(k){
+  const c = cat(k.category);
+  const kg = k.weight_g/1000;
+  const b = { base:CFG.base_fare_sen, band:CFG.band_sen[k.band]||0, weight:0, handling:0 };
+  b.weight = Math.max(0, Math.ceil(kg - CFG.included_kg)) * CFG.per_kg_sen;
+  c.h.forEach(f => b.handling += CFG.handling_sen[f]||0);
+  const delivery = b.base + b.band + b.weight + b.handling;
+  const goods = k.type==='BELI' ? k.budget_sen : 0;
+  const total = goods + delivery;
+  const commission = bps(total, CFG.commission_bps);
+  return { ...b, delivery, goods, total, commission,
+           carrier_earning: delivery - commission };
+}
+
+/* ── Capacity reservation (BR-903: lock + CHECK constraint) ───────── */
+function reserve(trip, k){
+  if (trip.res_g + k.weight_g > trip.cap_g) throw new Error('CAPACITY_EXCEEDED');
+  if (trip.res_p + 1 > trip.cap_p)         throw new Error('CAPACITY_EXCEEDED');
+  trip.res_g += k.weight_g; trip.res_p += 1;
+}
+
+/* ── Settlement (BR-915: goods_escrow = actual + refund) ──────────── */
+function settle(k){
+  const q = k.quote;
+  const actual = k.actual_goods_sen || 0;
+  const refund = q.goods - actual;
+  if (refund < 0) throw new Error('BR-915 VIOLATION');
+  const L = [];
+  L.push({t:'Penyelesaian ' + k.ref, e:[
+    ['D','Escrow Held — Barang', q.goods],
+    ['C','Pembawa — Bayaran balik kos', actual],
+    ['C','Pemohon — Pulangan baki', refund],
+    ['D','Escrow Held — Penghantaran', q.delivery],
+    ['C','Komisen Platform (25%)', q.commission],
+    ['C','Pembawa — Pendapatan', q.carrier_earning],
+  ]});
+  S.ledger.unshift(...L);
+  k.settled = { actual, refund, commission:q.commission, earning:q.carrier_earning };
+}
+
+/* ── Offline outbox (idempotency key born at user action) ─────────── */
+function act(label, fn){
+  const key = uid('idem-');
+  if (!S.online){
+    S.outbox.push({key,label,fn});
+    toast('Disimpan — menunggu talian');
+    render(); return;
+  }
+  run({key,label,fn});
+  render();
+}
+function run(item){
+  if (S.applied.has(item.key)) return;   // exactly-once
+  S.applied.add(item.key);
+  try { item.fn(); } catch(e){ toast('Gagal: '+e.message); }
+}
+function flush(){
+  const n = S.outbox.length;
+  S.outbox.forEach(run); S.outbox = [];
+  if(n) toast(n+' perkara dihantar');
+  render();
+}
+function toast(m){ S.toast=m; setTimeout(()=>{S.toast=null;render();},2600); }
+
+/* ── Event log ────────────────────────────────────────────────────── */
+function ev(k,label,note){ k.events.push({label,note,at:new Date()}); }
+
+/* ══════════════ RENDER ══════════════ */
+const $ = s => document.querySelector(s);
+
+function render(){
+  $('#roleBtn').textContent = S.role==='customer' ? '👤 Pelanggan' : '🚚 Pembawa';
+  const nb = $('#netBtn');
+  nb.textContent = S.online ? '📶 Talian ada' : '✈️ Tiada talian';
+  nb.className = 'chip ' + (S.online?'on':'off');
+
+  $('#app').innerHTML = (S.screen ? SCREENS[S.screen]() : TABS[S.role][S.tab].view());
+  $('#nav').innerHTML = Object.entries(TABS[S.role]).map(([k,t])=>
+    `<button class="${S.tab===k&&!S.screen?'on':''}" onclick="go('${k}')">
+       <span class="ic">${t.ic}</span>${t.ms}</button>`).join('');
+  $('#modal').innerHTML = S.modal ? MODALS[S.modal.type](S.modal) : '';
+  if(S.toast) $('#app').insertAdjacentHTML('afterbegin',
+    `<div class="banner ok">${S.toast}</div>`);
+}
+function go(t){ S.tab=t; S.screen=null; S.modal=null; render(); }
+function nav(s){ S.screen=s; S.modal=null; render(); }
+function open(m){ S.modal=m; render(); }
+function close(){ S.modal=null; render(); }
+
+function outboxBanner(){
+  if(!S.outbox.length) return '';
+  return `<div class="banner warn"><b>${S.outbox.length} perkara menunggu talian</b><br>
+    ${S.outbox.map(o=>'• '+o.label).join('<br>')}</div>`;
+}
+
+/* ══════════════ CUSTOMER ══════════════ */
+function custHome(){
+  const mine = S.kirims.filter(k=>k.by==='customer');
+  return `
+  <h2>Selamat pagi, Aisyah</h2>
+  <p class="sub">Kg Kepayan Baru, Sepanggar</p>
+  ${outboxBanner()}
+  <div class="card" style="background:var(--green-900);color:var(--cream);border:0">
+    <div style="font-size:12px;opacity:.8">Kirim dengan kasih</div>
+    <div style="font-size:17px;font-weight:800;margin:5px 0 11px">
+      Nak apa dari kampung hari ni?</div>
+    <button class="btn" onclick="startWizard()">+ Buat Kirim Baru</button>
+  </div>
+  <label>Kirim Saya</label>
+  ${mine.length ? mine.map(k=>kirimCard(k)).join('') :
+    `<div class="empty"><span class="ic">📦</span>Belum ada kirim lagi.</div>`}`;
+}
+
+function kirimCard(k){
+  const st = {POSTED:['grey','Di Papan Kirim'],MATCHED:['gold','Ada pembawa'],
+    PROCURING:['orange','Sedang dibeli'],VARIANCE:['red','Perlu keputusan awak'],
+    IN_TRANSIT:['orange','Dalam perjalanan'],DELIVERED:['gold','Sampai — sahkan'],
+    COMPLETED:['','Selesai']}[k.status]||['grey',k.status];
+  return `<div class="card tap" onclick="viewKirim('${k.id}')">
+    <div class="between"><span class="tag ${st[0]}">${st[1]}</span>
+      <small style="color:var(--grey)">${k.ref}</small></div>
+    <div style="font-weight:700;margin:7px 0 3px">${k.desc}</div>
+    <div style="font-size:12px;color:var(--grey)">
+      ${k.from} → ${k.to} · ${(k.weight_g/1000).toFixed(1)} kg</div>
+    <div class="between" style="margin-top:9px">
+      <span style="font-weight:800">${sen(k.quote.total)}</span>
+      ${k.status==='VARIANCE'?'<span class="tag red">Tindakan!</span>':''}
+    </div></div>`;
+}
+
+/* ── 4-step wizard (deck: Langkah 1/4 "Apa yang awak nak?") ───────── */
+function startWizard(){
+  S.wizard = {step:1, type:'BELI', desc:'', category:'laut', weight_g:2000,
+              budget_sen:3500, from:'Beluran', to:'Kg Kepayan Baru',
+              band:'long_haul', when:'Esok pagi'};
+  nav('wizard');
+}
+function wz(f,v){ S.wizard[f]=v; render(); }
+function wzStep(d){
+  const w=S.wizard;
+  if(d>0 && w.step===1 && !w.desc.trim()){ toast('Sila terangkan barang'); return; }
+  if(w.step+d===0){ S.screen=null; S.wizard=null; render(); return; }
+  if(w.step+d===5){ S.quote=quote(w); nav('confirm'); return; }
+  w.step+=d; render();
+}
+
+function wizard(){
+  const w=S.wizard;
+  const bar = `<div class="prog">${[1,2,3,4].map(i=>
+    `<i class="${i<=w.step?'on':''}"></i>`).join('')}</div>
+    <p class="sub">Langkah ${w.step} / 4</p>`;
+  let body='';
+  if(w.step===1){
+    body=`<h2>Apa yang awak nak?</h2>
+    <label>Barang yang diminta</label>
+    <textarea oninput="S.wizard.desc=this.value"
+      placeholder="Contoh: Udang galah saiz sederhana, 2kg, yang masih hidup kalau ada">${w.desc}</textarea>
+    <p class="sub" style="margin-top:6px">Terangkan sedikit jelas untuk senang pembawa cari.</p>
+    <label>Kategori</label>
+    <div class="cats">${CATS.map(c=>
+      `<div class="cat ${w.category===c.id?'on':''}" onclick="wz('category','${c.id}')">${c.ms}</div>`).join('')}</div>
+    <label>Anggar Berat</label>
+    <div class="stepper">
+      <button class="stepbtn" onclick="wz('weight_g',Math.max(500,S.wizard.weight_g-500))">−</button>
+      <div class="stepval">${(w.weight_g/1000).toFixed(1)} kg</div>
+      <button class="stepbtn" onclick="wz('weight_g',Math.min(50000,S.wizard.weight_g+500))">+</button>
+    </div>
+    <label>Had Bajet</label>
+    <input type="number" value="${(w.budget_sen/100)}"
+      oninput="S.wizard.budget_sen=Math.round(this.value*100)">
+    <p class="sub" style="margin-top:6px">
+      Pembawa tak akan beli lebih dari jumlah ini. Kalau harga pasar lebih tinggi,
+      kami akan tanya awak dulu.<br>
+      <b>Had bajet maksimum ${sen(CFG.max_budget_sen)}</b></p>
+    ${w.budget_sen>CFG.max_budget_sen?`<div class="banner err">Melebihi had maksimum.</div>`:''}`;
+  }
+  if(w.step===2){
+    body=`<h2>Dari mana, ke mana?</h2>
+    <label>Ambil dari</label>
+    <select onchange="wz('from',this.value)">${CORRIDOR.map(c=>
+      `<option ${w.from===c?'selected':''}>${c}</option>`).join('')}</select>
+    <label>Hantar ke</label>
+    <input value="${w.to}" oninput="S.wizard.to=this.value">
+    <div class="banner info" style="margin-top:14px">
+      <b>Laluan:</b> ${CORRIDOR.join(' → ')}<br>
+      Pembawa yang memang lalu jalan ni akan nampak kirim awak.</div>`;
+  }
+  if(w.step===3){
+    body=`<h2>Bila awak perlukan?</h2>
+    <label>Masa</label>
+    <div class="cats">${['Esok pagi','Esok petang','2 hari lagi','Minggu ni'].map(t=>
+      `<div class="cat ${w.when===t?'on':''}" onclick="wz('when','${t}')">${t}</div>`).join('')}</div>
+    <div class="banner warn" style="margin-top:16px">
+      Kirim ni bergantung pada perjalanan pembawa yang memang sudah dirancang.
+      Waktu anggaran, bukan janji tepat.</div>`;
+  }
+  if(w.step===4){
+    const q=quote(w);
+    body=`<h2>Semak dulu</h2>
+    <div class="card">
+      <div style="font-weight:700">${w.desc||'—'}</div>
+      <div style="font-size:12px;color:var(--grey);margin-top:5px">
+        ${cat(w.category).ms} · ${(w.weight_g/1000).toFixed(1)} kg<br>
+        ${w.from} → ${w.to} · ${w.when}</div>
+    </div>
+    <div class="card">
+      <div class="brk"><span>Had bajet barang</span><b>${sen(q.goods)}</b></div>
+      <div class="brk"><span class="g">Upah asas</span><span class="g">${sen(q.base)}</span></div>
+      <div class="brk"><span class="g">Laluan jauh (Beluran–KK)</span><span class="g">${sen(q.band)}</span></div>
+      <div class="brk"><span class="g">Berat</span><span class="g">${sen(q.weight)}</span></div>
+      <div class="brk"><span class="g">Pengendalian (sejuk/segar)</span><span class="g">${sen(q.handling)}</span></div>
+      <div class="brk"><span>Upah penghantaran</span><b>${sen(q.delivery)}</b></div>
+      <div class="brk tot"><span>Jumlah</span><span>${sen(q.total)}</span></div>
+    </div>
+    <div class="banner ok">Baki bajet yang tak digunakan akan
+      <b>dipulangkan penuh</b> kepada awak.</div>`;
+  }
+  return bar+body+`
+    <div class="row" style="margin-top:16px">
+      <button class="btn sm ghost" onclick="wzStep(-1)">Kembali</button>
+      <button class="btn sm" onclick="wzStep(1)"
+        ${w.budget_sen>CFG.max_budget_sen?'disabled':''}>
+        ${w.step===4?'Teruskan':'Seterusnya'}</button>
+    </div>`;
+}
+
+function confirmScreen(){
+  const w=S.wizard, q=S.quote;
+  return `<h2>Bayaran</h2>
+  <p class="sub">Duit dipegang platform sehingga awak sahkan barang sampai.</p>
+  <div class="card">
+    <div class="money">${sen(q.total)}</div>
+    <div style="font-size:12px;color:var(--grey);margin-top:4px">
+      Barang ${sen(q.goods)} + Penghantaran ${sen(q.delivery)}</div>
+  </div>
+  <div class="card">
+    <label style="margin-top:0">Cara Bayar</label>
+    <div class="cat on" style="display:block;text-align:center">
+      💵 Tunai Semasa Terima (COD)</div>
+    <p class="sub" style="margin:9px 0 0">
+      Bayaran atas talian belum dibuka — menunggu kelulusan.</p>
+  </div>
+  <div class="banner ok"><b>Escrow secara lalai.</b> Duit hanya dilepaskan
+    bila penerima sahkan barang sampai.</div>
+  <button class="btn" onclick="postKirim()">Hantar ke Papan Kirim</button>
+  <button class="btn ghost" onclick="nav('wizard')">Kembali</button>`;
+}
+
+function postKirim(){
+  const w=S.wizard, q=S.quote;
+  act('Kirim baru: '+w.desc.slice(0,22), ()=>{
+    const k={ id:uid('K'), ref:'KK-'+Math.random().toString(36).slice(2,8).toUpperCase(),
+      by:'customer', type:'BELI', desc:w.desc, category:w.category,
+      weight_g:w.weight_g, budget_sen:w.budget_sen, from:w.from, to:w.to,
+      band:w.band, when:w.when, quote:q, status:'POSTED', events:[], trip:null };
+    ev(k,'Kirim dihantar ke Papan Kirim');
+    S.kirims.unshift(k);
+  });
+  S.wizard=null; S.quote=null; S.screen=null; S.tab='home'; render();
+}
+
+function viewKirim(id){ S.screen='kirim'; S.viewId=id; S.modal=null; render(); }
+
+function kirimDetail(){
+  const k=S.kirims.find(x=>x.id===S.viewId); if(!k) return '';
+  const q=k.quote;
+  const steps=[['POSTED','Di Papan Kirim'],['MATCHED','Pembawa jumpa'],
+    ['PROCURING','Sedang dibeli'],['IN_TRANSIT','Dalam perjalanan'],
+    ['DELIVERED','Sampai'],['COMPLETED','Selesai']];
+  const order=['POSTED','MATCHED','PROCURING','VARIANCE','IN_TRANSIT','DELIVERED','COMPLETED'];
+  const ci=order.indexOf(k.status);
+  return `<button class="chip" style="background:var(--green-100);color:var(--green-700);margin-bottom:12px"
+      onclick="go('home')">← Kembali</button>
+  <h2>${k.desc}</h2><p class="sub">${k.ref} · ${k.from} → ${k.to}</p>
+  ${k.status==='VARIANCE'?`<div class="banner err">
+    <b>Harga pasar lebih tinggi dari bajet awak.</b><br>
+    ${k.variance.note}<br>Pasar: <b>${sen(k.variance.market)}</b> ·
+    Bajet awak: ${sen(q.goods)}
+    <div class="row" style="margin-top:10px">
+      <button class="btn sm" onclick="respondVar('APPROVE')">Setuju bayar lebih</button>
+      <button class="btn sm ghost" onclick="respondVar('DECLINE')">Tak jadi</button>
+    </div></div>`:''}
+  ${k.status==='DELIVERED'?`<div class="banner warn">
+    <b>Barang dah sampai?</b> Sahkan supaya pembawa boleh dibayar.
+    <button class="btn" style="margin-top:9px" onclick="confirmReceipt()">
+      Ya, saya sudah terima</button></div>`:''}
+  <div class="card"><div class="tl">
+    ${steps.map(([s,l])=>{
+      const i=order.indexOf(s);
+      return `<div class="ev ${i<ci?'done':i===ci?'now':''}">${l}</div>`}).join('')}
+  </div></div>
+  <label>Rekod</label>
+  <div class="card"><div class="tl">${k.events.map(e=>
+    `<div class="ev done">${e.label}${e.note?`<small>${e.note}</small>`:''}</div>`).join('')}
+  </div></div>
+  <label>Kos</label>
+  <div class="card">
+    <div class="brk"><span>Had bajet barang</span><span>${sen(q.goods)}</span></div>
+    ${k.actual_goods_sen!=null?
+      `<div class="brk"><span>Harga sebenar dibeli</span><b>${sen(k.actual_goods_sen)}</b></div>`:''}
+    <div class="brk"><span>Upah penghantaran</span><span>${sen(q.delivery)}</span></div>
+    ${k.settled?`<div class="brk"><span class="refund">Baki dipulangkan kepada awak</span>
+      <span class="refund">+ ${sen(k.settled.refund)}</span></div>`:''}
+    <div class="brk tot"><span>${k.settled?'Awak bayar':'Jumlah dipegang'}</span>
+      <span>${sen(k.settled? q.total-k.settled.refund : q.total)}</span></div>
+  </div>
+  ${k.settled?`<div class="banner ok">
+    <b>Selesai.</b> Baki bajet ${sen(k.settled.refund)} telah dipulangkan penuh.</div>`:''}`;
+}
+
+function respondVar(d){
+  const k=S.kirims.find(x=>x.id===S.viewId);
+  act('Keputusan harga: '+d, ()=>{
+    if(d==='APPROVE'){
+      k.quote.goods=k.variance.market;
+      k.quote.total=k.quote.goods+k.quote.delivery;
+      k.quote.commission=bps(k.quote.total,CFG.commission_bps);
+      k.quote.carrier_earning=k.quote.delivery-k.quote.commission;
+      k.varianceApproved=k.variance.market;
+      k.status='PROCURING';
+      ev(k,'Awak setuju harga baru',sen(k.variance.market));
+    } else {
+      k.status='COMPLETED'; k.actual_goods_sen=0;
+      k.settled={actual:0,refund:k.quote.goods,commission:0,earning:0};
+      ev(k,'Awak tak setuju — kirim dibatalkan','Bajet dipulangkan penuh');
+    }
+  });
+  render();
+}
+
+function confirmReceipt(){
+  const k=S.kirims.find(x=>x.id===S.viewId);
+  act('Sahkan terima '+k.ref, ()=>{
+    k.status='COMPLETED';
+    ev(k,'Penerima sahkan barang sampai','Escrow dilepaskan');
+    settle(k);
+    if(!S.me.customer.badges.includes('kirim1')) S.me.customer.badges.push('kirim1');
+  });
+  render();
+}
+
+/* ══════════════ CARRIER ══════════════ */
+function carrierHome(){
+  const t=S.trips[0];
+  const pct=Math.round(t.res_g/t.cap_g*100);
+  return `<h2>Trip Saya</h2><p class="sub">Rahman · Beluran · ⭐ 4.8</p>
+  ${outboxBanner()}
+  <div class="card">
+    <div class="between"><span class="tag gold">${t.status}</span>
+      <small style="color:var(--grey)">${t.vehicle}</small></div>
+    <div style="font-weight:800;font-size:16px;margin:8px 0 3px">${t.route}</div>
+    <div style="font-size:12px;color:var(--grey)">${t.depart}</div>
+    <div style="margin-top:12px;font-size:12px">
+      <div class="between"><span>Muatan</span>
+        <b>${(t.res_g/1000).toFixed(1)} / ${(t.cap_g/1000).toFixed(0)} kg
+        · ${t.res_p}/${t.cap_p} bungkus</b></div>
+      <div class="cap"><i class="${pct>=100?'full':''}" style="width:${Math.min(100,pct)}%"></i></div>
+    </div>
+    ${t.res_p>0?`<button class="btn sec" onclick="nav('manifest')">Lihat Manifes (${t.res_p})</button>`:''}
+  </div>
+  <div class="card" style="background:var(--green-100);border-color:var(--green-600)">
+    <div style="font-weight:800;margin-bottom:4px">🔄 Kirim Balik</div>
+    <p class="sub" style="margin:0 0 10px">
+      Balik ke Beluran esok? Umumkan sekali tekan — muatan balik jadi duit.</p>
+    <button class="btn sec" onclick="announceReturn()">Umum Perjalanan Balik</button>
+  </div>
+  ${S.trips.length>1?S.trips.slice(1).map(t=>`<div class="card">
+    <span class="tag">${t.status}</span>
+    <div style="font-weight:700;margin-top:7px">${t.route}</div>
+    <div style="font-size:12px;color:var(--grey)">${t.depart} · muatan balik</div></div>`).join(''):''}`;
+}
+
+function announceReturn(){
+  act('Umum perjalanan balik', ()=>{
+    S.trips.push({id:uid('T'),route:'Kota Kinabalu → Beluran',depart:'Lusa, 7:00 pagi',
+      band:'long_haul',cap_g:50000,cap_p:8,res_g:0,res_p:0,
+      vehicle:'Toyota Hilux',status:'ANNOUNCED',returnLeg:true});
+    toast('Perjalanan balik diumumkan');
+  });
+  render();
+}
+
+function board(){
+  const open=S.kirims.filter(k=>k.status==='POSTED');
+  const t=S.trips[0];
+  return `<h2>Papan Kirim</h2>
+  <p class="sub">Permintaan yang lalu laluan awak — ${t.route}</p>
+  ${outboxBanner()}
+  ${open.length?open.map(k=>{
+    const q=k.quote, fits=t.res_g+k.weight_g<=t.cap_g && t.res_p+1<=t.cap_p;
+    const score=fits?87:42;
+    return `<div class="card">
+      <div class="row">
+        <div class="score">${score}</div>
+        <div style="flex:1">
+          <div style="font-weight:700;font-size:14px">${k.desc}</div>
+          <div style="font-size:11.5px;color:var(--grey);margin-top:2px">
+            ${cat(k.category).ms} · ${(k.weight_g/1000).toFixed(1)} kg · ${k.when}</div>
+        </div></div>
+      <div style="font-size:12px;color:var(--grey);margin:9px 0">
+        ${k.from} → ${k.to} · Detour 2.4 km</div>
+      <div class="between">
+        <div><div style="font-size:10.5px;color:var(--grey);font-weight:700">
+          PENDAPATAN AWAK</div>
+          <div style="font-size:18px;font-weight:800">${sen(q.carrier_earning)}</div></div>
+        <div style="text-align:right"><div style="font-size:10.5px;color:var(--grey);font-weight:700">
+          BELANJA DULU</div>
+          <div style="font-size:14px;font-weight:700">${sen(q.goods)}</div></div>
+      </div>
+      ${!fits?`<div class="banner err" style="margin:10px 0 0">
+        Muatan penuh — tak muat.</div>`:
+        `<button class="btn" onclick="accept('${k.id}')">Terima Kirim Ini</button>`}
+    </div>`}).join('')
+  :`<div class="empty"><span class="ic">📋</span>
+      Tiada permintaan sekarang.<br><small>Tukar ke Pelanggan dan buat satu kirim.</small></div>`}`;
+}
+
+function accept(id){
+  const k=S.kirims.find(x=>x.id===id), t=S.trips[0], q=k.quote;
+  // BR-908: float check before accepting a procurement advance
+  if(S.me.carrier.held + q.goods > S.me.carrier.float_limit){
+    toast('Had float terlampau — tak boleh terima'); return;
+  }
+  act('Terima kirim '+k.ref, ()=>{
+    reserve(t,k);                              // BR-903
+    S.me.carrier.held += q.goods;
+    k.status='PROCURING'; k.trip=t.id;
+    k.otp=String(Math.floor(100000+Math.random()*900000));
+    ev(k,'Rahman terima kirim ini','Muatan ditempah');
+    toast('Diterima — ruang ditempah');
+  });
+  render();
+}
+
+function manifest(){
+  const t=S.trips[0];
+  const mine=S.kirims.filter(k=>k.trip===t.id);
+  return `<button class="chip" style="background:var(--green-100);color:var(--green-700);margin-bottom:12px"
+      onclick="go('trip')">← Kembali</button>
+  <h2>Manifes Trip</h2><p class="sub">${t.route} · ${t.depart}</p>
+  <div class="banner ok">📥 Manifes disimpan — boleh guna tanpa talian.</div>
+  ${mine.map(k=>{
+    const q=k.quote;
+    return `<div class="card">
+      <div class="between"><span class="tag ${k.status==='COMPLETED'?'':'orange'}">${k.status}</span>
+        <small style="color:var(--grey)">${k.ref}</small></div>
+      <div style="font-weight:700;margin:7px 0 3px">${k.desc}</div>
+      <div style="font-size:12px;color:var(--grey)">
+        Untuk: Aisyah · ${k.to}<br>Had bajet: <b>${sen(q.goods)}</b></div>
+      ${k.status==='PROCURING'?`
+        <button class="btn" onclick="open({type:'purchase',id:'${k.id}'})">
+          Rekod Pembelian</button>`:''}
+      ${k.status==='VARIANCE'?`<div class="banner warn" style="margin:10px 0 0">
+        Menunggu keputusan Aisyah…</div>`:''}
+      ${k.status==='IN_TRANSIT'?`
+        <button class="btn" onclick="open({type:'handover',id:'${k.id}'})">
+          Serah Barang (QR / Kod)</button>`:''}
+      ${k.status==='DELIVERED'?`<div class="banner ok" style="margin:10px 0 0">
+        Diserah — menunggu Aisyah sahkan.</div>`:''}
+      ${k.settled?`<div class="banner ok" style="margin:10px 0 0">
+        Dibayar: kos ${sen(k.settled.actual)} + upah ${sen(k.settled.earning)}</div>`:''}
+    </div>`}).join('')}`;
+}
+
+function earnings(){
+  const done=S.kirims.filter(k=>k.settled);
+  const total=done.reduce((a,k)=>a+k.settled.earning,0);
+  const pend=S.kirims.filter(k=>k.trip&&!k.settled).reduce((a,k)=>a+k.quote.carrier_earning,0);
+  return `<h2>Pendapatan</h2><p class="sub">Rahman · Pembawa Komuniti Disahkan</p>
+  <div class="card" style="background:var(--green-900);color:var(--cream);border:0">
+    <div style="font-size:11.5px;opacity:.8">BOLEH DIKELUARKAN</div>
+    <div class="money" style="color:var(--gold)">${sen(total)}</div>
+    <div style="font-size:12px;opacity:.8;margin-top:5px">
+      Belum selesai: ${sen(pend)}</div>
+  </div>
+  <div class="card">
+    <div class="brk"><span>Wang tunai dipegang (COD)</span><b>${sen(S.me.carrier.held)}</b></div>
+    <div class="brk"><span class="g">Had float awak</span>
+      <span class="g">${sen(S.me.carrier.float_limit)}</span></div>
+    <div class="cap"><i style="width:${S.me.carrier.held/S.me.carrier.float_limit*100}%"></i></div>
+  </div>
+  <label>Lejar (bukti kira-kira)</label>
+  ${S.ledger.length?S.ledger.map(t=>`<div class="card">
+    <div style="font-weight:700;font-size:12.5px;margin-bottom:7px">${t.t}</div>
+    <div class="ledger">${t.e.map(([d,n,a])=>
+      `<div class="${d==='D'?'d':'c'}">${d==='D'?'DR':'  CR'} ${n}
+        <span style="float:right">${sen(a)}</span></div>`).join('')}</div>
+  </div>`).join(''):`<div class="empty"><span class="ic">📒</span>Belum ada urus niaga.</div>`}`;
+}
+
+function profile(){
+  const me=S.role==='customer'?S.me.customer:S.me.carrier;
+  const has=S.role==='customer'?S.me.customer.badges:['first'];
+  const B=[['first','🌱','Kirim Pertama'],['kirim1','📦','Kirim Siap'],
+           ['trust','🤝','Dipercayai'],['komuniti','🏡','Sokong Kampung']];
+  const done=S.kirims.filter(k=>k.settled).length;
+  return `<h2>${me.name}</h2><p class="sub">${me.place} · ⭐ ${me.rating}</p>
+  <div class="card">
+    <div class="row" style="text-align:center">
+      <div style="flex:1"><div style="font-size:21px;font-weight:800">${done}</div>
+        <small style="color:var(--grey);font-size:11px">Kirim Siap</small></div>
+      <div style="flex:1"><div style="font-size:21px;font-weight:800">
+        ${S.kirims.length}</div>
+        <small style="color:var(--grey);font-size:11px">Jumlah Kirim</small></div>
+      <div style="flex:1"><div style="font-size:21px;font-weight:800">2</div>
+        <small style="color:var(--grey);font-size:11px">Komuniti</small></div>
+    </div></div>
+  <label>Lencana</label>
+  <div class="card"><div class="row" style="justify-content:space-around">
+    ${B.map(([id,ic,n])=>`<div class="badge ${has.includes(id)?'':'lock'}">
+      <div class="b">${has.includes(id)?ic:'🔒'}</div><small>${n}</small></div>`).join('')}
+  </div></div>
+  <div class="banner info">
+    <b>Prototaip.</b> Semua kiraan duit di sini ikut peraturan sebenar:
+    komisen 25%, had bajet RM250, baki dipulangkan penuh.</div>`;
+}
+
+/* ══════════════ MODALS ══════════════ */
+const MODALS = {
+  purchase(m){
+    const k=S.kirims.find(x=>x.id===m.id), q=k.quote;
+    const val=m.val!=null?m.val:Math.round(q.goods*0.8);
+    const over=val>q.goods && !k.varianceApproved;
+    return `<div class="modal" onclick="if(event.target===this)close()"><div class="sheet">
+      <div class="grab"></div>
+      <h2>Rekod Pembelian</h2>
+      <p class="sub">${k.desc}</p>
+      <div class="card"><div class="brk"><span>Had bajet</span><b>${sen(q.goods)}</b></div></div>
+      <label>Harga sebenar dibeli</label>
+      <input type="number" value="${(val/100).toFixed(2)}"
+        oninput="S.modal.val=Math.round(this.value*100);render()">
+      <label>Resit / gambar harga</label>
+      <div class="card" style="text-align:center;color:var(--grey);font-size:13px">
+        📷 Gambar resit diambil</div>
+      ${over?`<div class="banner err">
+        <b>Melebihi had bajet.</b> Tak boleh teruskan tanpa kebenaran Aisyah.
+        <br>BR-913 — sekatan pangkalan data.</div>
+        <button class="btn" onclick="raiseVar('${k.id}',${val})">Tanya Aisyah Dulu</button>`
+      :`<div class="banner ok">Baki ${sen(Math.max(0,q.goods-val))} akan
+        dipulangkan kepada Aisyah.</div>
+        <button class="btn" onclick="recordBuy('${k.id}',${val})">Sahkan Pembelian</button>`}
+      <button class="btn ghost" onclick="close()">Batal</button>
+    </div></div>`;
+  },
+  handover(m){
+    const k=S.kirims.find(x=>x.id===m.id);
+    return `<div class="modal" onclick="if(event.target===this)close()"><div class="sheet">
+      <div class="grab"></div>
+      <h2>Serahan Barang</h2>
+      <p class="sub">Minta penerima tunjuk QR, atau baca kod 6 angka.</p>
+      <div class="qr">${qrSvg()}</div>
+      <div class="banner info">Kod penerima (untuk demo): <b>${k.otp}</b></div>
+      <label>Masukkan kod dari penerima</label>
+      <input class="otpin" maxlength="6" inputmode="numeric" id="otpField"
+        placeholder="000000">
+      <button class="btn" onclick="verifyOtp('${k.id}')">Sahkan Serahan</button>
+      <button class="btn ghost" onclick="deliverQr('${k.id}')">Imbas QR (auto)</button>
+      ${!S.online?`<div class="banner warn" style="margin-top:10px">
+        Tiada talian — serahan akan disimpan dan dihantar bila ada talian.</div>`:''}
+    </div></div>`;
+  }
+};
+function qrSvg(){
+  let c='';
+  for(let i=0;i<13;i++)for(let j=0;j<13;j++)
+    if((i*j+i+j)%3===0||((i<4||i>8)&&(j<4||j>8)&&(i%2===0)))
+      c+=`<rect x="${j*12}" y="${i*12}" width="12" height="12"/>`;
+  return `<svg viewBox="0 0 156 156" width="100%" height="100%" fill="#12261C">${c}</svg>`;
+}
+
+function recordBuy(id,val){
+  const k=S.kirims.find(x=>x.id===id);
+  act('Rekod pembelian '+k.ref, ()=>{
+    k.actual_goods_sen=val; k.status='IN_TRANSIT';
+    ev(k,'Barang dibeli',sen(val)+' — resit disimpan');
+    ev(k,'Dalam perjalanan ke '+k.to);
+  });
+  close();
+}
+function raiseVar(id,val){
+  const k=S.kirims.find(x=>x.id===id);
+  act('Minta kebenaran harga '+k.ref, ()=>{
+    k.status='VARIANCE';
+    k.variance={market:val,note:'Musim hujan, harga udang naik di pasar Beluran.'};
+    ev(k,'Pembawa minta kebenaran harga',sen(val));
+    toast('Aisyah akan ditanya');
+  });
+  close();
+}
+function verifyOtp(id){
+  const k=S.kirims.find(x=>x.id===id);
+  const v=document.getElementById('otpField').value;
+  if(v!==k.otp){ toast('Kod salah — cuba lagi'); return; }
+  deliverQr(id);
+}
+function deliverQr(id){
+  const k=S.kirims.find(x=>x.id===id);
+  act('Serahan '+k.ref, ()=>{
+    k.status='DELIVERED';
+    ev(k,'Diserah kepada penerima', S.online?'Bukti: kod sah':'Bukti disimpan luar talian');
+  });
+  close();
+}
+
+/* ══════════════ TABS ══════════════ */
+const SCREENS = { wizard, confirm:confirmScreen, kirim:kirimDetail, manifest };
+const TABS = {
+  customer:{
+    home:{ic:'🏠',ms:'Utama',view:custHome},
+    papan:{ic:'📋',ms:'Papan',view:()=>`<h2>Papan Kirim</h2>
+      <p class="sub">Semua permintaan komuniti</p>
+      ${S.kirims.length?S.kirims.map(k=>kirimCard(k)).join(''):
+        `<div class="empty"><span class="ic">📋</span>Papan masih kosong.</div>`}`},
+    profil:{ic:'👤',ms:'Profil',view:profile}
+  },
+  carrier:{
+    trip:{ic:'🚚',ms:'Trip',view:carrierHome},
+    papan:{ic:'📋',ms:'Papan',view:board},
+    duit:{ic:'💰',ms:'Duit',view:earnings},
+    profil:{ic:'👤',ms:'Profil',view:profile}
+  }
+};
+
+$('#roleBtn').onclick=()=>{ S.role=S.role==='customer'?'carrier':'customer';
+  S.tab=Object.keys(TABS[S.role])[0]; S.screen=null; S.modal=null; render(); };
+$('#netBtn').onclick=()=>{ S.online=!S.online; if(S.online) flush(); else render(); };
+
+render();
+</script>
+</body>
+</html>

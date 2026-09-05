@@ -1,0 +1,88 @@
+name: PR
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  database:
+    name: Schema + RLS matrix
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with: { version: latest }
+
+      # Applies 0000 -> 0004 + seed from an empty database. Catches ordering
+      # bugs, which is the failure mode this project is most exposed to.
+      - name: Start stack and apply migrations from zero
+        run: |
+          supabase start
+          supabase db reset --debug
+
+      - name: pgTAP
+        run: supabase test db
+
+      # A table without policies is a data breach waiting to happen, so an
+      # unprotected table fails the build rather than shipping.
+      - name: Every public table has RLS
+        run: |
+          supabase db query --file - <<'SQL'
+          DO $$
+          DECLARE bad TEXT;
+          BEGIN
+            SELECT string_agg(c.relname, ', ') INTO bad
+            FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+            WHERE n.nspname = 'public' AND c.relkind = 'r' AND NOT c.relrowsecurity;
+            IF bad IS NOT NULL THEN
+              RAISE EXCEPTION 'Tables without RLS: %', bad;
+            END IF;
+          END $$;
+          SQL
+
+      # Bare auth.uid() re-evaluates per row and turns an index seek into a
+      # sequential scan. See SECURITY.md 4.2.
+      - name: No bare auth.uid() in policies
+        run: |
+          if grep -rn "auth\.uid()" supabase/migrations \
+             | grep -v "SELECT auth.uid()" | grep -v "^.*--"; then
+            echo "Policies must use (SELECT auth.uid())"; exit 1
+          fi
+
+      - name: internal and audit are not exposed via PostgREST
+        run: |
+          grep -q 'schemas = \["public", "graphql_public"\]' supabase/config.toml \
+            || { echo "config.toml exposes extra schemas"; exit 1; }
+
+  mobile:
+    name: Typecheck + size gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: npm }
+      - run: npm ci --prefix apps/mobile
+      - run: npm run typecheck --prefix apps/mobile
+
+      # iOS is out of scope. An accidental iOS target is a scope leak.
+      - name: No iOS targets
+        run: |
+          if [ -d apps/mobile/ios ] || grep -q '"ios"' apps/mobile/app.json; then
+            echo "iOS is out of scope"; exit 1
+          fi
+
+  security:
+    name: Secrets
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: gitleaks/gitleaks-action@v2
+
+      # A leaked service-role key is total compromise, so it is checked
+      # mechanically rather than trusted to code review.
+      - name: Service role key never in client code
+        run: |
+          if grep -rn "SUPABASE_SERVICE_ROLE" apps/mobile/src apps/mobile/app 2>/dev/null; then
+            echo "service_role key referenced in client code"; exit 1
+          fi

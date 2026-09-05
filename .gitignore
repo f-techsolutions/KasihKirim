@@ -1,0 +1,58 @@
+# ── Dependencies ────────────────────────────────────────────────────────────
+node_modules/
+.pnp
+.pnp.js
+
+# ── Secrets — NEVER commit ──────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.keystore
+*.jks
+google-services.json
+play-service-account.json
+service-account*.json
+
+# ── Expo / React Native ─────────────────────────────────────────────────────
+.expo/
+.expo-shared/
+dist/
+web-build/
+*.tsbuildinfo
+
+# ── Android ─────────────────────────────────────────────────────────────────
+apps/mobile/android/
+apps/mobile/ios/
+*.apk
+*.aab
+local.properties
+.gradle/
+build/
+
+# ── Supabase local state ────────────────────────────────────────────────────
+supabase/.branches/
+supabase/.temp/
+supabase/.env
+.supabase/
+
+# ── CI / logs ───────────────────────────────────────────────────────────────
+ci-logs/
+db-reset.log
+db-tests.log
+*.log
+npm-debug.*
+yarn-error.log
+
+# ── OS / editor ─────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+
+# ── Coverage ────────────────────────────────────────────────────────────────
+coverage/
+.nyc_output/
