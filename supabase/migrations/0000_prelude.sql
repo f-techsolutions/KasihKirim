@@ -42,50 +42,80 @@ END $$;
 CREATE SCHEMA IF NOT EXISTS internal;
 CREATE SCHEMA IF NOT EXISTS audit;
 CREATE SCHEMA IF NOT EXISTS ref;
+-- Authorisation helpers live here, NOT in auth: schema auth is owned by
+-- supabase_admin and the migration role (postgres) has USAGE but not CREATE,
+-- so CREATE FUNCTION auth.* fails with 42501. Not in public either: these are
+-- plumbing, and public is the PostgREST surface.
+CREATE SCHEMA IF NOT EXISTS authz;
 
 REVOKE ALL ON SCHEMA internal FROM anon, authenticated;
 REVOKE ALL ON SCHEMA audit    FROM anon, authenticated;
 GRANT  USAGE ON SCHEMA ref    TO authenticated;
+-- authenticated only. Every one of the 37 policy call sites is TO authenticated;
+-- no policy is TO anon, and service_role reaches these only through
+-- SECURITY DEFINER rpc_* functions that execute as the owner.
+GRANT  USAGE ON SCHEMA authz  TO authenticated;
 
 -- Reminder: supabase/config.toml exposes ONLY ["public","graphql_public"].
--- internal/audit/ref are unreachable through PostgREST regardless of policy.
+-- internal/audit/ref/authz are unreachable through PostgREST regardless of
+-- policy. USAGE on authz does not expose it to the API; exposure is governed
+-- solely by the config.toml schema list.
 
--- ── Auth helpers ────────────────────────────────────────────────────────────
+-- ── Authorisation helpers (schema authz) ────────────────────────────────────
 -- STABLE so the planner evaluates them once per statement, not once per row.
 -- All read the JWT claim; none join a table. This is what keeps board queries
 -- from degrading into a per-row subquery. See SECURITY.md §4.
+--
+-- SECURITY INVOKER (the default) is deliberate and must stay: they read only
+-- the session GUC request.jwt.claims, so they touch nothing the caller cannot
+-- already see in their own token. SECURITY DEFINER would grant privilege for
+-- no purpose.
 
-CREATE OR REPLACE FUNCTION auth.user_roles() RETURNS text[]
+CREATE OR REPLACE FUNCTION authz.user_roles() RETURNS text[]
 LANGUAGE sql STABLE AS $$
   SELECT COALESCE(ARRAY(SELECT jsonb_array_elements_text(
     NULLIF(current_setting('request.jwt.claims', true), '')::jsonb
       -> 'app_metadata' -> 'roles')), '{}');
 $$;
 
-CREATE OR REPLACE FUNCTION auth.has_role(p text) RETURNS boolean
-LANGUAGE sql STABLE AS $$ SELECT p = ANY(auth.user_roles()); $$;
+CREATE OR REPLACE FUNCTION authz.has_role(p text) RETURNS boolean
+LANGUAGE sql STABLE AS $$ SELECT p = ANY(authz.user_roles()); $$;
 
-CREATE OR REPLACE FUNCTION auth.is_admin() RETURNS boolean
+CREATE OR REPLACE FUNCTION authz.is_admin() RETURNS boolean
 LANGUAGE sql STABLE AS $$
-  SELECT EXISTS (SELECT 1 FROM unnest(auth.user_roles()) r WHERE r LIKE 'admin\_%');
+  SELECT EXISTS (SELECT 1 FROM unnest(authz.user_roles()) r WHERE r LIKE 'admin\_%');
 $$;
 
-CREATE OR REPLACE FUNCTION auth.my_carrier_id() RETURNS uuid
+CREATE OR REPLACE FUNCTION authz.my_carrier_id() RETURNS uuid
 LANGUAGE sql STABLE AS $$
   SELECT NULLIF(current_setting('request.jwt.claims', true)::jsonb
     -> 'app_metadata' ->> 'carrier_id', '')::uuid;
 $$;
 
-CREATE OR REPLACE FUNCTION auth.my_seller_id() RETURNS uuid
+CREATE OR REPLACE FUNCTION authz.my_seller_id() RETURNS uuid
 LANGUAGE sql STABLE AS $$
   SELECT NULLIF(current_setting('request.jwt.claims', true)::jsonb
     -> 'app_metadata' ->> 'seller_id', '')::uuid;
 $$;
 
+-- Postgres grants EXECUTE to PUBLIC on every new function, so revoke first,
+-- then grant narrowly. authenticated is the only role that calls these
+-- directly: all 37 policy call sites are TO authenticated, and the two
+-- SECURITY INVOKER trigger functions that call is_admin() run as the
+-- authenticated user performing the UPDATE.
+--   anon                : no policy is TO anon.
+--   service_role        : BYPASSRLS, so policies never evaluate for it; it
+--                         reaches these only via SECURITY DEFINER rpc_*.
+--   supabase_auth_admin : the access-token hook calls none of these.
+REVOKE EXECUTE ON FUNCTION
+  authz.user_roles(), authz.has_role(text), authz.is_admin(),
+  authz.my_carrier_id(), authz.my_seller_id()
+FROM PUBLIC, anon;
+
 GRANT EXECUTE ON FUNCTION
-  auth.user_roles(), auth.has_role(text), auth.is_admin(),
-  auth.my_carrier_id(), auth.my_seller_id()
-TO authenticated, anon, service_role;
+  authz.user_roles(), authz.has_role(text), authz.is_admin(),
+  authz.my_carrier_id(), authz.my_seller_id()
+TO authenticated;
 
 -- ── Shared touch trigger ────────────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION internal.tg_touch()

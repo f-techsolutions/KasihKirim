@@ -244,7 +244,7 @@ CREATE OR REPLACE FUNCTION public.rpc_send_capacity_invite(
   p_target UUID DEFAULT NULL, p_message TEXT DEFAULT NULL)
 RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
 DECLARE
-  v_carrier UUID := auth.my_carrier_id(); t public.trips;
+  v_carrier UUID := authz.my_carrier_id(); t public.trips;
   v_invite UUID; v_free_g INT; v_sent INT := 0;
 BEGIN
   IF v_carrier IS NULL THEN RAISE EXCEPTION 'STATE_ACTOR_NOT_PERMITTED'; END IF;
@@ -419,12 +419,12 @@ ALTER TABLE public.carrier_stock_lots    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.trip_listings         ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY invites_select ON public.capacity_invites FOR SELECT TO authenticated
-  USING (carrier_id = auth.my_carrier_id()
+  USING (carrier_id = authz.my_carrier_id()
          OR target_user_id = (SELECT auth.uid())
          OR EXISTS (SELECT 1 FROM public.community_members cm
                     WHERE cm.community_id = capacity_invites.community_id
                       AND cm.user_id = (SELECT auth.uid()))
-         OR auth.is_admin());
+         OR authz.is_admin());
 REVOKE INSERT, UPDATE, DELETE ON public.capacity_invites FROM authenticated, anon;
 
 CREATE POLICY invite_resp_own ON public.invite_responses FOR ALL TO authenticated
@@ -432,27 +432,27 @@ CREATE POLICY invite_resp_own ON public.invite_responses FOR ALL TO authenticate
 
 CREATE POLICY restock_parties ON public.restock_requests FOR SELECT TO authenticated
   USING (supplier_id = (SELECT auth.uid())
-         OR carrier_id = auth.my_carrier_id() OR auth.is_admin());
+         OR carrier_id = authz.my_carrier_id() OR authz.is_admin());
 
 CREATE POLICY promotions_own ON public.promotions FOR SELECT TO authenticated
-  USING (promoter_id = (SELECT auth.uid()) OR auth.is_admin());
+  USING (promoter_id = (SELECT auth.uid()) OR authz.is_admin());
 REVOKE INSERT, UPDATE, DELETE ON public.promotions FROM authenticated, anon;
 
 CREATE POLICY attributions_own ON public.promotion_attributions FOR SELECT TO authenticated
   USING (EXISTS (SELECT 1 FROM public.promotions p
                  WHERE p.id = promotion_attributions.promotion_id
                    AND p.promoter_id = (SELECT auth.uid()))
-         OR auth.is_admin());
+         OR authz.is_admin());
 REVOKE INSERT, UPDATE, DELETE ON public.promotion_attributions FROM authenticated, anon;
 
 -- Buyers see ACTIVE lots. cost_basis_sen is hidden by the view, not the policy
 -- (FR-447) — a policy filters rows, not columns.
 CREATE POLICY lots_select ON public.carrier_stock_lots FOR SELECT TO authenticated
-  USING (carrier_id = auth.my_carrier_id() OR auth.is_admin()
+  USING (carrier_id = authz.my_carrier_id() OR authz.is_admin()
          OR (status='ACTIVE' AND (sell_by IS NULL OR sell_by > now())));
 CREATE POLICY lots_write ON public.carrier_stock_lots FOR ALL TO authenticated
-  USING (carrier_id = auth.my_carrier_id())
-  WITH CHECK (carrier_id = auth.my_carrier_id());
+  USING (carrier_id = authz.my_carrier_id())
+  WITH CHECK (carrier_id = authz.my_carrier_id());
 
 CREATE VIEW public.v_lot_listings WITH (security_barrier=true) AS
   SELECT l.id, l.carrier_id, l.seller_id, l.trip_id, l.title, l.category_id,
@@ -464,7 +464,7 @@ CREATE VIEW public.v_lot_listings WITH (security_barrier=true) AS
 GRANT SELECT ON public.v_lot_listings TO authenticated;
 
 CREATE POLICY listings_select ON public.trip_listings FOR SELECT TO authenticated
-  USING (is_active OR auth.is_admin());
+  USING (is_active OR authz.is_admin());
 
 GRANT EXECUTE ON FUNCTION
   public.rpc_send_capacity_invite(UUID,TEXT,UUID,UUID,TEXT),
@@ -500,7 +500,7 @@ CREATE POLICY inventory_moves_own ON public.inventory_movements
       SELECT p.id FROM public.products p
       JOIN public.sellers s ON s.id = p.seller_id
       WHERE s.user_id = (SELECT auth.uid()))
-    OR auth.is_admin());
+    OR authz.is_admin());
 -- Writes stay closed: movements are append-only via internal.fn_adjust_inventory.
 REVOKE INSERT, UPDATE, DELETE ON public.inventory_movements FROM authenticated, anon;
 
@@ -509,5 +509,5 @@ REVOKE INSERT, UPDATE, DELETE ON public.inventory_movements FROM authenticated, 
 -- table would silently return nothing.
 CREATE POLICY user_roles_own ON public.user_roles
   FOR SELECT TO authenticated
-  USING (user_id = (SELECT auth.uid()) OR auth.is_admin());
+  USING (user_id = (SELECT auth.uid()) OR authz.is_admin());
 REVOKE INSERT, UPDATE, DELETE ON public.user_roles FROM authenticated, anon;

@@ -221,15 +221,15 @@ ALTER TABLE public.cart_items               ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.delivery_tracking_points ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY agents_select ON public.agents FOR SELECT TO authenticated
-  USING (status = 'APPROVED' OR user_id = (SELECT auth.uid()) OR auth.is_admin());
+  USING (status = 'APPROVED' OR user_id = (SELECT auth.uid()) OR authz.is_admin());
 
 CREATE POLICY offers_select ON public.delivery_offers FOR SELECT TO authenticated
   USING (
-    carrier_id = auth.my_carrier_id()
+    carrier_id = authz.my_carrier_id()
     OR EXISTS (SELECT 1 FROM public.kirim_requests k
                WHERE k.id = delivery_offers.kirim_id
                  AND k.requester_id = (SELECT auth.uid()))
-    OR auth.is_admin()
+    OR authz.is_admin()
   );
 -- No INSERT/UPDATE policy: offers are created and resolved only by
 -- internal.fn_make_offer / fn_accept_offer. (BR-904 pattern)
@@ -246,13 +246,13 @@ CREATE POLICY cart_items_own ON public.cart_items FOR ALL TO authenticated
 
 CREATE POLICY tracking_select ON public.delivery_tracking_points FOR SELECT TO authenticated
   USING (
-    carrier_id = auth.my_carrier_id()
+    carrier_id = authz.my_carrier_id()
     OR EXISTS (SELECT 1 FROM public.deliveries d
                JOIN public.kirim_requests k ON k.id = d.kirim_id
                WHERE d.trip_id = delivery_tracking_points.trip_id
                  AND k.requester_id = (SELECT auth.uid())
                  AND d.status IN ('IN_TRANSIT','OUT_FOR_DELIVERY'))
-    OR auth.is_admin()
+    OR authz.is_admin()
   );
 REVOKE UPDATE, DELETE ON public.delivery_tracking_points FROM authenticated, anon;
 

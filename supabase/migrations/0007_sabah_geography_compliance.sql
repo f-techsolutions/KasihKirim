@@ -379,20 +379,20 @@ ALTER TABLE public.seller_licences   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.seller_categories ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY service_areas_read ON public.service_areas FOR SELECT TO authenticated
-  USING (status IN ('PILOT','ACTIVE') OR auth.is_admin());
+  USING (status IN ('PILOT','ACTIVE') OR authz.is_admin());
 CREATE POLICY pickup_points_read ON public.pickup_points FOR SELECT TO authenticated
-  USING (is_active OR auth.is_admin());
+  USING (is_active OR authz.is_admin());
 
 -- KYC-class documents: owner writes, compliance reads. Every read is audited.
 CREATE POLICY seller_docs_own ON public.seller_documents FOR SELECT TO authenticated
   USING (seller_id IN (SELECT id FROM public.sellers WHERE user_id=(SELECT auth.uid()))
-         OR auth.has_role('admin_compliance'));
+         OR authz.has_role('admin_compliance'));
 CREATE POLICY seller_docs_insert ON public.seller_documents FOR INSERT TO authenticated
   WITH CHECK (seller_id IN (SELECT id FROM public.sellers WHERE user_id=(SELECT auth.uid())));
 
 CREATE POLICY seller_licences_own ON public.seller_licences FOR SELECT TO authenticated
   USING (seller_id IN (SELECT id FROM public.sellers WHERE user_id=(SELECT auth.uid()))
-         OR auth.has_role('admin_compliance') OR auth.has_role('admin_ops'));
+         OR authz.has_role('admin_compliance') OR authz.has_role('admin_ops'));
 CREATE POLICY seller_licences_insert ON public.seller_licences FOR INSERT TO authenticated
   WITH CHECK (seller_id IN (SELECT id FROM public.sellers WHERE user_id=(SELECT auth.uid())));
 -- Verification is an admin act only.
@@ -400,7 +400,7 @@ REVOKE UPDATE, DELETE ON public.seller_licences FROM authenticated, anon;
 
 CREATE POLICY seller_cats_own ON public.seller_categories FOR SELECT TO authenticated
   USING (seller_id IN (SELECT id FROM public.sellers WHERE user_id=(SELECT auth.uid()))
-         OR auth.is_admin());
+         OR authz.is_admin());
 REVOKE INSERT, UPDATE, DELETE ON public.seller_categories FROM authenticated, anon;
 
 -- Compliance tables are read-only reference data; only admins mutate them,

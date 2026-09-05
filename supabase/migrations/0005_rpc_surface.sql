@@ -74,7 +74,7 @@ CREATE OR REPLACE FUNCTION public.rpc_accept_offer(
   p_trip UUID, p_kirim UUID, p_idempotency_key TEXT DEFAULT NULL)
 RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
 DECLARE
-  v_carrier UUID := auth.my_carrier_id();
+  v_carrier UUID := authz.my_carrier_id();
   k public.kirim_requests; q internal.quotes;
   v_res UUID; v_delivery UUID; v_advance BIGINT;
 BEGIN
@@ -131,7 +131,7 @@ CREATE OR REPLACE FUNCTION public.rpc_delivery_transition(
 RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
 DECLARE v_role ref.user_role; v_new ref.kirim_status; v_roles TEXT[];
 BEGIN
-  v_roles := auth.user_roles();
+  v_roles := authz.user_roles();
   IF array_length(v_roles,1) IS NULL THEN RAISE EXCEPTION 'STATE_ACTOR_NOT_PERMITTED'; END IF;
 
   -- Pick the role that this specific transition permits, from the roles the
@@ -158,7 +158,7 @@ END $$;
 /** Carrier earnings, derived from the ledger without exposing it. */
 CREATE OR REPLACE FUNCTION public.rpc_my_earnings()
 RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
-DECLARE v_carrier UUID := auth.my_carrier_id();
+DECLARE v_carrier UUID := authz.my_carrier_id();
 BEGIN
   IF v_carrier IS NULL THEN RETURN jsonb_build_object('available_sen',0,'pending_sen',0); END IF;
   RETURN (

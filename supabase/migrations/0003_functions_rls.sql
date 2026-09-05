@@ -4,10 +4,18 @@
 -- ============================================================================
 
 -- ════════════════════════════════════════════════════════════════════════════
--- AUTH HOOK  (helpers themselves live in 0000_prelude.sql)
+-- AUTH HOOK  (authorisation helpers live in schema authz, 0000_prelude.sql)
+--
+-- The hook lives in PUBLIC, not authz and not auth:
+--   auth   - owned by supabase_admin; the migration role cannot CREATE there.
+--   public - the documented Supabase location for an access-token hook, and
+--            supabase_auth_admin already holds USAGE on it.
+-- It is PostgREST-reachable by virtue of being in public, so EXECUTE is
+-- revoked from authenticated/anon/PUBLIC below and granted only to
+-- supabase_auth_admin.
 -- ════════════════════════════════════════════════════════════════════════════
 -- JWT enrichment: roles in the claim, not a join in every policy.
-CREATE OR REPLACE FUNCTION auth.custom_access_token_hook(event jsonb)
+CREATE OR REPLACE FUNCTION public.custom_access_token_hook(event jsonb)
 RETURNS jsonb LANGUAGE plpgsql STABLE AS $$
 DECLARE v_roles text[]; v_meta jsonb; v_uid uuid := (event->>'user_id')::uuid;
 BEGIN
@@ -29,8 +37,8 @@ END $$;
 -- reads a role claim silently denies. Symptom: a logged-in user sees an empty
 -- app with no error. Easy to misdiagnose for hours.
 GRANT USAGE  ON SCHEMA public TO supabase_auth_admin;
-GRANT EXECUTE ON FUNCTION auth.custom_access_token_hook(jsonb) TO supabase_auth_admin;
-REVOKE EXECUTE ON FUNCTION auth.custom_access_token_hook(jsonb) FROM authenticated, anon, public;
+GRANT EXECUTE ON FUNCTION public.custom_access_token_hook(jsonb) TO supabase_auth_admin;
+REVOKE EXECUTE ON FUNCTION public.custom_access_token_hook(jsonb) FROM authenticated, anon, PUBLIC;
 GRANT SELECT ON public.user_roles, public.carriers, public.sellers, public.profiles
   TO supabase_auth_admin;
 
@@ -143,7 +151,7 @@ CREATE TRIGGER tg_kirim_budget_cap
 CREATE OR REPLACE FUNCTION internal.tg_protect_profile_columns()
 RETURNS TRIGGER LANGUAGE plpgsql AS $$
 BEGIN
-  IF auth.is_admin() THEN RETURN NEW; END IF;
+  IF authz.is_admin() THEN RETURN NEW; END IF;
   NEW.status := OLD.status;
   NEW.rating_avg := OLD.rating_avg;
   NEW.rating_count := OLD.rating_count;
@@ -160,7 +168,7 @@ CREATE TRIGGER tg_profiles_protect BEFORE UPDATE ON public.profiles
 CREATE OR REPLACE FUNCTION internal.tg_protect_trip_capacity()
 RETURNS TRIGGER LANGUAGE plpgsql AS $$
 BEGIN
-  IF auth.is_admin() THEN RETURN NEW; END IF;
+  IF authz.is_admin() THEN RETURN NEW; END IF;
   NEW.reserved_weight_grams := OLD.reserved_weight_grams;
   NEW.reserved_volume_cm3   := OLD.reserved_volume_cm3;
   NEW.reserved_parcels      := OLD.reserved_parcels;
@@ -408,7 +416,7 @@ END $$;
 
 -- profiles
 CREATE POLICY profiles_select ON public.profiles FOR SELECT TO authenticated
-  USING (id = (SELECT auth.uid()) OR auth.is_admin());
+  USING (id = (SELECT auth.uid()) OR authz.is_admin());
 CREATE POLICY profiles_update ON public.profiles FOR UPDATE TO authenticated
   USING (id = (SELECT auth.uid())) WITH CHECK (id = (SELECT auth.uid()));
 
@@ -432,28 +440,28 @@ CREATE POLICY communities_read ON public.communities FOR SELECT TO authenticated
 
 -- carriers / vehicles
 CREATE POLICY carriers_select ON public.carriers FOR SELECT TO authenticated
-  USING (user_id = (SELECT auth.uid()) OR status='APPROVED' OR auth.is_admin());
+  USING (user_id = (SELECT auth.uid()) OR status='APPROVED' OR authz.is_admin());
 CREATE POLICY vehicles_own ON public.vehicles FOR ALL TO authenticated
-  USING (carrier_id = auth.my_carrier_id()) WITH CHECK (carrier_id = auth.my_carrier_id());
+  USING (carrier_id = authz.my_carrier_id()) WITH CHECK (carrier_id = authz.my_carrier_id());
 
 -- trips: own, plus the public board
 CREATE POLICY trips_select ON public.trips FOR SELECT TO authenticated
-  USING (carrier_id = auth.my_carrier_id()
-         OR status IN ('ANNOUNCED','BOARDING') OR auth.is_admin());
+  USING (carrier_id = authz.my_carrier_id()
+         OR status IN ('ANNOUNCED','BOARDING') OR authz.is_admin());
 CREATE POLICY trips_insert ON public.trips FOR INSERT TO authenticated
-  WITH CHECK (carrier_id = auth.my_carrier_id());
+  WITH CHECK (carrier_id = authz.my_carrier_id());
 CREATE POLICY trips_update ON public.trips FOR UPDATE TO authenticated
-  USING (carrier_id = auth.my_carrier_id() AND status <> 'DEPARTED')
-  WITH CHECK (carrier_id = auth.my_carrier_id());
+  USING (carrier_id = authz.my_carrier_id() AND status <> 'DEPARTED')
+  WITH CHECK (carrier_id = authz.my_carrier_id());
 
 -- kirim: own + board. Carriers see the item, NOT the requester's contact details.
 CREATE POLICY kirim_select ON public.kirim_requests FOR SELECT TO authenticated
   USING (
     requester_id = (SELECT auth.uid())
-    OR (status='POSTED' AND visibility='board' AND deleted_at IS NULL AND auth.has_role('carrier'))
+    OR (status='POSTED' AND visibility='board' AND deleted_at IS NULL AND authz.has_role('carrier'))
     OR EXISTS (SELECT 1 FROM public.deliveries d
-               WHERE d.kirim_id = kirim_requests.id AND d.carrier_id = auth.my_carrier_id())
-    OR auth.is_admin());
+               WHERE d.kirim_id = kirim_requests.id AND d.carrier_id = authz.my_carrier_id())
+    OR authz.is_admin());
 CREATE POLICY kirim_insert ON public.kirim_requests FOR INSERT TO authenticated
   WITH CHECK (requester_id = (SELECT auth.uid()) AND status='DRAFT');
 CREATE POLICY kirim_update_draft ON public.kirim_requests FOR UPDATE TO authenticated
@@ -462,21 +470,21 @@ CREATE POLICY kirim_update_draft ON public.kirim_requests FOR UPDATE TO authenti
 
 -- deliveries: read-only to counterparties. NO write policy exists. (BR-904)
 CREATE POLICY deliveries_select ON public.deliveries FOR SELECT TO authenticated
-  USING (carrier_id = auth.my_carrier_id()
+  USING (carrier_id = authz.my_carrier_id()
          OR EXISTS (SELECT 1 FROM public.kirim_requests k
                     WHERE k.id = deliveries.kirim_id AND k.requester_id = (SELECT auth.uid()))
-         OR auth.is_admin());
+         OR authz.is_admin());
 
 CREATE POLICY devents_select ON public.delivery_events FOR SELECT TO authenticated
   USING (EXISTS (SELECT 1 FROM public.deliveries d
                  WHERE d.id = delivery_events.delivery_id
-                   AND (d.carrier_id = auth.my_carrier_id()
+                   AND (d.carrier_id = authz.my_carrier_id()
                         OR EXISTS (SELECT 1 FROM public.kirim_requests k
                                    WHERE k.id=d.kirim_id AND k.requester_id=(SELECT auth.uid())))));
 
 CREATE POLICY reservations_select ON public.trip_reservations FOR SELECT TO authenticated
   USING (EXISTS (SELECT 1 FROM public.trips t
-                 WHERE t.id = trip_reservations.trip_id AND t.carrier_id = auth.my_carrier_id())
+                 WHERE t.id = trip_reservations.trip_id AND t.carrier_id = authz.my_carrier_id())
          OR EXISTS (SELECT 1 FROM public.kirim_requests k
                     WHERE k.id = trip_reservations.kirim_id AND k.requester_id=(SELECT auth.uid())));
 
@@ -484,7 +492,7 @@ CREATE POLICY variances_select ON public.price_variances FOR SELECT TO authentic
   USING (raised_by = (SELECT auth.uid())
          OR EXISTS (SELECT 1 FROM public.kirim_requests k
                     WHERE k.id = price_variances.kirim_id AND k.requester_id=(SELECT auth.uid()))
-         OR auth.is_admin());
+         OR authz.is_admin());
 
 -- handover_codes: NEVER readable by anyone. No SELECT policy at all.
 REVOKE ALL ON public.handover_codes FROM authenticated, anon;
@@ -492,7 +500,7 @@ REVOKE ALL ON public.handover_codes FROM authenticated, anon;
 CREATE POLICY proofs_select ON public.proofs FOR SELECT TO authenticated
   USING (EXISTS (SELECT 1 FROM public.deliveries d
                  WHERE d.id = proofs.delivery_id
-                   AND (d.carrier_id = auth.my_carrier_id()
+                   AND (d.carrier_id = authz.my_carrier_id()
                         OR EXISTS (SELECT 1 FROM public.kirim_requests k
                                    WHERE k.id=d.kirim_id AND k.requester_id=(SELECT auth.uid())))));
 
@@ -500,13 +508,13 @@ CREATE POLICY proofs_select ON public.proofs FOR SELECT TO authenticated
 CREATE POLICY products_select ON public.products FOR SELECT TO authenticated
   USING (status='active' AND deleted_at IS NULL
          OR seller_id IN (SELECT id FROM public.sellers WHERE user_id=(SELECT auth.uid()))
-         OR auth.is_admin());
+         OR authz.is_admin());
 CREATE POLICY products_write ON public.products FOR ALL TO authenticated
   USING (seller_id IN (SELECT id FROM public.sellers WHERE user_id=(SELECT auth.uid())))
   WITH CHECK (seller_id IN (SELECT id FROM public.sellers WHERE user_id=(SELECT auth.uid())));
 CREATE POLICY product_images_read ON public.product_images FOR SELECT TO authenticated USING (true);
 CREATE POLICY sellers_select ON public.sellers FOR SELECT TO authenticated
-  USING (status='APPROVED' OR user_id=(SELECT auth.uid()) OR auth.is_admin());
+  USING (status='APPROVED' OR user_id=(SELECT auth.uid()) OR authz.is_admin());
 CREATE POLICY inventory_own ON public.inventory FOR SELECT TO authenticated
   USING (product_id IN (SELECT p.id FROM public.products p
                         JOIN public.sellers s ON s.id=p.seller_id
@@ -515,7 +523,7 @@ CREATE POLICY inventory_own ON public.inventory FOR SELECT TO authenticated
 CREATE POLICY orders_select ON public.orders FOR SELECT TO authenticated
   USING (buyer_id=(SELECT auth.uid())
          OR seller_id IN (SELECT id FROM public.sellers WHERE user_id=(SELECT auth.uid()))
-         OR auth.is_admin());
+         OR authz.is_admin());
 CREATE POLICY order_items_select ON public.order_items FOR SELECT TO authenticated
   USING (EXISTS (SELECT 1 FROM public.orders o WHERE o.id=order_items.order_id
                  AND (o.buyer_id=(SELECT auth.uid())
@@ -529,14 +537,14 @@ CREATE POLICY campaigns_read ON public.voucher_campaigns FOR SELECT TO authentic
   USING (is_active AND now() BETWEEN starts_at AND ends_at);
 
 CREATE POLICY reviews_select ON public.reviews FOR SELECT TO authenticated
-  USING (is_visible OR rater_id=(SELECT auth.uid()) OR auth.is_admin());
+  USING (is_visible OR rater_id=(SELECT auth.uid()) OR authz.is_admin());
 CREATE POLICY reviews_insert ON public.reviews FOR INSERT TO authenticated
   WITH CHECK (rater_id=(SELECT auth.uid())
     AND EXISTS (SELECT 1 FROM public.deliveries d
                 WHERE d.id=reviews.delivery_id AND d.status='COMPLETED'));
 
 CREATE POLICY disputes_select ON public.disputes FOR SELECT TO authenticated
-  USING (raised_by=(SELECT auth.uid()) OR against_id=(SELECT auth.uid()) OR auth.is_admin());
+  USING (raised_by=(SELECT auth.uid()) OR against_id=(SELECT auth.uid()) OR authz.is_admin());
 
 CREATE POLICY conv_select ON public.conversations FOR SELECT TO authenticated
   USING (EXISTS (SELECT 1 FROM public.conversation_participants cp
