@@ -30,7 +30,7 @@ concurrency:
 
 env:
   # Pinned for reproducibility. Bump deliberately, never floating.
-  SUPABASE_CLI_VERSION: "2.2.1"
+  SUPABASE_CLI_VERSION: "2.107.0"
   DENO_VERSION: "v2.1.4"
   PG_CLIENT_MAJOR: "16"
 

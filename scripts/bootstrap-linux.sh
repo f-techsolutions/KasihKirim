@@ -9,7 +9,7 @@
 # ============================================================================
 set -euo pipefail
 NODE_MAJOR=20
-SUPABASE_VERSION="${SUPABASE_VERSION:-2.2.1}"
+SUPABASE_VERSION="${SUPABASE_VERSION:-2.107.0}"
 
 echo "── base packages ──"
 sudo apt-get update -qq

@@ -5,7 +5,7 @@ set -euo pipefail
 echo "── Supabase CLI ──"
 # Installed from the release tarball rather than npm: the npm package is
 # deprecated for global install and the tarball works behind a proxy.
-SUPABASE_VERSION="${SUPABASE_VERSION:-2.2.1}"
+SUPABASE_VERSION="${SUPABASE_VERSION:-2.107.0}"
 ARCH="$(dpkg --print-architecture)"
 curl -fsSL -o /tmp/supabase.deb \
   "https://github.com/supabase/cli/releases/download/v${SUPABASE_VERSION}/supabase_${SUPABASE_VERSION}_linux_${ARCH}.deb"

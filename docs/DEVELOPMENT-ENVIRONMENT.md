@@ -214,6 +214,77 @@ cp apps/mobile/.env.example apps/mobile/.env
 
 ---
 
+## 4a. Supabase CLI / config contract
+
+The repository and CI must agree on one CLI version. It is pinned in four
+places and they must not drift:
+
+| Location | Key |
+|---|---|
+| `.github/workflows/kasihkirim-verification.yml` | `SUPABASE_CLI_VERSION` |
+| `.devcontainer/setup.sh` | `SUPABASE_VERSION` |
+| `scripts/bootstrap-linux.sh` | `SUPABASE_VERSION` |
+| `.gitpod.yml` | download URL |
+
+**Pinned version: `2.107.0`** (released 2026-06-17). Never `latest`.
+
+### Why the first CI run failed at `supabase start`
+
+The previous pin, `2.2.1` (~Jan 2025), predated two things:
+
+```
+Unknown config field: [auth.sms.otp_length]
+Unknown config field: [auth.sms.otp_expiry]
+Failed reading config: Invalid db.major_version: 17
+```
+
+| Rejected entry | Verdict | Action |
+|---|---|---|
+| `db.major_version = 17` | **Not obsolete.** PG17 in the local stack landed ~Apr 2025; PG17 is now the Supabase platform default. The old CLI simply could not parse it. | **Kept 17.** Fixed by upgrading the CLI, not by downgrading the database. |
+| `auth.sms.otp_length` | **Never existed** under `[auth.sms]` in any CLI version. `otp_length`/`otp_expiry` exist only under `[auth.email]`. | **Moved, not deleted** — see below. |
+| `auth.sms.otp_expiry` | Same. | Same. |
+
+### SMS OTP settings — where they actually live
+
+SMS OTP length and expiry are GoTrue settings, not CLI config:
+
+```
+GOTRUE_SMS_OTP_LENGTH   6-10, default 6
+GOTRUE_SMS_OTP_EXP      seconds, default 60
+```
+
+The product requirement (PRD FR-101: 6 digits, 5-minute TTL) is unchanged. It
+is enforced:
+
+- **local dev** — GoTrue defaults (6 digits). Local OTP lifetime is not a
+  product behaviour and does not need to match.
+- **production** — Supabase dashboard → Authentication → Providers → Phone, or
+  the Management API. **Open task: set SMS OTP expiry to 300 s before launch.**
+
+This is GoTrue's *auth* OTP. KasihKirim's *handover* OTP (`public.handover_codes`,
+HMAC-hashed, 5-attempt lockout) is a separate mechanism and is unaffected.
+
+### Two risks discovered while fixing this
+
+**RISK-1 — Postgres image segfault, may hit the test gate.**
+`supabase/postgres` issue #2112 reports that image `17.6.1.106` **segfaults**
+when a role calls a function with `EXECUTE` revoked from `authenticated`,
+taking Postgres into recovery. Migration `0005` revokes exactly that on every
+`public.rpc_*`, and `02_rls.test.sql` calls as `authenticated`. If `db reset`
+passes but `test db` dies with a connection/recovery error rather than an
+assertion failure, this is the cause. Reported workaround: pin the local
+Postgres image `>= 17.6.1.121`. **Not applied** — no change without a
+demonstrated failure.
+
+**RISK-2 — Node 20 versus supabase-js.**
+Supabase's changelog states client libraries **dropped Node.js 20 support on
+2026-06-30**, and Node 20 is itself past LTS. The repository standard is Node
+20 (`.nvmrc`). This does not affect the database gate — React Native runs on
+Hermes, not Node — but it will affect the admin console and tooling.
+**Flagged for decision, not changed.**
+
+---
+
 ## 5. Edge Functions
 
 ```bash

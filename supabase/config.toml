@@ -11,6 +11,10 @@ max_rows = 200
 
 [db]
 port = 54322
+# PostgreSQL 17 RETAINED. The CLI rejection was a CLI-age problem, not a
+# PG17 support problem: the pinned CLI (2.2.1, ~Jan 2025) predated PG17 in
+# the local stack, which landed ~Apr 2025. PG17 is now the Supabase platform
+# default. Fixed by upgrading the CLI, NOT by downgrading the database.
 major_version = 17
 
 [auth]
@@ -27,8 +31,23 @@ enable_signup = true
 enable_confirmations = true
 template = "Kod KasihKirim anda: {{ .Code }}. Sah 5 minit. Jangan kongsi kod ini."
 max_frequency = "30s"
-otp_length = 6
-otp_expiry = 300
+
+# otp_length / otp_expiry are NOT config.toml keys under [auth.sms] in any CLI
+# version. `otp_length` and `otp_expiry` exist only under [auth.email].
+# SMS OTP is configured in GoTrue itself:
+#     GOTRUE_SMS_OTP_LENGTH  (6-10, default 6)
+#     GOTRUE_SMS_OTP_EXP     (seconds, default 60)
+#
+# INTENT PRESERVED, NOT DELETED — the requirement is unchanged
+# (PRD FR-101: 6 digits, 5-minute TTL):
+#   local dev  : GoTrue defaults (6 digits). Expiry differs from the 300s
+#                intent; local OTP lifetime is not a product behaviour.
+#   production : set SMS OTP length/expiry in the Supabase dashboard
+#                (Authentication -> Providers -> Phone), or via the
+#                Management API. Tracked in DEVELOPMENT-ENVIRONMENT.md 4a.
+#
+# NOTE: this is GoTrue's *auth* OTP. KasihKirim's *handover* OTP is a separate
+# mechanism (public.handover_codes) and is unaffected.
 
 [auth.hook.custom_access_token]
 enabled = true
