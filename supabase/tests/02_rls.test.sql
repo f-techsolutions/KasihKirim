@@ -59,16 +59,14 @@ SELECT is((SELECT count(*) FROM public.kirim_requests), 1::bigint,
 SELECT is((SELECT count(*) FROM public.addresses), 1::bigint,
   'requester sees her own address');
 
+WITH changed AS (
+  UPDATE public.kirim_requests
+  SET budget_cap_sen = 1
+  WHERE reference_code = 'KK-TEST01'
+  RETURNING id
+)
 SELECT is(
-  (
-    WITH changed AS (
-      UPDATE public.kirim_requests
-      SET budget_cap_sen = 1
-      WHERE reference_code = 'KK-TEST01'
-      RETURNING id
-    )
-    SELECT count(*) FROM changed
-  ),
+  (SELECT count(*) FROM changed),
   0::bigint,
   'requester cannot edit a POSTED kirim (drafts only)'
 );
