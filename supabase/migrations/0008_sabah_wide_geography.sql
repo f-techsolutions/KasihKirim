@@ -199,6 +199,49 @@ REVOKE ALL ON FUNCTION public.rpc_check_serviceability(UUID,UUID) FROM PUBLIC, a
 GRANT EXECUTE ON FUNCTION public.rpc_check_serviceability(UUID,UUID) TO authenticated;
 
 -- ════════════════════════════════════════════════════════════════════════════
+-- 5a. DISTANCE MATRIX REBUILD
+--
+-- Naive all-pairs over the corridor graph. Trivial at this size, and the
+-- curated distances it produces feed the pricing engine
+-- (internal.fn_quote_kirim) and fn_check_serviceability above.
+--
+-- This lives in a MIGRATION, not in seed.sql, because it is permanent database
+-- infrastructure rather than seed data. It previously sat in seed.sql and was
+-- called 22 lines later in the same file; the Supabase CLI pipelines seed
+-- statements, and pgx Parses every statement in a batch before Executing any,
+-- so the call was name-resolved before the CREATE had run:
+--     ERROR: function internal.fn_rebuild_distance_matrix() does not exist
+-- Defining it here means it exists in the catalogue before seed.sql begins.
+--
+-- Dependencies, both created in 0001_schema.sql:
+--     ref.route_edges           (graph input)
+--     ref.node_distance_matrix  (target)
+-- The only unqualified identifier in the body is the CTE alias `walk`, so
+-- SECURITY DEFINER with SET search_path='' is safe as written.
+-- ════════════════════════════════════════════════════════════════════════════
+CREATE OR REPLACE FUNCTION internal.fn_rebuild_distance_matrix()
+RETURNS INT LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
+DECLARE n INT := 0;
+BEGIN
+  DELETE FROM ref.node_distance_matrix;
+  WITH RECURSIVE walk AS (
+    SELECT from_node_id AS src, to_node_id AS dst, distance_km AS km,
+           typical_minutes AS mins, 1 AS hops, ARRAY[from_node_id,to_node_id] AS path
+    FROM ref.route_edges WHERE is_active
+    UNION ALL
+    SELECT w.src, e.to_node_id, w.km + e.distance_km, w.mins + e.typical_minutes,
+           w.hops + 1, w.path || e.to_node_id
+    FROM walk w JOIN ref.route_edges e ON e.from_node_id = w.dst
+    WHERE e.is_active AND NOT e.to_node_id = ANY(w.path) AND w.hops < 8
+  )
+  INSERT INTO ref.node_distance_matrix (from_node_id,to_node_id,distance_km,minutes,hop_count,path_nodes)
+  SELECT DISTINCT ON (src,dst) src,dst,km,mins,hops,path
+  FROM walk ORDER BY src,dst,km ASC;
+  GET DIAGNOSTICS n = ROW_COUNT;
+  RETURN n;
+END $$;
+
+-- ════════════════════════════════════════════════════════════════════════════
 -- 6. RLS
 -- ════════════════════════════════════════════════════════════════════════════
 GRANT SELECT ON ref.divisions, ref.transport_types TO authenticated;

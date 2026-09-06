@@ -56,29 +56,11 @@ BEGIN
   END LOOP;
 END $$;
 
--- ── Distance matrix: naive all-pairs over a ~10 node graph. ─────────────────
--- Rebuilt by pg_cron on edge change. Trivial at this size.
-CREATE OR REPLACE FUNCTION internal.fn_rebuild_distance_matrix()
-RETURNS INT LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
-DECLARE n INT := 0;
-BEGIN
-  DELETE FROM ref.node_distance_matrix;
-  WITH RECURSIVE walk AS (
-    SELECT from_node_id AS src, to_node_id AS dst, distance_km AS km,
-           typical_minutes AS mins, 1 AS hops, ARRAY[from_node_id,to_node_id] AS path
-    FROM ref.route_edges WHERE is_active
-    UNION ALL
-    SELECT w.src, e.to_node_id, w.km + e.distance_km, w.mins + e.typical_minutes,
-           w.hops + 1, w.path || e.to_node_id
-    FROM walk w JOIN ref.route_edges e ON e.from_node_id = w.dst
-    WHERE e.is_active AND NOT e.to_node_id = ANY(w.path) AND w.hops < 8
-  )
-  INSERT INTO ref.node_distance_matrix (from_node_id,to_node_id,distance_km,minutes,hop_count,path_nodes)
-  SELECT DISTINCT ON (src,dst) src,dst,km,mins,hops,path
-  FROM walk ORDER BY src,dst,km ASC;
-  GET DIAGNOSTICS n = ROW_COUNT;
-  RETURN n;
-END $$;
+-- ── Distance matrix ─────────────────────────────────────────────────────────
+-- internal.fn_rebuild_distance_matrix() is defined in migration
+-- 0008_sabah_wide_geography.sql (section 5a), not here: it is permanent
+-- infrastructure, and a definition in this file cannot be called from this
+-- file because the CLI batches seed statements.
 
 SELECT internal.fn_rebuild_distance_matrix();
 -- Beluran -> Kota Kinabalu should now be ~266 km => band 'long_haul'.
