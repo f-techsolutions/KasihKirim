@@ -59,10 +59,19 @@ SELECT is((SELECT count(*) FROM public.kirim_requests), 1::bigint,
 SELECT is((SELECT count(*) FROM public.addresses), 1::bigint,
   'requester sees her own address');
 
-SELECT throws_ok(
-  $$UPDATE public.kirim_requests SET budget_cap_sen = 1
-    WHERE reference_code='KK-TEST01'$$,
-  NULL, NULL, 'requester cannot edit a POSTED kirim (drafts only)');
+SELECT is(
+  (
+    WITH changed AS (
+      UPDATE public.kirim_requests
+      SET budget_cap_sen = 1
+      WHERE reference_code = 'KK-TEST01'
+      RETURNING id
+    )
+    SELECT count(*) FROM changed
+  ),
+  0::bigint,
+  'requester cannot edit a POSTED kirim (drafts only)'
+);
 
 -- Protected columns: an UPDATE policy alone cannot stop self-rating.
 UPDATE public.profiles SET rating_avg = 5.0, status = 'active'
