@@ -51,7 +51,11 @@ LANGUAGE sql STABLE AS $$ SELECT user_id FROM tests.handles WHERE handle=p_handl
 
 /** Simulate a PostgREST request from this user, with their real role claims. */
 CREATE OR REPLACE FUNCTION tests.authenticate_as(p_handle TEXT)
-RETURNS VOID LANGUAGE plpgsql AS $$
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, tests, pg_temp
+AS $$
 DECLARE v_id UUID; v_roles TEXT[]; v_carrier UUID; v_seller UUID;
 BEGIN
   v_id := tests.uid(p_handle);
