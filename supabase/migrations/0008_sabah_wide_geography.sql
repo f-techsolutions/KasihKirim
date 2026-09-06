@@ -225,7 +225,14 @@ DECLARE n INT := 0;
 BEGIN
   DELETE FROM ref.node_distance_matrix;
   WITH RECURSIVE walk AS (
-    SELECT from_node_id AS src, to_node_id AS dst, distance_km AS km,
+    -- distance_km is NUMERIC(8,2); the recursive term's w.km + e.distance_km
+    -- yields UNCONSTRAINED numeric because PostgreSQL drops the typmod on
+    -- arithmetic. A recursive CTE requires both terms to match exactly,
+    -- typmod included, so the anchor is widened to plain numeric here.
+    -- Widening the anchor rather than narrowing the recursive term avoids
+    -- rounding at every hop and removes any mid-traversal overflow risk;
+    -- NUMERIC(8,2) is re-applied once, at the INSERT below.
+    SELECT from_node_id AS src, to_node_id AS dst, distance_km::numeric AS km,
            typical_minutes AS mins, 1 AS hops, ARRAY[from_node_id,to_node_id] AS path
     FROM ref.route_edges WHERE is_active
     UNION ALL
