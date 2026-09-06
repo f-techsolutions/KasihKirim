@@ -3,6 +3,7 @@
 -- ============================================================================
 BEGIN;
 SELECT plan(5);
+SELECT tests.clear_auth();      -- deterministic role: start as postgres
 SELECT tests.seed_fixture();
 SELECT tests.clear_auth();
 

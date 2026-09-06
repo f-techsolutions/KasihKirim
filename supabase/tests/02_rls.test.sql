@@ -6,6 +6,7 @@
 -- ============================================================================
 BEGIN;
 SELECT plan(20);
+SELECT tests.clear_auth();      -- deterministic role: start as postgres
 SELECT tests.seed_fixture();
 
 -- ── Carrier on the board: sees the request, NOT the contact details ────────

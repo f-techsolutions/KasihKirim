@@ -3,6 +3,7 @@
 -- ============================================================================
 BEGIN;
 SELECT plan(10);
+SELECT tests.clear_auth();      -- deterministic role: start as postgres
 SELECT tests.seed_fixture();
 SELECT tests.clear_auth();
 
@@ -89,37 +90,6 @@ SELECT throws_ok(
 SELECT is((SELECT (value->>'muatan_jual')::boolean FROM ref.app_config
            WHERE key='feature_flags'), false,
   'muatan_jual feature flag is OFF pending LGL-02/13/14/15');
-
-SELECT * FROM finish();
-ROLLBACK;
-
--- ============================================================================
--- Audit fixes D-1 / D-2 (appended)
--- ============================================================================
-BEGIN;
-SELECT plan(4);
-SELECT tests.seed_fixture();
-
-SELECT tests.authenticate_as('aisyah');
-
--- D-2: own roles visible, others' not.
-SELECT ok((SELECT count(*) FROM public.user_roles
-           WHERE user_id = tests.uid('aisyah')) >= 1,
-  'D-2: a user can read their own roles');
-
-SELECT is((SELECT count(*) FROM public.user_roles
-           WHERE user_id <> tests.uid('aisyah')), 0::bigint,
-  'D-2: a user cannot read anyone else roles');
-
-SELECT throws_ok(
-  format($$INSERT INTO public.user_roles (user_id, role)
-           VALUES (%L,'admin_super')$$, tests.uid('aisyah')),
-  '42501', NULL,
-  'D-2: a user cannot grant themselves a role');
-
--- D-1: not a seller, so no movements visible.
-SELECT is((SELECT count(*) FROM public.inventory_movements), 0::bigint,
-  'D-1: a non-seller sees no inventory movements');
 
 SELECT * FROM finish();
 ROLLBACK;

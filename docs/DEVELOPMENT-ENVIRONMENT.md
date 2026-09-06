@@ -183,6 +183,44 @@ supabase test db        # 84 pgTAP assertions
 | `0001_schema` | Tables in dependency order. Two FKs added by `ALTER` afterwards to break a cycle. |
 | `0002` → `0008` | Supporting entities, functions/RLS, money, RPC surface, commerce, compliance, Sabah-wide geography. |
 
+### 3.1a How the runner selects helpers vs tests
+
+`supabase test db` runs pg_prove over **`supabase/tests/*.sql`**, non-recursively.
+
+```
+supabase/tests/
+  01_constraints.test.sql        ← TAP suite, one plan
+  ...                            ← 8 more suites
+  helpers/
+    00_helpers.sql               ← NOT matched by tests/*.sql; not a TAP suite
+```
+
+The helper file has no TAP plan, so while it sat directly in `tests/` pg_prove
+reported it as a file with "no plan". Moving it into `helpers/` takes it out of
+the glob; it is installed explicitly instead:
+
+```bash
+supabase db reset
+psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" \
+  -v ON_ERROR_STOP=1 -f supabase/tests/helpers/00_helpers.sql
+supabase test db
+```
+
+`scripts/verify-gate.sh` and the CI workflow both do this, so a local run and a
+CI run execute the same sequence.
+
+**One TAP plan per file.** `06` and `07` previously held two `plan()/finish()`
+blocks each, which produced "more than one plan" and collided test numbering —
+two different assertions both reported as "Failed test 7". They are now split
+into `06`/`06b` and `07`/`07b`. No assertion was changed or removed.
+
+**Helper grants are test-only.** `tests.authenticate_as()` switches the session
+to `authenticated`, which is the point — RLS must be exercised as a real user.
+Schema `tests` is created by the helper file and by no migration, so it does
+not exist in staging or production, and the `GRANT USAGE`/`GRANT EXECUTE` at
+the foot of that file touch nothing a real deployment has. **No production
+schema, table, function or policy is granted anything.**
+
 ### 3.2 Expected first-run failures
 
 These are anticipated, not defects to route around. **Do not weaken a test to

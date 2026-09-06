@@ -4,6 +4,7 @@
 -- ============================================================================
 BEGIN;
 SELECT plan(14);
+SELECT tests.clear_auth();      -- deterministic role: start as postgres
 SELECT tests.seed_fixture();
 
 -- ── BR-903: overbooking is structurally impossible ─────────────────────────
