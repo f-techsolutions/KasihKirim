@@ -233,7 +233,7 @@ ON CONFLICT (code) DO NOTHING;
 -- release. Beluran is one district among 27 — not the root of the geography.
 INSERT INTO ref.districts (region_id, division_id, code, name, local_authority,
                            status, terrain_profile)
-SELECT r.id, dv.id, d.code, d.name, d.la, d.st::ref.district_status, d.terrain
+SELECT r.id, dv.id, d.code, d.name, d.la, d.st::ref.district_status, d.terrain::text[]
 FROM (VALUES
   -- West Coast
   ('SBH-KK','Kota Kinabalu','SBH-DIV-WC','Dewan Bandaraya Kota Kinabalu','PILOT','{urban,coastal}'),
