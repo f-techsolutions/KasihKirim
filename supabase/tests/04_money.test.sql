@@ -56,14 +56,14 @@ BEGIN
 END $$;
 
 SELECT is(
-  (SELECT SUM(amount_sen) FROM internal.ledger_entries e
+  (SELECT SUM(amount_sen)::bigint FROM internal.ledger_entries e
    JOIN internal.ledger_accounts a ON a.id=e.account_id
    WHERE a.account_code LIKE 'REQUESTER_REFUND:%' AND e.direction='CREDIT'),
   700::bigint,
   'unspent RM7.00 of the RM35 budget is refunded to the requester');
 
 SELECT is(
-  (SELECT SUM(amount_sen) FROM internal.ledger_entries e
+  (SELECT SUM(amount_sen)::bigint FROM internal.ledger_entries e
    JOIN internal.ledger_accounts a ON a.id=e.account_id
    WHERE a.account_code = 'PLATFORM_COMMISSION' AND e.direction='CREDIT'),
   (SELECT commission_sen FROM q),
@@ -72,7 +72,7 @@ SELECT is(
 -- Goods are reimbursed AT COST. The platform never marks up a villager's
 -- groceries, and never quietly keeps the change.
 SELECT is(
-  (SELECT SUM(e.amount_sen) FROM internal.ledger_entries e
+  (SELECT SUM(e.amount_sen)::bigint FROM internal.ledger_entries e
    JOIN internal.ledger_accounts a ON a.id=e.account_id
    WHERE a.account_code LIKE 'CARRIER_PAYABLE:%' AND e.direction='CREDIT'),
   2800 + ((SELECT delivery_fee_sen FROM q) - (SELECT commission_sen FROM q)),

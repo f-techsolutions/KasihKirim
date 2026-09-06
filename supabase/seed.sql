@@ -126,6 +126,15 @@ INSERT INTO ref.delivery_transition_rules
   ('IN_TRANSIT','START_DELIVERY','OUT_FOR_DELIVERY','{carrier}','{BELI,HANTAR,PASARAN}',false,NULL),
   ('OUT_FOR_DELIVERY','CONFIRM_DELIVERY','DELIVERED','{carrier,agent}','{BELI,HANTAR,PASARAN}',true,'dropoff'),
   ('OUT_FOR_DELIVERY','REPORT_FAILURE','FAILED_DELIVERY','{carrier}','{BELI,HANTAR,PASARAN}',false,NULL),
+  -- FAILED_PICKUP was a dead end: reachable from AWAITING_PICKUP but with no
+  -- outgoing rule, stranding the delivery. ARCHITECTURE.md 5.1 routes it into
+  -- the RETURNING/CANCELLED confluence, and the guards table permits
+  -- '* -> CANCELLED'. These two are the spec-supported minimum.
+  -- OPEN PRODUCT QUESTION: under BELI the carrier has already PURCHASED before
+  -- AWAITING_PICKUP, so a third path (reimbursement / RETURNING) may be needed.
+  -- Not invented here.
+  ('FAILED_PICKUP','RETRY','AWAITING_PICKUP','{carrier}','{BELI,HANTAR,PASARAN}',false,NULL),
+  ('FAILED_PICKUP','CANCEL','CANCELLED','{customer,carrier,admin_ops}','{BELI,HANTAR,PASARAN}',false,NULL),
   ('FAILED_DELIVERY','RETRY','OUT_FOR_DELIVERY','{carrier}','{BELI,HANTAR,PASARAN}',false,NULL),
   ('FAILED_DELIVERY','RETURN','RETURNING','{carrier}','{BELI,HANTAR,PASARAN}',false,NULL),
   ('RETURNING','CONFIRM_RETURN','RETURNED','{carrier,agent}','{BELI,HANTAR,PASARAN}',true,'dropoff'),

@@ -87,8 +87,9 @@ SELECT throws_ok(
   NULL, NULL, 'promoter payout cannot exceed platform commission');
 
 -- ── Muatan Jual is closed until legal clears ───────────────────────────────
-SELECT is((SELECT (value->>'muatan_jual')::boolean FROM ref.app_config
-           WHERE key='feature_flags'), false,
+-- 0007 superseded app_config.feature_flags with ref.feature_gates; the old key
+-- now holds a pointer, so value->>'muatan_jual' was NULL. Read the live source.
+SELECT is((SELECT enabled FROM ref.feature_gates WHERE key='muatan_jual_enabled'), false,
   'muatan_jual feature flag is OFF pending LGL-02/13/14/15');
 
 SELECT * FROM finish();

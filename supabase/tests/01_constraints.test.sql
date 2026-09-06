@@ -3,20 +3,23 @@
 -- code declined. These are the invariants that survive a future bug.
 -- ============================================================================
 BEGIN;
-SELECT plan(14);
+SELECT plan(15);
 SELECT tests.clear_auth();      -- deterministic role: start as postgres
 SELECT tests.seed_fixture();
 
 -- ── BR-903: overbooking is structurally impossible ─────────────────────────
+-- Direct writes to reserved_* are refused outright (0009 Layer 2). Previously
+-- they were SILENTLY REVERTED by tg_protect_trip_capacity, which also reverted
+-- the legitimate sync trigger and left reserved_* permanently 0.
 SELECT throws_ok(
   format($$UPDATE public.trips SET reserved_weight_grams = capacity_weight_grams + 1
            WHERE id = %L$$, tests.uid('_trip')),
-  '23514', NULL, 'ck_trip_weight_capacity blocks weight overbooking');
+  '42501', NULL, 'direct write to reserved_weight_grams is forbidden');
 
 SELECT throws_ok(
   format($$UPDATE public.trips SET reserved_parcels = capacity_parcels + 1
            WHERE id = %L$$, tests.uid('_trip')),
-  '23514', NULL, 'ck_trip_parcel_capacity blocks parcel overbooking');
+  '42501', NULL, 'direct write to reserved_parcels is forbidden');
 
 -- Reserving exactly to capacity must SUCCEED. A guard that blocks the last
 -- legitimate slot is as broken as one that allows an extra.
@@ -27,6 +30,12 @@ SELECT lives_ok(
 
 SELECT is((SELECT reserved_weight_grams FROM public.trips WHERE id=tests.uid('_trip')),
   10000, 'trigger synced reserved weight to exactly capacity');
+
+-- ...and one gram beyond capacity, via the only legitimate writer, is refused.
+SELECT throws_ok(
+  format($$SELECT internal.fn_reserve_capacity(%L,%L,1,1,1)$$,
+         tests.uid('_trip'), tests.uid('_kirim')),
+  NULL, NULL, 'fn_reserve_capacity refuses one unit beyond capacity');
 
 -- ── BR-908: COD + procurement advance share ONE float limit ────────────────
 SELECT throws_ok(
@@ -70,10 +79,15 @@ SELECT throws_ok(
   '23514', NULL, 'budget cap ceiling of RM250 enforced');
 
 -- ── Ledger must balance (deferred to COMMIT) ───────────────────────────────
+-- The balance trigger is DEFERRABLE INITIALLY DEFERRED, so it fires at COMMIT.
+-- Inside a test transaction that ends in ROLLBACK it would never fire at all.
+-- Forcing it IMMEDIATE checks the same constraint at statement time -- this
+-- strengthens the assertion, it does not weaken it.
 SELECT throws_ok($$
   DO $x$
   DECLARE t UUID;
   BEGIN
+    SET CONSTRAINTS internal.tg_ledger_balanced IMMEDIATE;
     INSERT INTO internal.ledger_transactions
       (kind,reference_type,reference_id,idempotency_key)
     VALUES ('TEST','test',gen_random_uuid(),'unbalanced-'||gen_random_uuid()::text)
