@@ -285,6 +285,138 @@ Hermes, not Node — but it will affect the admin console and tooling.
 
 ---
 
+## 4b. Line endings and MANIFEST.sha256
+
+**The repository stores text as LF on every platform.**
+
+`MANIFEST.sha256` hashes file *content*. A Windows checkout that converts to
+CRLF produces different bytes on disk from the same committed blob, so
+`sha256sum -c` reports failures for files Git considers identical. Chasing
+those hashes one at a time is not a fix — the settings below are.
+
+### One-time setup, per clone
+
+```bash
+git config --local core.autocrlf false
+git config --local core.eol lf
+```
+
+Repository-local only. Your global Git configuration is not touched, so other
+projects keep whatever behaviour they expect.
+
+`.gitattributes` pins this with `* text=auto eol=lf`, plus explicit rules for
+`.sh`, `.sql`, `.md`, `.yml`, `.json`, `.toml`, `.ts`, `.tsx`, `.html` and
+`binary` for image/archive/keystore types. Shell scripts matter most: a `.sh`
+file with CRLF fails on Linux with `/usr/bin/env: 'bash\r': No such file or
+directory`.
+
+#### If a clone already has CRLF on disk
+
+**Do not run `git rm --cached -r . && git reset --hard`.** It discards every
+uncommitted change in the working tree, staged or not. It is also unnecessary
+here: `git ls-files --eol` shows this repository is already `i/lf` throughout,
+so the index needs no renormalisation — only the checkout on disk can drift.
+
+Non-destructive procedure, in order:
+
+```bash
+# 1. Confirm whether anything is actually wrong.
+git ls-files --eol | grep -v 'i/lf w/lf'     # no output means nothing to fix
+
+# 2. Protect your work FIRST. Choose one:
+git stash push -u -m "before eol normalisation"   # or: git commit
+
+# 3. Only with a clean tree, refresh the checkout for the affected paths.
+git checkout-index --force --all
+#    or, for specific files only:
+#    git checkout-index --force -- path/to/file
+
+# 4. Restore your work.
+git stash pop
+```
+
+`git checkout-index --force --all` rewrites working-tree files from the index
+using the current `.gitattributes` rules. Run it **only on a clean tree** —
+step 2 is not optional.
+
+In practice you should never need this. Setting `core.autocrlf false` before
+cloning prevents the problem entirely, and files already committed as LF stay
+LF.
+
+### The commit workflow
+
+`update-manifest.sh` hashes **staged content**, not the working tree — that is
+what makes it platform-independent. **It therefore requires every intended
+source change to be staged before it runs**, and refuses to proceed otherwise
+rather than silently hashing content that does not match what you are about to
+commit.
+
+Run these in order:
+
+```bash
+# 1. Make your source changes.
+
+# 2. Stage them.
+git add <files>
+
+# 3. Regenerate the manifest from the index.
+./scripts/update-manifest.sh          # aborts if tracked files are unstaged
+
+# 4. Stage the manifest.
+git add MANIFEST.sha256
+
+# 5. Verify against canonical index content.
+./scripts/verify-manifest.sh --staged # expect: N OK, 0 FAILED, 0 MISSING
+
+# 6. Whitespace / conflict-marker check.
+git diff --check
+git diff --cached --check
+
+# 7. Read what you are about to commit.
+git diff --cached
+
+# 8. Only then:
+git commit -m "..."
+```
+
+Step 4 is easy to forget: `update-manifest.sh` writes the file but does not
+stage it, so without it the manifest shows as an unstaged modification and the
+commit goes out stale.
+
+#### No circular dependency
+
+`MANIFEST.sha256` is excluded from its own generation, unconditionally and
+before any other filter. Were it included, writing the file would change the
+content being hashed and the manifest could never verify — a bug this
+repository has already hit once, when a `find`-based generator enumerated the
+redirect target mid-write. The current script builds into a temp file and
+replaces the manifest atomically, so the manifest is never read while being
+written.
+
+Because of the exclusion, re-running `update-manifest.sh` after staging the
+manifest is a no-op: staging `MANIFEST.sha256` cannot change any other file's
+hash.
+
+`update-manifest.sh` resolves the repository root itself, so it runs from any
+subdirectory. It enumerates the Git index, excludes `MANIFEST.sha256`, `.patch`,
+archives, `.git`, `node_modules` and build output, sorts with `LC_ALL=C` for
+byte-deterministic ordering, writes to a temp file, then replaces the manifest
+atomically. It never enumerates the manifest while writing it — a
+self-referential hash can never match, which is a bug this repository has
+already hit once.
+
+### Verifying
+
+```bash
+./scripts/verify-manifest.sh --staged   # canonical; use on Windows and in CI
+./scripts/verify-manifest.sh            # working tree; may differ on Windows
+```
+
+**`--staged` is authoritative.** Plain `sha256sum -c MANIFEST.sha256` reads the
+working tree and will produce false failures on a CRLF checkout.
+
+---
+
 ## 5. Edge Functions
 
 ```bash

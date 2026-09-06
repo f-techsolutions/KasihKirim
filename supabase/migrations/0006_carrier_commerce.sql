@@ -27,8 +27,17 @@ DROP INDEX IF EXISTS ux_commission_active;
 -- basis MUST be in the key: muatan_jual charges platform commission on BOTH
 -- goods_subtotal (10%) and delivery_fee (25%). Without basis the second insert
 -- is rejected and the unbundled pricing silently collapses to one rule.
+--
+-- NULLS NOT DISTINCT (PG15+) replaces an earlier COALESCE(kirim_type::text,'*')
+-- sentinel. That expression could not be indexed: enum -> text routes through
+-- enum_out, which is STABLE not IMMUTABLE because ALTER TYPE ... RENAME VALUE
+-- can change an enum's text rendering, and CREATE INDEX requires IMMUTABLE.
+-- This form states the intent directly -- a NULL kirim_type collides with
+-- another NULL kirim_type -- and compares on the enum's native equality
+-- operator, so a future RENAME VALUE cannot silently corrupt the index.
 CREATE UNIQUE INDEX ux_commission_active
-  ON internal.commission_rules (context, party, basis, COALESCE(kirim_type::text,'*'))
+  ON internal.commission_rules (context, party, basis, kirim_type)
+  NULLS NOT DISTINCT
   WHERE effective_to IS NULL;
 
 -- ════════════════════════════════════════════════════════════════════════════

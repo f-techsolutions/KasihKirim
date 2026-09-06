@@ -1,0 +1,43 @@
+# ============================================================================
+# KasihKirim — canonical line endings
+#
+# The repository stores text as LF. Windows Git Bash checkouts must not apply
+# CRLF conversion, because MANIFEST.sha256 hashes file CONTENT: a CRLF working
+# tree produces different hashes from the same committed bytes, and
+# `sha256sum -c` then reports false failures for files Git considers identical.
+#
+# `text=auto eol=lf` means: Git decides text vs binary by content, and every
+# file it classifies as text is checked out with LF on every platform.
+# ============================================================================
+* text=auto eol=lf
+
+# Shell scripts must be LF or they fail on Linux with:
+#   /usr/bin/env: 'bash\r': No such file or directory
+*.sh    text eol=lf
+
+# SQL is executed by the Supabase CLI on Linux containers.
+*.sql   text eol=lf
+
+# Explicit, though `text=auto` would infer these correctly anyway.
+*.md    text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+*.json  text eol=lf
+*.toml  text eol=lf
+*.ts    text eol=lf
+*.tsx   text eol=lf
+*.html  text eol=lf
+
+# Binary: never touched, never line-ending converted, never diffed as text.
+# The repository currently tracks no binary files; these rules are pre-emptive
+# so that adding one later cannot silently corrupt it.
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.webp  binary
+*.pdf   binary
+*.ico   binary
+*.jks   binary
+*.keystore binary
+*.tar.gz binary
+*.zip   binary
