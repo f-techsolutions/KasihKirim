@@ -3,68 +3,35 @@
 --
 -- DEFECT: a known PLANNED district reported GEOGRAPHY_UNKNOWN.
 --
--- internal.fn_check_serviceability resolves a district FROM a route_node. Only
--- the 13 pilot-corridor nodes existed, so all 27 districts were "known" as
+-- internal.fn_check_serviceability resolved a district FROM a route_node. Only
+-- the pilot-corridor nodes existed, so all 27 districts were known as
 -- administrative geography but only a handful were resolvable as locations.
 -- Sandakan -- a real, seeded, PLANNED district -- looked unmapped.
 --
 -- That conflates two different things:
---     geography IDENTITY  -- do we know this place?      (ref.districts)
---     graph COVERAGE      -- can we route to it yet?     (ref.route_edges)
+--     geography IDENTITY  -- do we know this place?    (ref.districts)
+--     graph COVERAGE      -- can we route to it yet?   (ref.route_edges)
 --
--- The fix separates them. Every district gets a representative node, derived
--- FROM ref.districts rather than from a hardcoded list, so the three states
--- become distinguishable:
+-- This migration contains ONLY the function. The centroid values and the
+-- representative-node generation are DATA and live in seed.sql, because
+-- ref.districts is populated by the seed, which runs AFTER all migrations.
+-- An earlier draft of this file performed those UPDATEs and INSERTs here and
+-- would have silently affected ZERO rows -- the same defect already seen with
+-- ref.category_compliance in 0007.
 --
+-- Resulting states, all distinguishable:
 --     known + ACTIVE/PILOT + routable  -> serviceable
 --     known + PLANNED                  -> DESTINATION_NOT_ACTIVE
 --     known + ACTIVE but no edges      -> NO_ROUTE
 --     genuinely unmapped input         -> GEOGRAPHY_UNKNOWN
 --
--- No district name appears in any function. Adding a district still opens
--- service by configuration alone, with no application release.
+-- No district name or code appears anywhere in this function. Opening a
+-- district remains a configuration change, never an application release.
+--
+-- Centroids are identity/resolution infrastructure ONLY. ref.route_edges stays
+-- the sole authoritative source of curated distance: a district with a
+-- centroid but no edges yields NO_ROUTE, never a straight-line price.
 -- ============================================================================
-
--- ── District centroids ──────────────────────────────────────────────────────
--- APPROXIMATE district-town coordinates, sufficient for nearest-node resolution
--- and status reporting. They are NOT used for pricing: ref.route_edges carries
--- the curated distances, and a district with no edges yields NO_ROUTE rather
--- than a fabricated price.
--- LOCAL VERIFICATION REQUIRED before go-live.
-UPDATE ref.districts d SET centroid = v.geog
-FROM (VALUES
-  ('SBH-KK',  116.0735, 5.9804), ('SBH-KBD', 116.4300, 6.3500),
-  ('SBH-PPR', 115.9300, 5.7300), ('SBH-PNP', 116.1100, 5.9200),
-  ('SBH-PTT', 116.0700, 5.9000), ('SBH-RNU', 116.6667, 5.9500),
-  ('SBH-TRN', 116.2264, 6.1775), ('SBH-BFT', 115.7500, 5.3500),
-  ('SBH-KGU', 116.1600, 5.3400), ('SBH-KPY', 115.5800, 5.6000),
-  ('SBH-NBW', 116.4500, 5.0600), ('SBH-SPT', 115.5500, 5.0900),
-  ('SBH-TBN', 116.3600, 5.6700), ('SBH-TNM', 115.9500, 5.1300),
-  ('SBH-KMR', 116.7500, 6.5000), ('SBH-KDT', 116.8400, 6.8800),
-  ('SBH-PTS', 116.8300, 6.6500), ('SBH-BLR', 117.5333, 5.8667),
-  ('SBH-KNB', 117.9000, 5.5000), ('SBH-SDK', 118.1200, 5.8400),
-  ('SBH-TLP', 117.1333, 5.6333), ('SBH-TGD', 117.2000, 5.3500),
-  ('SBH-KLB', 117.5000, 4.5000), ('SBH-KNK', 118.2500, 4.6800),
-  ('SBH-LD',  118.3300, 5.0300), ('SBH-SMP', 118.6100, 4.4800),
-  ('SBH-TWU', 117.8900, 4.2400), ('SBH-BLR-PTN', 117.2500, 6.2167)
-) AS v(code, lng, lat)
-CROSS JOIN LATERAL (SELECT ST_Point(v.lng, v.lat)::geography AS geog) g
-WHERE d.code = v.code;
-
--- ── One representative node per district, generated from the districts table ─
--- Idempotent: skips any district that already has a node.
-INSERT INTO ref.route_nodes (name, node_type, district, district_id, geog, is_major)
-SELECT d.name,
-       CASE WHEN 'urban' = ANY(d.terrain_profile) THEN 'bandar' ELSE 'pekan' END,
-       d.name, d.id, d.centroid,
-       'urban' = ANY(d.terrain_profile)
-FROM ref.districts d
-WHERE d.centroid IS NOT NULL
-  AND NOT EXISTS (SELECT 1 FROM ref.route_nodes n WHERE n.district_id = d.id);
-
--- Backfill district_id on the pilot-corridor nodes seeded before 0008.
-UPDATE ref.route_nodes n SET district_id = d.id
-  FROM ref.districts d WHERE d.name = n.district AND n.district_id IS NULL;
 
 -- ── Serviceability: identity first, routability second ──────────────────────
 CREATE OR REPLACE FUNCTION internal.fn_check_serviceability(

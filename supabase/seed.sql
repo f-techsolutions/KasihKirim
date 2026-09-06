@@ -326,9 +326,64 @@ END $$;
 
 SELECT internal.fn_rebuild_distance_matrix();
 
+-- ── District centroids (0011 geography identity) ────────────────────────────
+-- APPROXIMATE district-town coordinates, sufficient for nearest-node
+-- resolution and status reporting. They are NOT a pricing input:
+-- ref.route_edges remains the sole authoritative source of curated distance,
+-- and a district with a centroid but no edges yields NO_ROUTE, never a
+-- straight-line price.
+-- LOCAL VERIFICATION REQUIRED before go-live. These are not production-verified.
+UPDATE ref.districts d
+   SET centroid = ST_Point(v.lng, v.lat)::geography
+  FROM (VALUES
+  ('SBH-KK',  116.0735, 5.9804), ('SBH-KBD', 116.4300, 6.3500),
+  ('SBH-PPR', 115.9300, 5.7300), ('SBH-PNP', 116.1100, 5.9200),
+  ('SBH-PTT', 116.0700, 5.9000), ('SBH-RNU', 116.6667, 5.9500),
+  ('SBH-TRN', 116.2264, 6.1775), ('SBH-BFT', 115.7500, 5.3500),
+  ('SBH-KGU', 116.1600, 5.3400), ('SBH-KPY', 115.5800, 5.6000),
+  ('SBH-NBW', 116.4500, 5.0600), ('SBH-SPT', 115.5500, 5.0900),
+  ('SBH-TBN', 116.3600, 5.6700), ('SBH-TNM', 115.9500, 5.1300),
+  ('SBH-KMR', 116.7500, 6.5000), ('SBH-KDT', 116.8400, 6.8800),
+  ('SBH-PTS', 116.8300, 6.6500), ('SBH-BLR', 117.5333, 5.8667),
+  ('SBH-KNB', 117.9000, 5.5000), ('SBH-SDK', 118.1200, 5.8400),
+  ('SBH-TLP', 117.1333, 5.6333), ('SBH-TGD', 117.2000, 5.3500),
+  ('SBH-KLB', 117.5000, 4.5000), ('SBH-KNK', 118.2500, 4.6800),
+  ('SBH-LD',  118.3300, 5.0300), ('SBH-SMP', 118.6100, 4.4800),
+  ('SBH-TWU', 117.8900, 4.2400), ('SBH-BLR-PTN', 117.2500, 6.2167)
+) AS v(code, lng, lat)
+WHERE d.code = v.code;
+
+-- Any district code above that does not exist is a data inconsistency, not a
+-- reason to invent a row. Fail loudly rather than seeding partial geography.
+DO $geo$
+DECLARE missing INT;
+BEGIN
+  SELECT count(*) INTO missing FROM ref.districts WHERE centroid IS NULL;
+  IF missing > 0 THEN
+    RAISE EXCEPTION 'GEOGRAPHY_INCOMPLETE: % district(s) have no centroid: %',
+      missing, (SELECT string_agg(code, ', ') FROM ref.districts WHERE centroid IS NULL);
+  END IF;
+END $geo$;
+
 -- Backfill district_id on existing geography.
+-- MUST run BEFORE the representative-node insert below: that insert's guard
+-- reads district_id, so running it first would fail to see the pilot-corridor
+-- nodes and create a DUPLICATE node for districts that already have one.
 UPDATE ref.route_nodes n SET district_id = d.id
   FROM ref.districts d WHERE d.name = n.district AND n.district_id IS NULL;
+
+-- ── One representative node per district, generated FROM ref.districts ───────
+-- Generated from the table, never from a hardcoded list, so a district added
+-- later becomes resolvable by configuration alone. These nodes carry NO edges,
+-- so they never enter ref.node_distance_matrix and can never produce a price.
+INSERT INTO ref.route_nodes (name, node_type, district, district_id, geog, is_major)
+SELECT d.name,
+       CASE WHEN 'urban' = ANY(d.terrain_profile) THEN 'bandar' ELSE 'pekan' END,
+       d.name, d.id, d.centroid,
+       'urban' = ANY(d.terrain_profile)
+FROM ref.districts d
+WHERE d.centroid IS NOT NULL
+  AND NOT EXISTS (SELECT 1 FROM ref.route_nodes n WHERE n.district_id = d.id);
 UPDATE public.communities c SET district_id = d.id
   FROM ref.districts d WHERE d.name = c.district AND c.district_id IS NULL;
 UPDATE public.communities c SET service_area_id = sa.id

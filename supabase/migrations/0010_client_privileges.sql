@@ -78,7 +78,27 @@ GRANT SELECT                       ON public.voucher_issuances TO authenticated;
 -- ── anon gets nothing ───────────────────────────────────────────────────────
 -- Every policy in this schema is TO authenticated. An unauthenticated caller
 -- has no business reading any of it.
-REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon;
+--
+-- Scoped to tables WE own. `REVOKE ... ON ALL TABLES IN SCHEMA public` also
+-- targets PostGIS's spatial_ref_sys, which the extension owns, producing:
+--     WARNING 01006: no privileges could be revoked for "spatial_ref_sys"
+-- Those warnings were harmless -- the revoke simply had no effect on an object
+-- we do not own -- but they are noise that hides real warnings, and attempting
+-- to alter extension-owned objects is not something a migration should do.
+DO $revoke_anon$
+DECLARE t RECORD;
+BEGIN
+  FOR t IN
+    SELECT c.relname
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    LEFT JOIN pg_depend d ON d.objid = c.oid AND d.deptype = 'e'
+    WHERE n.nspname = 'public' AND c.relkind IN ('r','v')
+      AND d.objid IS NULL                       -- not extension-owned
+  LOOP
+    EXECUTE format('REVOKE ALL ON public.%I FROM anon', t.relname);
+  END LOOP;
+END $revoke_anon$;
 
 -- ── Re-assert the narrower rules that must survive the grants above ─────────
 -- Order matters: these REVOKEs run after the GRANTs so they win.
@@ -104,6 +124,7 @@ GRANT  UPDATE (status, depart_at, depart_window_minutes, arrive_est_at,
   ON public.trips TO authenticated;
 
 -- Reference data: read-only.
+-- ref contains no extension-owned objects, so the blanket form is safe here.
 GRANT SELECT ON ALL TABLES IN SCHEMA ref TO authenticated;
 REVOKE INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA ref FROM authenticated, anon;
 REVOKE ALL ON ALL TABLES IN SCHEMA ref FROM anon;
