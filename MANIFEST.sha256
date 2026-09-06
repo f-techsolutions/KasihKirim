@@ -1,7 +1,7 @@
 d79edaa3e64bfba7b753a656184d2ce6c124c1b6bbabe198d24517cd2cb017d0  ./.devcontainer/devcontainer.json
 93a6141cf0613332027ebcf3a7f44375c8b228fb9f578c4b1b794486b4e35fa7  ./.devcontainer/setup.sh
 d12acac6a2d00b610169d78b6226e6374498baa642f4d6bce867cf632d8694c0  ./.gitattributes
-a1da290468829cda8bf16b2489a0bfdee5e9d8145f3ac856af7ff2dfece47ce9  ./.github/workflows/kasihkirim-verification.yml
+41b6a153b799443b866e211a0bd4dd4a25b80fd11a298c0100cad2b685929e87  ./.github/workflows/kasihkirim-verification.yml
 fa23bda73e812faa4648de3d69dd9516e052c2088e6b74d571ddc800201ef98b  ./.github/workflows/pr.yml
 6752acc1c108e68ea2e96484a09128421303d9e490878faa466bc936c1b734f7  ./.gitignore
 08d8da07046051613cb24bdd928513d67cd67b8ce11fe229d403968c8e91aa3f  ./.gitpod.yml
@@ -34,7 +34,7 @@ b8f6f5cdcbb5bcffd54089570b3c3bbcfe22c99000f7817e331036f7b6a2b2c8  ./apps/mobile/
 258d264c4fc691c0110986c4a5908cc8e262618e216584db45e3f51f36c69ceb  ./docs/ARCHITECTURE.md
 21a570cd2e06051d847412599b3c05a8d28d9a4a86d086419b1e034a5dbb9b5e  ./docs/DATABASE.md
 a334f2a0a2ff220ae9f22c78a0fb7698ce5792a14e795c4124d1eec4de1a3eb4  ./docs/DEPLOYMENT.md
-87e0f6597bb3715945aa8ae2aa439a00de991c19ecf1f2f3be4a86c8d1e1bbb6  ./docs/DEVELOPMENT-ENVIRONMENT.md
+2d38335b5a146be804d6b775d79822444ad21d53fb65b97c3988e52d0300998d  ./docs/DEVELOPMENT-ENVIRONMENT.md
 0873f2acd3cadd87ffa2fa560e88fdb6b96e981fbe936d4f84ddd6e6ff2a2e9a  ./docs/IMPLEMENTATION-GAP-REPORT.md
 aaeb12cf97eff0023cf4ef7bac95514539c8bceafc46bcd140c77a977b721fc9  ./docs/MUATAN-JUAL-COMPLIANCE.md
 a3adfc4b1c00250b8d70d84f63d74ec42989d3abd860df30999167ef36844403  ./docs/PRD.md
@@ -44,7 +44,7 @@ b907d7b60ff4cd07b86ce4776eaabe68927c0ae11832dbdbfc78a431f26ae439  ./prototype/ka
 716ee7b4074fc8d50b0e99611cea13ec958819293e90f43df504ab2f06127742  ./scripts/bootstrap-linux.sh
 490d710db38d5cf79093c2f941fc08c177eabc4ff00e62fcc0809e7e0302b244  ./scripts/kasihkirim-doctor.sh
 584eea43de4920c872ccfa84ea586553ae191c2cb4495ab4015ad2f5054eb1a0  ./scripts/update-manifest.sh
-2654497dd1b30382ea6925a75addfa06e8488ae7cc01560c128a3cb852c0628c  ./scripts/verify-gate.sh
+719c4c1569f254093b265b1e26891487556b92e0823c0cc4dcbfbf5073ce10c5  ./scripts/verify-gate.sh
 db9efb3091f4aba2961c6e5c8302e2f910ce7e1d5e9ca8ff4fbbb69c66b497fc  ./scripts/verify-manifest.sh
 1c64e625755412d918e443f73f9e1b48345aa91c411f4d22f1b55f691431911e  ./supabase/config.toml
 e6dcffcff77a180dfe493a3cb2fb0b0c8324379b506135f047d1768469358606  ./supabase/functions/_shared/clients.ts
@@ -64,7 +64,10 @@ e05bfb3b375a0428a64547ae889168f29a294e93fda8be96f4ad1967b82b51b0  ./supabase/mig
 eb4d2854410ed9ed79980e228e5b61aac98b2ba55c738ab4056c21b2126e399c  ./supabase/migrations/0007_sabah_geography_compliance.sql
 210393160366bae1aa0d9ffe5bec70afc1ebb2dfe80124c323dd8bb3090b2b85  ./supabase/migrations/0008_sabah_wide_geography.sql
 d67d9c8cfd967e53921d8df722bc43bb77198b182baf20f9cf8584cd286f74e0  ./supabase/migrations/0009_integrity_fixes.sql
+0d8286b5fdf34c0894e83ddaede96fd1b932d5eb761df7dee71d0e896c671eae  ./supabase/migrations/0010_client_privileges.sql
+4e71fdd5d8c9a3e820764b74439dfe0142e7ef53deb85b0cfb6d926dc208692f  ./supabase/migrations/0011_geography_identity.sql
 f838f7cc78b1d51c47cd3d0c7714879e41d1fcecd95486468cf1a4d1f377ab95  ./supabase/seed.sql
+cc4b9f5085d2a009db75b8a46dab062619afe4a9eecb96f939b5bbaf2962ebc3  ./supabase/testing/00_helpers.sql
 f3eebdaa5cc2d1f465d9828bb2bdd03a48b657ae0b9b8fdf2e94fb80e72abaa2  ./supabase/tests/01_constraints.test.sql
 504fff7883e9f646d4681c852ef5ae9f901a1f2674941a0cd8d0b5ad0975ebfa  ./supabase/tests/02_rls.test.sql
 9301e75a5cb5a19f8b5c42b9352cfe43ef509358c052f967b8725b2bb84b279d  ./supabase/tests/03_state_machine.test.sql
@@ -73,5 +76,4 @@ f3eebdaa5cc2d1f465d9828bb2bdd03a48b657ae0b9b8fdf2e94fb80e72abaa2  ./supabase/tes
 334829a0429f3b5dabba3b5f866435419c4b8ab22679a74d467edd9b17e8630d  ./supabase/tests/06_commerce.test.sql
 ab0fe9f92c4f9d6fa174d2ce7fd17466f4418a12897a336f85480182299bfcea  ./supabase/tests/06b_audit_fixes.test.sql
 7bd4cabc1b4f913702f405227ca323b1035059bb032ec023a8ace18c7f3ff06a  ./supabase/tests/07_compliance.test.sql
-99e7fe8bbcf53d0a0af60cec321936f56b5fbced184c59abe052dec56fd38c78  ./supabase/tests/07b_sabah_geography.test.sql
-3dad6f53b90593658bcbfb073e892becf2abe1b7f4948b0e3e53e34c7344ce75  ./supabase/tests/helpers/00_helpers.sql
+65a71b42f02a99ce19f15841f57882301ec3c53ae8452db1f318a0f549efa6df  ./supabase/tests/07b_sabah_geography.test.sql

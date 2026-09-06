@@ -143,7 +143,7 @@ jobs:
           echo "DB RESET       PASS"
 
       # ── 7b. Install pgTAP helpers ────────────────────────────────────────
-      # supabase/tests/helpers/ sits OUTSIDE pg_prove's non-recursive
+      # supabase/testing/ sits OUTSIDE pg_prove's non-recursive
       # tests/*.sql glob, so the helper file is never parsed as a TAP suite.
       # It is installed here instead: after the schema exists, before the
       # assertions run. Test-only — schema `tests` is in no migration.
@@ -151,7 +151,7 @@ jobs:
         run: |
           set -euo pipefail
           psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" \
-            -v ON_ERROR_STOP=1 -f supabase/tests/helpers/00_helpers.sql
+            -v ON_ERROR_STOP=1 -f supabase/testing/00_helpers.sql
           echo "HELPERS        PASS"
 
       # ── 8. FIRST AUTHORITATIVE ASSERTION RUN ─────────────────────────────

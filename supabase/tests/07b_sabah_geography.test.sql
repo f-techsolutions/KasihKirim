@@ -4,7 +4,7 @@
 -- Product scope is Sabah; Beluran/Paitan/KK are pilot locations only.
 -- ============================================================================
 BEGIN;
-SELECT plan(7);
+SELECT plan(11);
 SELECT tests.clear_auth();      -- deterministic role: start as postgres
 SELECT tests.seed_fixture();
 SELECT tests.clear_auth();
@@ -33,12 +33,47 @@ SELECT is((SELECT medium FROM ref.transport_types WHERE code='BOAT'),
   'water', 'BOAT is registered as a first-class water transport type');
 
 -- §8: serviceability is a server decision, never an app conditional.
+-- All four states are asserted, so a regression in any one of them is caught
+-- rather than only the case that originally failed.
+
+-- KNOWN + PLANNED -> not yet open (NOT "unknown")
 SELECT is(
   (SELECT (internal.fn_check_serviceability(
      (SELECT id FROM ref.route_nodes WHERE name='Kota Kinabalu'),
      (SELECT id FROM ref.route_nodes WHERE name='Sandakan')) ->> 'reason')),
   'DESTINATION_NOT_ACTIVE',
   'a PLANNED district is correctly reported as not yet serviceable');
+
+-- KNOWN + PLANNED on the ORIGIN side reports the origin, not the destination
+SELECT is(
+  (SELECT (internal.fn_check_serviceability(
+     (SELECT id FROM ref.route_nodes WHERE name='Tawau'),
+     (SELECT id FROM ref.route_nodes WHERE name='Kota Kinabalu')) ->> 'reason')),
+  'ORIGIN_NOT_ACTIVE',
+  'a PLANNED origin is reported as ORIGIN_NOT_ACTIVE');
+
+-- GENUINELY UNMAPPED input -> GEOGRAPHY_UNKNOWN (and only this case)
+SELECT is(
+  (SELECT (internal.fn_check_serviceability(
+     (SELECT id FROM ref.route_nodes WHERE name='Kota Kinabalu'),
+     '00000000-0000-0000-0000-000000000000'::uuid) ->> 'reason')),
+  'GEOGRAPHY_UNKNOWN',
+  'an unmapped destination is reported as GEOGRAPHY_UNKNOWN');
+
+-- KNOWN + ACTIVE both ends, connected by the seeded corridor -> serviceable
+SELECT is(
+  (SELECT (internal.fn_check_serviceability(
+     (SELECT id FROM ref.route_nodes WHERE name='Beluran'),
+     (SELECT id FROM ref.route_nodes WHERE name='Kota Kinabalu')) ->> 'serviceable')),
+  'true',
+  'an ACTIVE origin and destination on the seeded corridor is serviceable');
+
+-- every district resolves to geography: identity is complete Sabah-wide
+SELECT is(
+  (SELECT count(*) FROM ref.districts d
+    WHERE NOT EXISTS (SELECT 1 FROM ref.route_nodes n WHERE n.district_id = d.id)),
+  0::bigint,
+  'every Sabah district resolves to at least one route node');
 
 SELECT * FROM finish();
 ROLLBACK;

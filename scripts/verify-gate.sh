@@ -83,7 +83,7 @@ run supabase db reset || die "migrations failed — capture the full error, fix 
 
 gate "install pgTAP helpers"
 run psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" \
-      -v ON_ERROR_STOP=1 -f supabase/tests/helpers/00_helpers.sql \
+      -v ON_ERROR_STOP=1 -f supabase/testing/00_helpers.sql \
   || die "helper install failed"
 
 gate "supabase test db"

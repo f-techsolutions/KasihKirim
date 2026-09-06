@@ -185,14 +185,16 @@ supabase test db        # 84 pgTAP assertions
 
 ### 3.1a How the runner selects helpers vs tests
 
-`supabase test db` runs pg_prove over **`supabase/tests/*.sql`**, non-recursively.
+`supabase test db` runs pg_prove over **`supabase/tests/` RECURSIVELY**. A
+`helpers/` subdirectory is therefore still discovered — the helper must live
+outside the tests tree entirely.
 
 ```
 supabase/tests/
   01_constraints.test.sql        ← TAP suite, one plan
   ...                            ← 8 more suites
-  helpers/
-    00_helpers.sql               ← NOT matched by tests/*.sql; not a TAP suite
+supabase/testing/
+  00_helpers.sql                 ← SIBLING dir, never discovered by pg_prove
 ```
 
 The helper file has no TAP plan, so while it sat directly in `tests/` pg_prove
@@ -202,7 +204,7 @@ the glob; it is installed explicitly instead:
 ```bash
 supabase db reset
 psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" \
-  -v ON_ERROR_STOP=1 -f supabase/tests/helpers/00_helpers.sql
+  -v ON_ERROR_STOP=1 -f supabase/testing/00_helpers.sql
 supabase test db
 ```
 
