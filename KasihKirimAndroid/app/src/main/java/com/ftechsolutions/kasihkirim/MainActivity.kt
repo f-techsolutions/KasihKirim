@@ -13,11 +13,11 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        val repo = (application as KasihKirimApplication).authRepository
+        val app = application as KasihKirimApplication
         setContent {
             KasihKirimTheme {
-                val vm: AuthViewModel = viewModel(factory = AuthViewModel.Factory(repo))
-                App(vm)
+                val vm: AuthViewModel = viewModel(factory = AuthViewModel.Factory(app.authRepository))
+                App(vm, app.addressRepository)
             }
         }
     }

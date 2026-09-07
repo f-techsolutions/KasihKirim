@@ -30,4 +30,36 @@
     <string name="nav_sales">Jualan</string>
 
     <string name="phase1_placeholder">Skrin ini akan dibina dalam fasa seterusnya.</string>
+
+    <string name="back">Kembali</string>
+
+    <string name="addresses_title">Alamat Saya</string>
+    <string name="addresses_empty">Tiada alamat lagi.</string>
+    <string name="addresses_add_title">Tambah Alamat</string>
+    <string name="addresses_label">Label (cth. Rumah)</string>
+    <string name="addresses_recipient_name">Nama Penerima</string>
+    <string name="addresses_recipient_phone">Telefon Penerima</string>
+    <string name="addresses_community">Kampung / Pekan</string>
+    <string name="addresses_landmark">Petunjuk Lokasi</string>
+    <string name="addresses_save">Simpan Alamat</string>
+    <string name="addresses_default_badge">(Utama)</string>
+    <string name="addresses_set_default">Jadikan Utama</string>
+    <string name="addresses_delete">Padam</string>
+    <string name="addresses_edit">Kemas Kini</string>
+    <string name="addresses_edit_title">Kemas Kini Alamat</string>
+    <string name="addresses_update">Simpan Perubahan</string>
+    <string name="addresses_cancel_edit">Batal</string>
+
+    <string name="serviceability_title">Semak Liputan</string>
+    <string name="serviceability_origin">Dari</string>
+    <string name="serviceability_destination">Ke</string>
+    <string name="serviceability_no_node">Kampung ini belum ada nod laluan.</string>
+    <string name="serviceability_check">Semak</string>
+    <string name="serviceability_ok">Boleh dihantar</string>
+    <string name="serviceability_distance">%1$.1f km, anggaran %2$d minit</string>
+    <string name="serviceability_water">Memerlukan pengangkutan air</string>
+    <string name="serviceability_origin_not_active">Kami belum sampai ke %1$s.</string>
+    <string name="serviceability_dest_not_active">Kami belum sampai ke %1$s.</string>
+    <string name="serviceability_no_route">Tiada laluan antara lokasi ini.</string>
+    <string name="serviceability_unknown">Lokasi tidak dikenali.</string>
 </resources>

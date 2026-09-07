@@ -14,6 +14,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ftechsolutions.kasihkirim.R
 import com.ftechsolutions.kasihkirim.domain.model.AuthState
+import com.ftechsolutions.kasihkirim.domain.repository.AddressRepository
 import com.ftechsolutions.kasihkirim.ui.auth.AuthScreen
 import com.ftechsolutions.kasihkirim.ui.auth.AuthViewModel
 import com.ftechsolutions.kasihkirim.ui.auth.messageRes
@@ -25,7 +26,7 @@ import com.ftechsolutions.kasihkirim.ui.navigation.AppNavHost
  * a moment on every cold start while the session is restored from Keystore.
  */
 @Composable
-fun App(vm: AuthViewModel) {
+fun App(vm: AuthViewModel, addressRepository: AddressRepository) {
     val state by vm.authState.collectAsStateWithLifecycle()
 
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
@@ -36,7 +37,7 @@ fun App(vm: AuthViewModel) {
                 Text(stringResource(R.string.auth_checking))
             }
             AuthState.Unauthenticated -> AuthScreen(vm)
-            is AuthState.Authenticated -> AppNavHost(s.user, vm)
+            is AuthState.Authenticated -> AppNavHost(s.user, vm, addressRepository)
             is AuthState.Error -> Centered {
                 Text(stringResource(s.error.messageRes()),
                     color = MaterialTheme.colorScheme.error)
