@@ -25,7 +25,7 @@ jobs:
 
       - name: Install pgTAP test helpers
         run: |
-          supabase db query --file supabase/tests/helpers/00_helpers.sql
+          supabase db query --file supabase/test_helpers/00_helpers.sql
 
       - name: pgTAP
         run: supabase test db
