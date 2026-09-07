@@ -91,10 +91,60 @@ jobs:
       # sequential scan. See SECURITY.md 4.2.
       - name: No bare auth.uid() in policies
         run: |
-          if grep -rn "auth\.uid()" supabase/migrations \
-             | grep -v "SELECT auth.uid()" | grep -v "^.*--"; then
-            echo "Policies must use (SELECT auth.uid())"; exit 1
+          set -euo pipefail
+
+          DB_URL="$(supabase status --output json | jq -r '.DB_URL // .db.url // empty')"
+
+          if [ -z "$DB_URL" ]; then
+            echo "::error::Could not determine local Supabase DB URL"
+            echo "Supabase status output:"
+            supabase status --output json
+            exit 1
           fi
+
+          psql "$DB_URL" \
+            -v ON_ERROR_STOP=1 \
+            <<'SQL'
+          DO $$
+          DECLARE bad TEXT;
+          BEGIN
+            SELECT string_agg(
+              format('%I.%I [%s]', schemaname, tablename, policyname),
+              E'\n'
+              ORDER BY schemaname, tablename, policyname
+            )
+            INTO bad
+            FROM pg_policies
+            WHERE schemaname = 'public'
+              AND (
+                (
+                  qual IS NOT NULL
+                  AND regexp_replace(
+                    qual,
+                    '\([[:space:]]*SELECT[[:space:]]+auth\.uid\(\)[[:space:]]*\)',
+                    '',
+                    'gi'
+                  ) ~* 'auth\.uid\(\)'
+                )
+                OR
+                (
+                  with_check IS NOT NULL
+                  AND regexp_replace(
+                    with_check,
+                    '\([[:space:]]*SELECT[[:space:]]+auth\.uid\(\)[[:space:]]*\)',
+                    '',
+                    'gi'
+                  ) ~* 'auth\.uid\(\)'
+                )
+              );
+
+            IF bad IS NOT NULL THEN
+              RAISE EXCEPTION
+                'Policies containing bare auth.uid(): %',
+                bad;
+            END IF;
+          END $$;
+          SQL
 
       - name: internal and audit are not exposed via PostgREST
         run: |
