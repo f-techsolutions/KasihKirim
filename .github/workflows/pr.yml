@@ -23,6 +23,10 @@ jobs:
           supabase start
           supabase db reset --debug
 
+      - name: Install pgTAP test helpers
+        run: |
+          supabase db query --file supabase/tests/helpers/00_helpers.sql
+
       - name: pgTAP
         run: supabase test db
 
