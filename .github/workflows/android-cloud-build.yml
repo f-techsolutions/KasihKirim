@@ -45,6 +45,18 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
+      # android-actions/setup-android@v3 bundles an old cmdline-tools (16.0)
+      # whose sdkmanager fetches the repository index fine but can't
+      # recognize package entries published after its own release -- a
+      # newly-added platform silently fails to resolve even though it is
+      # genuinely available. Install a current cmdline-tools release first
+      # and use that sdkmanager for everything else.
+      - name: Update Android cmdline-tools
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/16.0/bin/sdkmanager" --licenses >/dev/null || true
+          "$ANDROID_HOME/cmdline-tools/16.0/bin/sdkmanager" "cmdline-tools;latest"
+          echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
+
       - name: Install Android SDK packages
         run: |
           yes | sdkmanager --licenses >/dev/null || true
