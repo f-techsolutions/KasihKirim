@@ -46,13 +46,17 @@ jobs:
         uses: android-actions/setup-android@v3
 
       # android-actions/setup-android@v3 bundles an old cmdline-tools (16.0)
-      # whose sdkmanager fetches the repository index fine but can't
-      # recognize package entries published after its own release -- a
-      # newly-added platform silently fails to resolve even though it is
-      # genuinely available. Install a current cmdline-tools release first
-      # and use that sdkmanager for everything else.
+      # that only understands SDK XML schema up to version 3, so it can't
+      # see packages (like platforms;android-37) published under a newer
+      # schema -- it fetches the repository index fine and just silently
+      # fails to match the entry. Install a current cmdline-tools release
+      # and use that sdkmanager for everything else. The old tools already
+      # occupy cmdline-tools/latest, so clear that path first -- otherwise
+      # sdkmanager installs the new release into a sibling directory
+      # (cmdline-tools/latest-2) instead of the path we then put on PATH.
       - name: Update Android cmdline-tools
         run: |
+          rm -rf "$ANDROID_HOME/cmdline-tools/latest"
           yes | "$ANDROID_HOME/cmdline-tools/16.0/bin/sdkmanager" --licenses >/dev/null || true
           "$ANDROID_HOME/cmdline-tools/16.0/bin/sdkmanager" "cmdline-tools;latest"
           echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
