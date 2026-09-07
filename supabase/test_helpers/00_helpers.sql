@@ -50,29 +50,128 @@ CREATE OR REPLACE FUNCTION tests.uid(p_handle TEXT) RETURNS UUID
 LANGUAGE sql STABLE AS $$ SELECT user_id FROM tests.handles WHERE handle=p_handle $$;
 
 /** Simulate a PostgREST request from this user, with their real role claims. */
-CREATE OR REPLACE FUNCTION tests.authenticate_as(p_handle TEXT)
-RETURNS VOID
-LANGUAGE plpgsql
+CREATE OR REPLACE FUNCTION tests.get_user_context(p_handle TEXT)
+RETURNS JSONB
+LANGUAGE sql
+STABLE
 SECURITY DEFINER
 SET search_path = public, tests, pg_temp
 AS $$
-DECLARE v_id UUID; v_roles TEXT[]; v_carrier UUID; v_seller UUID;
-BEGIN
-  v_id := tests.uid(p_handle);
-  IF v_id IS NULL THEN RAISE EXCEPTION 'no such test user: %', p_handle; END IF;
-  SELECT array_agg(role::text) INTO v_roles
-    FROM public.user_roles WHERE user_id=v_id AND revoked_at IS NULL;
-  SELECT id INTO v_carrier FROM public.carriers WHERE user_id=v_id;
-  SELECT id INTO v_seller  FROM public.sellers  WHERE user_id=v_id;
+  SELECT jsonb_build_object(
+    'id', h.user_id,
+    'roles',
+      COALESCE(
+        (
+          SELECT jsonb_agg(ur.role::text ORDER BY ur.role::text)
+          FROM public.user_roles ur
+          WHERE ur.user_id = h.user_id
+            AND ur.revoked_at IS NULL
+        ),
+        '[]'::jsonb
+      ),
+    'carrier_id',
+      (
+        SELECT c.id
+        FROM public.carriers c
+        WHERE c.user_id = h.user_id
+        LIMIT 1
+      ),
+    'seller_id',
+      (
+        SELECT se.id
+        FROM public.sellers se
+        WHERE se.user_id = h.user_id
+        LIMIT 1
+      )
+  )
+  FROM tests.handles h
+  WHERE h.handle = p_handle
+$$;
 
-  PERFORM set_config('role','authenticated',true);
-  PERFORM set_config('request.jwt.claims', json_build_object(
-    'sub', v_id::text, 'role','authenticated',
-    'app_metadata', json_build_object(
-      'roles', COALESCE(v_roles, ARRAY[]::text[]),
-      'carrier_id', v_carrier, 'seller_id', v_seller,
-      'account_status','active')
-  )::text, true);
+CREATE OR REPLACE FUNCTION tests.get_user_context(p_handle TEXT)
+RETURNS JSONB
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public, tests, pg_temp
+AS $$
+  SELECT jsonb_build_object(
+    'id', h.user_id,
+    'roles',
+      COALESCE(
+        (
+          SELECT jsonb_agg(ur.role::text ORDER BY ur.role::text)
+          FROM public.user_roles ur
+          WHERE ur.user_id = h.user_id
+            AND ur.revoked_at IS NULL
+        ),
+        '[]'::jsonb
+      ),
+    'carrier_id',
+      (
+        SELECT c.id
+        FROM public.carriers c
+        WHERE c.user_id = h.user_id
+        LIMIT 1
+      ),
+    'seller_id',
+      (
+        SELECT se.id
+        FROM public.sellers se
+        WHERE se.user_id = h.user_id
+        LIMIT 1
+      )
+  )
+  FROM tests.handles h
+  WHERE h.handle = p_handle
+$$;
+
+CREATE OR REPLACE FUNCTION tests.authenticate_as(p_handle TEXT)
+RETURNS VOID
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_ctx JSONB;
+  v_id UUID;
+  v_roles TEXT[];
+  v_carrier UUID;
+  v_seller UUID;
+BEGIN
+  v_ctx := tests.get_user_context(p_handle);
+
+  IF v_ctx IS NULL THEN
+    RAISE EXCEPTION 'no such test user: %', p_handle;
+  END IF;
+
+  v_id := (v_ctx->>'id')::UUID;
+
+  SELECT COALESCE(
+    ARRAY(
+      SELECT jsonb_array_elements_text(v_ctx->'roles')
+    ),
+    ARRAY[]::TEXT[]
+  )
+  INTO v_roles;
+
+  v_carrier := NULLIF(v_ctx->>'carrier_id','')::UUID;
+  v_seller  := NULLIF(v_ctx->>'seller_id','')::UUID;
+
+  PERFORM set_config('role', 'authenticated', true);
+
+  PERFORM set_config(
+    'request.jwt.claims',
+    json_build_object(
+      'sub', v_id::text,
+      'role', 'authenticated',
+      'app_metadata', json_build_object(
+        'roles', v_roles,
+        'carrier_id', v_carrier,
+        'seller_id', v_seller,
+        'account_status', 'active'
+      )
+    )::text,
+    true
+  );
 END $$;
 
 CREATE OR REPLACE FUNCTION tests.clear_auth() RETURNS VOID

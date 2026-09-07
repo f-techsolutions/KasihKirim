@@ -1,7 +1,7 @@
 d79edaa3e64bfba7b753a656184d2ce6c124c1b6bbabe198d24517cd2cb017d0  ./.devcontainer/devcontainer.json
 93a6141cf0613332027ebcf3a7f44375c8b228fb9f578c4b1b794486b4e35fa7  ./.devcontainer/setup.sh
 d12acac6a2d00b610169d78b6226e6374498baa642f4d6bce867cf632d8694c0  ./.gitattributes
-41b6a153b799443b866e211a0bd4dd4a25b80fd11a298c0100cad2b685929e87  ./.github/workflows/kasihkirim-verification.yml
+432572236146a58c983543461ec923f2ae3c7d4e54bd731d0e68456759e09800  ./.github/workflows/kasihkirim-verification.yml
 fa23bda73e812faa4648de3d69dd9516e052c2088e6b74d571ddc800201ef98b  ./.github/workflows/pr.yml
 6752acc1c108e68ea2e96484a09128421303d9e490878faa466bc936c1b734f7  ./.gitignore
 08d8da07046051613cb24bdd928513d67cd67b8ce11fe229d403968c8e91aa3f  ./.gitpod.yml
@@ -40,11 +40,12 @@ aaeb12cf97eff0023cf4ef7bac95514539c8bceafc46bcd140c77a977b721fc9  ./docs/MUATAN-
 a3adfc4b1c00250b8d70d84f63d74ec42989d3abd860df30999167ef36844403  ./docs/PRD.md
 ea1cebd9b03670fb0dc8176dbfc6636655cc3858cfcb2a74bc6b9e35578ead33  ./docs/SECURITY.md
 068b2e2588446b2844ca1f9591b969d02b85ca043813bec1f542da486f9cce76  ./docs/TESTING.md
+69f9ade5def862ba87c014c7e655bf8e548305a4566cd3e5ac0bcbb43c504998  ./fix_kasihkirim_rls_tests.sh
 b907d7b60ff4cd07b86ce4776eaabe68927c0ae11832dbdbfc78a431f26ae439  ./prototype/kasihkirim.html
 716ee7b4074fc8d50b0e99611cea13ec958819293e90f43df504ab2f06127742  ./scripts/bootstrap-linux.sh
 490d710db38d5cf79093c2f941fc08c177eabc4ff00e62fcc0809e7e0302b244  ./scripts/kasihkirim-doctor.sh
 584eea43de4920c872ccfa84ea586553ae191c2cb4495ab4015ad2f5054eb1a0  ./scripts/update-manifest.sh
-719c4c1569f254093b265b1e26891487556b92e0823c0cc4dcbfbf5073ce10c5  ./scripts/verify-gate.sh
+211beb785835e2d8fc241553b73f0519283b18304ad3088fdd6fb0d1b84f9377  ./scripts/verify-gate.sh
 db9efb3091f4aba2961c6e5c8302e2f910ce7e1d5e9ca8ff4fbbb69c66b497fc  ./scripts/verify-manifest.sh
 1c64e625755412d918e443f73f9e1b48345aa91c411f4d22f1b55f691431911e  ./supabase/config.toml
 e6dcffcff77a180dfe493a3cb2fb0b0c8324379b506135f047d1768469358606  ./supabase/functions/_shared/clients.ts
@@ -67,9 +68,9 @@ d67d9c8cfd967e53921d8df722bc43bb77198b182baf20f9cf8584cd286f74e0  ./supabase/mig
 645d5390a02d56d01674608c5f04732fe969543d7ac024b69b33af296066a632  ./supabase/migrations/0010_client_privileges.sql
 ac84bfa27e5f767c7f836bb27444a2afa80a0809b144e57a4cb5834542db5671  ./supabase/migrations/0011_geography_identity.sql
 98400a4715cf8a0c9ef92215a256781f4fb6fa3549338ff8022a743d9314780d  ./supabase/seed.sql
-cc4b9f5085d2a009db75b8a46dab062619afe4a9eecb96f939b5bbaf2962ebc3  ./supabase/testing/00_helpers.sql
+55c4789f594d06594afd5c7c4f7ca72166e4feeddccef01dee4853afc157c45e  ./supabase/test_helpers/00_helpers.sql
 f3eebdaa5cc2d1f465d9828bb2bdd03a48b657ae0b9b8fdf2e94fb80e72abaa2  ./supabase/tests/01_constraints.test.sql
-504fff7883e9f646d4681c852ef5ae9f901a1f2674941a0cd8d0b5ad0975ebfa  ./supabase/tests/02_rls.test.sql
+0f2fb9ec2f4f9edf5dab274cc151cad28e13beb1d5544619c8859062e26e689f  ./supabase/tests/02_rls.test.sql
 9301e75a5cb5a19f8b5c42b9352cfe43ef509358c052f967b8725b2bb84b279d  ./supabase/tests/03_state_machine.test.sql
 6fe6999ce9556f56f163c418b6824455c84d0e21d721bcc772fe472f37ffb707  ./supabase/tests/04_money.test.sql
 61ad96f26980c467e8e93f9e9dfd4fbe3233ea75521f9d9342dad8d3763830e6  ./supabase/tests/05_idempotency.test.sql
