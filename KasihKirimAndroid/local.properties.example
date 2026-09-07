@@ -1,0 +1,6 @@
+# Copy to local.properties. NEVER commit local.properties.
+# Only the PUBLISHABLE key belongs here. A service_role key in an APK is a
+# total compromise: it bypasses RLS for every table.
+sdk.dir=/path/to/Android/sdk
+SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
+SUPABASE_PUBLISHABLE_KEY=sb_publishable_YOUR_KEY

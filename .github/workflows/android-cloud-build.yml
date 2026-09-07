@@ -1,0 +1,117 @@
+name: KasihKirim Android Cloud Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'KasihKirimAndroid/**'
+      - '.github/workflows/android-cloud-build.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GRADLE_VERSION: '9.6.0'
+  ANDROID_PLATFORM: 'android-37'
+  BUILD_TOOLS: '37.0.0'
+
+jobs:
+  build:
+    name: Android Debug APK
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platform-tools" "platforms;${ANDROID_PLATFORM}" "build-tools;${BUILD_TOOLS}"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v5
+        with:
+          gradle-version: ${{ env.GRADLE_VERSION }}
+
+      - name: Generate Gradle wrapper
+        working-directory: KasihKirimAndroid
+        run: gradle wrapper --gradle-version "${GRADLE_VERSION}" --distribution-type bin
+
+      - name: Configure Supabase build values
+        working-directory: KasihKirimAndroid
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+        run: |
+          test -n "$SUPABASE_URL" || { echo 'Missing SUPABASE_URL secret'; exit 1; }
+          test -n "$SUPABASE_PUBLISHABLE_KEY" || { echo 'Missing SUPABASE_PUBLISHABLE_KEY secret'; exit 1; }
+          printf 'sdk.dir=%s\nSUPABASE_URL=%s\nSUPABASE_PUBLISHABLE_KEY=%s\n' "$ANDROID_HOME" "$SUPABASE_URL" "$SUPABASE_PUBLISHABLE_KEY" > local.properties
+
+      # Added with the Phase 1 foundation. A service_role key or DB password in
+      # the client is a total compromise: it bypasses RLS on every table. Fail
+      # the build rather than let one reach an APK.
+      - name: GATE — no forbidden secret in Android sources
+        run: |
+          set -euo pipefail
+          fail=0
+          # Match KEY MATERIAL, not the words. An earlier version of this gate
+          # grepped for the bare string 'service_role', which appears in the
+          # comment in SupabaseClientProvider.kt explaining why it must never
+          # be used -- and so failed the build it was meant to protect.
+          # Comment lines are stripped before matching.
+          if grep -rIn --include='*.kt' --include='*.kts' --include='*.xml' -E \
+               -e 'sb_secret_[A-Za-z0-9_-]+' \
+               -e 'eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}' \
+               -e '(SERVICE_ROLE|SERVICE_KEY)[A-Z_]*\s*[:=]\s*["'"'"'][^"'"'"']+' \
+               -e 'postgres(ql)?://[^\s"]+' \
+               KasihKirimAndroid/ | grep -vE '^\S+:[0-9]+:\s*(//|\*|#|<!--)' ; then
+            echo "::error::key material found in Android sources"; fail=1
+          fi
+          if git ls-files --error-unmatch KasihKirimAndroid/local.properties >/dev/null 2>&1; then
+            echo "::error::local.properties is tracked"; fail=1
+          fi
+          exit $fail
+
+      - name: Build debug APK
+        working-directory: KasihKirimAndroid
+        run: ./gradlew :app:assembleDebug --no-daemon
+
+      - name: Run JVM tests
+        working-directory: KasihKirimAndroid
+        run: ./gradlew test --no-daemon
+
+      # Inspect the packaged binary itself, not just the sources.
+      - name: GATE — no secret survived into the APK
+        run: |
+          set -euo pipefail
+          APK=$(find KasihKirimAndroid/app/build/outputs/apk/debug -name '*.apk' | head -1)
+          test -n "$APK" || { echo "::error::APK not produced"; exit 1; }
+          if strings "$APK" | grep -qE 'service_role|sb_secret_|postgres(ql)?://'; then
+            echo "::error::secret-shaped string found inside the APK"; exit 1
+          fi
+          echo "APK OK: $(du -h "$APK" | cut -f1)"
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: KasihKirim-debug-apk
+          path: KasihKirimAndroid/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14

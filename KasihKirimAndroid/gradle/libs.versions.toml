@@ -1,0 +1,52 @@
+# Versions are pinned to the baseline agreed for this project. Several are newer
+# than the assistant's training data; they are used as specified and must be
+# confirmed to resolve on the first real build. Do not upgrade casually.
+[versions]
+agp             = "9.4.0"
+kotlin          = "2.3.21"
+composeBom      = "2026.08.00"
+navigation      = "2.10.0"
+lifecycle       = "2.11.0"
+supabaseBom     = "3.5.0"
+ktor            = "3.0.3"
+coreKtx         = "1.15.0"
+activityCompose = "1.9.3"
+securityCrypto  = "1.1.0-alpha06"
+coroutines      = "1.9.0"
+junit           = "4.13.2"
+androidxJunit   = "1.2.1"
+espresso        = "3.6.1"
+
+[libraries]
+androidx-core-ktx        = { module = "androidx.core:core-ktx",                       version.ref = "coreKtx" }
+androidx-activity-compose= { module = "androidx.activity:activity-compose",           version.ref = "activityCompose" }
+androidx-lifecycle-runtime= { module = "androidx.lifecycle:lifecycle-runtime-ktx",    version.ref = "lifecycle" }
+androidx-lifecycle-compose= { module = "androidx.lifecycle:lifecycle-runtime-compose",version.ref = "lifecycle" }
+androidx-lifecycle-vm     = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycle" }
+androidx-navigation      = { module = "androidx.navigation:navigation-compose",       version.ref = "navigation" }
+androidx-security-crypto = { module = "androidx.security:security-crypto",            version.ref = "securityCrypto" }
+
+compose-bom       = { module = "androidx.compose:compose-bom",           version.ref = "composeBom" }
+compose-ui        = { module = "androidx.compose.ui:ui" }
+compose-graphics  = { module = "androidx.compose.ui:ui-graphics" }
+compose-tooling   = { module = "androidx.compose.ui:ui-tooling" }
+compose-preview   = { module = "androidx.compose.ui:ui-tooling-preview" }
+compose-material3 = { module = "androidx.compose.material3:material3" }
+compose-test-junit4 = { module = "androidx.compose.ui:ui-test-junit4" }
+compose-test-manifest = { module = "androidx.compose.ui:ui-test-manifest" }
+
+supabase-bom      = { module = "io.github.jan-tennert.supabase:bom",            version.ref = "supabaseBom" }
+supabase-auth     = { module = "io.github.jan-tennert.supabase:auth-kt" }
+supabase-postgrest= { module = "io.github.jan-tennert.supabase:postgrest-kt" }
+ktor-okhttp       = { module = "io.ktor:ktor-client-okhttp",                    version.ref = "ktor" }
+
+coroutines-test   = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
+junit             = { module = "junit:junit",                                   version.ref = "junit" }
+androidx-junit    = { module = "androidx.test.ext:junit",                       version.ref = "androidxJunit" }
+espresso-core     = { module = "androidx.test.espresso:espresso-core",          version.ref = "espresso" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+kotlin-android      = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+kotlin-compose      = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+kotlin-serialization= { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }

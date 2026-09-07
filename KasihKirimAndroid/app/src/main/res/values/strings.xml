@@ -1,0 +1,33 @@
+<resources>
+    <string name="app_name">KasihKirim</string>
+    <string name="tagline">Kirim dengan kasih, dari kampung ke bandar</string>
+
+    <string name="auth_sign_in">Log Masuk</string>
+    <string name="auth_sign_up">Daftar</string>
+    <string name="auth_email">E-mel</string>
+    <string name="auth_password">Kata laluan</string>
+    <string name="auth_sign_out">Log Keluar</string>
+    <string name="auth_have_account">Sudah ada akaun? Log masuk</string>
+    <string name="auth_no_account">Belum ada akaun? Daftar</string>
+    <string name="auth_checking">Menyemak sesi…</string>
+    <string name="auth_phone_soon">Log masuk dengan nombor telefon belum tersedia.</string>
+
+    <string name="err_invalid_email">Sila masukkan e-mel yang sah.</string>
+    <string name="err_password_short">Kata laluan mesti sekurang-kurangnya 8 aksara.</string>
+    <string name="err_credentials">E-mel atau kata laluan salah.</string>
+    <string name="err_network">Tiada talian. Sila cuba lagi.</string>
+    <string name="err_unexpected">Ada masalah. Sila cuba lagi.</string>
+    <string name="err_not_configured">Aplikasi belum dikonfigurasi. Sila hubungi sokongan.</string>
+
+    <string name="nav_home">Utama</string>
+    <string name="nav_send">Kirim</string>
+    <string name="nav_board">Papan</string>
+    <string name="nav_orders">Pesanan</string>
+    <string name="nav_profile">Profil</string>
+    <string name="nav_trips">Trip</string>
+    <string name="nav_earnings">Duit</string>
+    <string name="nav_muatan_jual">Muatan Jual</string>
+    <string name="nav_sales">Jualan</string>
+
+    <string name="phase1_placeholder">Skrin ini akan dibina dalam fasa seterusnya.</string>
+</resources>
