@@ -48,13 +48,30 @@ jobs:
       # unprotected table fails the build rather than shipping.
       - name: Every public table has RLS
         run: |
-          supabase db query --file - <<'SQL'
+          set -euo pipefail
+
+          DB_URL="$(supabase status --output json | jq -r '.DB_URL // .db.url // empty')"
+
+          if [ -z "$DB_URL" ]; then
+            echo "::error::Could not determine local Supabase DB URL"
+            echo "Supabase status output:"
+            supabase status --output json
+            exit 1
+          fi
+
+          psql "$DB_URL" \
+            -v ON_ERROR_STOP=1 \
+            <<'SQL'
           DO $$
           DECLARE bad TEXT;
           BEGIN
             SELECT string_agg(c.relname, ', ') INTO bad
-            FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
-            WHERE n.nspname = 'public' AND c.relkind = 'r' AND NOT c.relrowsecurity;
+            FROM pg_class c
+            JOIN pg_namespace n ON n.oid = c.relnamespace
+            WHERE n.nspname = 'public'
+              AND c.relkind = 'r'
+              AND NOT c.relrowsecurity;
+
             IF bad IS NOT NULL THEN
               RAISE EXCEPTION 'Tables without RLS: %', bad;
             END IF;
