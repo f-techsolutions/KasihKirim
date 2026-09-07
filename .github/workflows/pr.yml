@@ -60,7 +60,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: 20, cache: npm }
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
       - run: npm ci --prefix apps/mobile
       - run: npm run typecheck --prefix apps/mobile
 
@@ -77,7 +80,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
-      - uses: gitleaks/gitleaks-action@v2
+      - uses: gitleaks/gitleaks-action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # A leaked service-role key is total compromise, so it is checked
       # mechanically rather than trusted to code review.
