@@ -21,10 +21,11 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.boolean
-import kotlinx.serialization.json.content
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.double
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 import java.io.IOException
 import java.time.Instant
 
@@ -37,12 +38,6 @@ private data class IsDefaultUpdate(@SerialName("is_default") val isDefault: Bool
 
 @Serializable
 private data class DeletedAtUpdate(@SerialName("deleted_at") val deletedAt: String)
-
-@Serializable
-private data class ServiceabilityParams(
-    @SerialName("p_origin_node") val originNode: String,
-    @SerialName("p_dest_node") val destNode: String,
-)
 
 class AddressRepositoryImpl : AddressRepository {
 
@@ -137,8 +132,18 @@ class AddressRepositoryImpl : AddressRepository {
 
     override suspend fun checkServiceability(originNodeId: String, destNodeId: String): AppResult<Serviceability> =
         runCatchingResult {
+            // The reified rpc(function, parameters: T) overload isn't in the
+            // pinned supabase-bom 3.5.0 -- only rpc(function, JsonObject) and
+            // rpc(function, request-lambda) exist there, so build the params
+            // as a JsonObject directly.
             SupabaseClientProvider.client.postgrest
-                .rpc("rpc_check_serviceability", ServiceabilityParams(originNodeId, destNodeId))
+                .rpc(
+                    "rpc_check_serviceability",
+                    buildJsonObject {
+                        put("p_origin_node", originNodeId)
+                        put("p_dest_node", destNodeId)
+                    },
+                )
                 .decodeAs<JsonObject>()
                 .toServiceability()
         }
