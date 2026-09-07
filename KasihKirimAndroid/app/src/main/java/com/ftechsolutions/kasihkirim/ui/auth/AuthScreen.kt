@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -82,7 +83,7 @@ fun AuthScreen(vm: AuthViewModel) {
         }
 
         Spacer(Modifier.height(8.dp))
-        TextButton(onClick = { isSignUp = !isSignUp; vm.clearError() }) {
+        TextButton(onClick = { isSignUp = if (isSignUp) false else true; vm.clearError() }) {
             Text(stringResource(if (isSignUp) R.string.auth_have_account else R.string.auth_no_account))
         }
 
