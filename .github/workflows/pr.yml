@@ -46,7 +46,7 @@ jobs:
 
       # A table without policies is a data breach waiting to happen, so an
       # unprotected table fails the build rather than shipping.
-      - name: Every public table has RLS
+      - name: Every public application table has RLS
         run: |
           set -euo pipefail
 
@@ -65,15 +65,24 @@ jobs:
           DO $$
           DECLARE bad TEXT;
           BEGIN
-            SELECT string_agg(c.relname, ', ') INTO bad
+            SELECT string_agg(c.relname, ', ' ORDER BY c.relname)
+              INTO bad
             FROM pg_class c
-            JOIN pg_namespace n ON n.oid = c.relnamespace
+            JOIN pg_namespace n
+              ON n.oid = c.relnamespace
+            LEFT JOIN pg_depend d
+              ON d.classid = 'pg_class'::regclass
+             AND d.objid = c.oid
+             AND d.deptype = 'e'
+            LEFT JOIN pg_extension e
+              ON e.oid = d.refobjid
             WHERE n.nspname = 'public'
               AND c.relkind = 'r'
+              AND e.oid IS NULL
               AND NOT c.relrowsecurity;
 
             IF bad IS NOT NULL THEN
-              RAISE EXCEPTION 'Tables without RLS: %', bad;
+              RAISE EXCEPTION 'Application tables without RLS: %', bad;
             END IF;
           END $$;
           SQL
