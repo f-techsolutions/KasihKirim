@@ -1,0 +1,6 @@
+<resources>
+    <style name="Theme.KasihKirim" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">#123D28</item>
+        <item name="android:windowBackground">#FDF7EA</item>
+    </style>
+</resources>
