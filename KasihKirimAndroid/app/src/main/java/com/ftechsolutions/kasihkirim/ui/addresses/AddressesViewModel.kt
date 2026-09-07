@@ -106,6 +106,24 @@ class AddressesViewModel(private val repo: AddressRepository) : ViewModel() {
         }
     }
 
+    fun setDefault(id: String) {
+        viewModelScope.launch {
+            when (val result = repo.setDefaultAddress(id)) {
+                is AppResult.Success -> load()   // re-fetch: two rows changed server-side
+                is AppResult.Failure -> _state.update { it.copy(error = result.error) }
+            }
+        }
+    }
+
+    fun delete(id: String) {
+        viewModelScope.launch {
+            when (val result = repo.deleteAddress(id)) {
+                is AppResult.Success -> _state.update { it.copy(addresses = it.addresses.filterNot { a -> a.id == id }) }
+                is AppResult.Failure -> _state.update { it.copy(error = result.error) }
+            }
+        }
+    }
+
     private inline fun updateForm(transform: (AddressFormState) -> AddressFormState) =
         _state.update { it.copy(form = transform(it.form)) }
 

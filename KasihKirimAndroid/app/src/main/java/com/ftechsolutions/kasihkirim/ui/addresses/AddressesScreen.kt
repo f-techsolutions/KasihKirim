@@ -10,6 +10,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
@@ -41,7 +42,9 @@ fun AddressesScreen(vm: AddressesViewModel, onBack: () -> Unit) {
             if (state.addresses.isEmpty() && !state.isLoading) {
                 item { Text(stringResource(R.string.addresses_empty)) }
             }
-            items(state.addresses, key = { it.id }) { address -> AddressCard(address) }
+            items(state.addresses, key = { it.id }) { address ->
+                AddressCard(address, onSetDefault = { vm.setDefault(address.id) }, onDelete = { vm.delete(address.id) })
+            }
 
             item {
                 Spacer(Modifier.height(16.dp))
@@ -56,10 +59,16 @@ fun AddressesScreen(vm: AddressesViewModel, onBack: () -> Unit) {
 }
 
 @Composable
-private fun AddressCard(address: Address) {
+private fun AddressCard(address: Address, onSetDefault: () -> Unit, onDelete: () -> Unit) {
     ElevatedCard {
         Column(Modifier.padding(16.dp)) {
-            Text(address.label, style = MaterialTheme.typography.titleMedium)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(address.label, style = MaterialTheme.typography.titleMedium)
+                if (address.isDefault) {
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.addresses_default_badge), style = MaterialTheme.typography.labelSmall)
+                }
+            }
             Text(address.recipientName, style = MaterialTheme.typography.bodyMedium)
             Text(address.recipientPhone, style = MaterialTheme.typography.bodyMedium)
             Text(
@@ -67,6 +76,14 @@ private fun AddressCard(address: Address) {
                 style = MaterialTheme.typography.bodySmall,
             )
             Text(address.landmarkNote, style = MaterialTheme.typography.bodySmall)
+
+            Row(Modifier.padding(top = 8.dp)) {
+                if (!address.isDefault) {
+                    TextButton(onClick = onSetDefault) { Text(stringResource(R.string.addresses_set_default)) }
+                }
+                Spacer(Modifier.weight(1f))
+                TextButton(onClick = onDelete) { Text(stringResource(R.string.addresses_delete)) }
+            }
         }
     }
 }

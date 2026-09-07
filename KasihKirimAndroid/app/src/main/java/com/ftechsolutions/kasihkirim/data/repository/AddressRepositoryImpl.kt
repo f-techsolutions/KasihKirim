@@ -15,11 +15,20 @@ import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
 import io.github.jan.supabase.postgrest.query.Order
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import java.io.IOException
+import java.time.Instant
 
 private const val ADDRESS_COLUMNS =
     "id,label,recipient_name,recipient_phone,landmark_note,is_default," +
         "community:communities(id,name,type,district,state)"
+
+@Serializable
+private data class IsDefaultUpdate(@SerialName("is_default") val isDefault: Boolean)
+
+@Serializable
+private data class DeletedAtUpdate(@SerialName("deleted_at") val deletedAt: String)
 
 class AddressRepositoryImpl : AddressRepository {
 
@@ -28,10 +37,38 @@ class AddressRepositoryImpl : AddressRepository {
     override suspend fun listAddresses(): AppResult<List<Address>> = runCatchingResult {
         SupabaseClientProvider.client.postgrest.from("addresses")
             .select(columns = Columns.raw(ADDRESS_COLUMNS)) {
+                filter { is_("deleted_at", null) }
                 order("is_default", Order.DESCENDING)
             }
             .decodeList<AddressDto>()
             .map { it.toDomain() }
+    }
+
+    override suspend fun setDefaultAddress(id: String): AppResult<Unit> = runCatchingResult {
+        val userId = SupabaseClientProvider.client.auth.currentUserOrNull()?.id
+            ?: return AppResult.Failure(AppError.SessionExpired)
+        val table = SupabaseClientProvider.client.postgrest.from("addresses")
+        // Clear first: ux_addresses_one_default allows at most one row with
+        // is_default true per user, so setting the new default before
+        // clearing the old one would violate it.
+        table.update(IsDefaultUpdate(false)) {
+            filter {
+                eq("user_id", userId)
+                eq("is_default", true)
+            }
+        }
+        table.update(IsDefaultUpdate(true)) {
+            filter { eq("id", id) }
+        }
+        Unit
+    }
+
+    override suspend fun deleteAddress(id: String): AppResult<Unit> = runCatchingResult {
+        SupabaseClientProvider.client.postgrest.from("addresses")
+            .update(DeletedAtUpdate(Instant.now().toString())) {
+                filter { eq("id", id) }
+            }
+        Unit
     }
 
     override suspend fun createAddress(draft: NewAddress): AppResult<Address> = runCatchingResult {

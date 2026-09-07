@@ -42,4 +42,7 @@
     <string name="addresses_community">Kampung / Pekan</string>
     <string name="addresses_landmark">Petunjuk Lokasi</string>
     <string name="addresses_save">Simpan Alamat</string>
+    <string name="addresses_default_badge">(Utama)</string>
+    <string name="addresses_set_default">Jadikan Utama</string>
+    <string name="addresses_delete">Padam</string>
 </resources>

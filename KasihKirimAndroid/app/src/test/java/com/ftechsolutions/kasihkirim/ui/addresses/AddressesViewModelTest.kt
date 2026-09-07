@@ -21,6 +21,8 @@ private class FakeAddressRepository(
     var createResult: AppResult<Address>? = null,
 ) : AddressRepository {
     var createCalls = 0
+    var setDefaultCalls = 0
+    var deleteCalls = 0
 
     override suspend fun listAddresses(): AppResult<List<Address>> = AppResult.Success(addresses)
 
@@ -37,6 +39,18 @@ private class FakeAddressRepository(
                 isDefault = false,
             ),
         )
+    }
+
+    override suspend fun setDefaultAddress(id: String): AppResult<Unit> {
+        setDefaultCalls++
+        addresses = addresses.map { it.copy(isDefault = it.id == id) }
+        return AppResult.Success(Unit)
+    }
+
+    override suspend fun deleteAddress(id: String): AppResult<Unit> {
+        deleteCalls++
+        addresses = addresses.filterNot { it.id == id }
+        return AppResult.Success(Unit)
     }
 
     override suspend fun searchCommunities(query: String): AppResult<List<Community>> =
@@ -104,5 +118,33 @@ class AddressesViewModelTest {
         vm.submit(); advanceUntilIdle()
 
         assertEquals(0, repo.createCalls)
+    }
+
+    @Test fun `setDefault re-fetches so only one address stays default`() = runTest(dispatcher) {
+        val kampungB = KAMPUNG_A.copy(id = "c2", name = "Kampung B")
+        val repo = FakeAddressRepository(addresses = listOf(
+            Address("a1", "Rumah", "Aisyah", "+60123456789", KAMPUNG_A, "Sebelah kedai runcit", true),
+            Address("a2", "Pejabat", "Aisyah", "+60123456789", kampungB, "Tingkat 2", false),
+        ))
+        val vm = AddressesViewModel(repo); advanceUntilIdle()
+
+        vm.setDefault("a2"); advanceUntilIdle()
+
+        assertEquals(1, repo.setDefaultCalls)
+        val byId = vm.state.value.addresses.associateBy { it.id }
+        assertFalse(byId.getValue("a1").isDefault)
+        assertTrue(byId.getValue("a2").isDefault)
+    }
+
+    @Test fun `delete removes the address from state`() = runTest(dispatcher) {
+        val repo = FakeAddressRepository(addresses = listOf(
+            Address("a1", "Rumah", "Aisyah", "+60123456789", KAMPUNG_A, "Sebelah kedai runcit", true),
+        ))
+        val vm = AddressesViewModel(repo); advanceUntilIdle()
+
+        vm.delete("a1"); advanceUntilIdle()
+
+        assertEquals(1, repo.deleteCalls)
+        assertTrue(vm.state.value.addresses.isEmpty())
     }
 }
