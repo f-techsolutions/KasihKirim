@@ -7,12 +7,17 @@ on:
     paths:
       - 'KasihKirimAndroid/**'
       - '.github/workflows/android-cloud-build.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'KasihKirimAndroid/**'
+      - '.github/workflows/android-cloud-build.yml'
 
 permissions:
   contents: read
 
 concurrency:
-  group: android-${{ github.ref }}
+  group: android-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 env:
@@ -28,10 +33,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
@@ -54,14 +59,28 @@ jobs:
         working-directory: KasihKirimAndroid
         run: gradle wrapper --gradle-version "${GRADLE_VERSION}" --distribution-type bin
 
+      # Fork pull requests never see repository secrets -- GitHub withholds
+      # them from workflows triggered by a pull_request event from a fork,
+      # by design, to stop a fork from exfiltrating secrets via a crafted
+      # workflow change. That means this step fails closed for fork PRs
+      # rather than silently building with an empty Supabase config.
       - name: Configure Supabase build values
         working-directory: KasihKirimAndroid
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+          IS_FORK_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
         run: |
-          test -n "$SUPABASE_URL" || { echo 'Missing SUPABASE_URL secret'; exit 1; }
-          test -n "$SUPABASE_PUBLISHABLE_KEY" || { echo 'Missing SUPABASE_PUBLISHABLE_KEY secret'; exit 1; }
+          set -euo pipefail
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_PUBLISHABLE_KEY" ]; then
+            echo "::error::Missing SUPABASE_URL and/or SUPABASE_PUBLISHABLE_KEY secret."
+            if [ "$IS_FORK_PR" = "true" ]; then
+              echo "::error::This build was triggered by a pull request from a fork. GitHub does not expose repository secrets (SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY) to workflows run for fork pull requests -- this is a GitHub security restriction, not a misconfiguration, and it cannot be worked around from within the workflow. A maintainer must build this change from a branch on the base repository (or via workflow_dispatch) instead."
+            else
+              echo "::error::Add SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY under Settings -> Secrets and variables -> Actions for this repository."
+            fi
+            exit 1
+          fi
           printf 'sdk.dir=%s\nSUPABASE_URL=%s\nSUPABASE_PUBLISHABLE_KEY=%s\n' "$ANDROID_HOME" "$SUPABASE_URL" "$SUPABASE_PUBLISHABLE_KEY" > local.properties
 
       # Added with the Phase 1 foundation. A service_role key or DB password in
@@ -89,13 +108,22 @@ jobs:
           fi
           exit $fail
 
-      - name: Build debug APK
-        working-directory: KasihKirimAndroid
-        run: ./gradlew :app:assembleDebug --no-daemon
-
       - name: Run JVM tests
         working-directory: KasihKirimAndroid
         run: ./gradlew test --no-daemon
+
+      - name: Upload JVM test reports (failure only)
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: KasihKirim-jvm-test-reports
+          path: KasihKirimAndroid/app/build/reports/tests/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Build debug APK
+        working-directory: KasihKirimAndroid
+        run: ./gradlew :app:assembleDebug --no-daemon
 
       # Inspect the packaged binary itself, not just the sources.
       - name: GATE — no secret survived into the APK
@@ -109,7 +137,7 @@ jobs:
           echo "APK OK: $(du -h "$APK" | cut -f1)"
 
       - name: Upload APK
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: KasihKirim-debug-apk
           path: KasihKirimAndroid/app/build/outputs/apk/debug/app-debug.apk
