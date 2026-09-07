@@ -14,6 +14,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.ftechsolutions.kasihkirim.domain.model.AuthUser
 import com.ftechsolutions.kasihkirim.domain.repository.AddressRepository
+import com.ftechsolutions.kasihkirim.domain.repository.KirimRepository
 import com.ftechsolutions.kasihkirim.ui.addresses.AddressesScreen
 import com.ftechsolutions.kasihkirim.ui.addresses.AddressesViewModel
 import com.ftechsolutions.kasihkirim.ui.auth.AuthViewModel
@@ -21,6 +22,7 @@ import com.ftechsolutions.kasihkirim.ui.board.BoardScreen
 import com.ftechsolutions.kasihkirim.ui.home.HomeScreen
 import com.ftechsolutions.kasihkirim.ui.orders.OrdersScreen
 import com.ftechsolutions.kasihkirim.ui.profile.ProfileScreen
+import com.ftechsolutions.kasihkirim.ui.send.KirimQuoteViewModel
 import com.ftechsolutions.kasihkirim.ui.send.SendScreen
 import com.ftechsolutions.kasihkirim.ui.serviceability.ServiceabilityScreen
 import com.ftechsolutions.kasihkirim.ui.serviceability.ServiceabilityViewModel
@@ -29,7 +31,12 @@ private const val ADDRESSES_ROUTE = "addresses"
 private const val SERVICEABILITY_ROUTE = "serviceability"
 
 @Composable
-fun AppNavHost(user: AuthUser, authViewModel: AuthViewModel, addressRepository: AddressRepository) {
+fun AppNavHost(
+    user: AuthUser,
+    authViewModel: AuthViewModel,
+    addressRepository: AddressRepository,
+    kirimRepository: KirimRepository,
+) {
     val nav: NavHostController = rememberNavController()
     val tabs = tabsFor(user.primaryRole)
     val entry by nav.currentBackStackEntryAsState()
@@ -77,9 +84,13 @@ fun AppNavHost(user: AuthUser, authViewModel: AuthViewModel, addressRepository: 
                 val vm: ServiceabilityViewModel = viewModel(factory = ServiceabilityViewModel.Factory(addressRepository))
                 ServiceabilityScreen(vm, onBack = { nav.popBackStack() })
             }
+            composable(Destination.SEND.route) {
+                val vm: KirimQuoteViewModel =
+                    viewModel(factory = KirimQuoteViewModel.Factory(kirimRepository, addressRepository))
+                SendScreen(vm)
+            }
             // Phase 1 renders honest placeholders. These are NOT mocks: they
-            // claim nothing and call no backend. Phases 3-8 replace them.
-            composable(Destination.SEND.route) { SendScreen() }
+            // claim nothing and call no backend. Phases 4-8 replace them.
             composable(Destination.BOARD.route) { BoardScreen() }
             composable(Destination.ORDERS.route) { OrdersScreen() }
             composable(Destination.TRIPS.route) { PlaceholderScreen(Destination.TRIPS) }

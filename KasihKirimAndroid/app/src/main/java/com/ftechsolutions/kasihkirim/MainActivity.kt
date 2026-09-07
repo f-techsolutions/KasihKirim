@@ -17,7 +17,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             KasihKirimTheme {
                 val vm: AuthViewModel = viewModel(factory = AuthViewModel.Factory(app.authRepository))
-                App(vm, app.addressRepository)
+                App(vm, app.addressRepository, app.kirimRepository)
             }
         }
     }

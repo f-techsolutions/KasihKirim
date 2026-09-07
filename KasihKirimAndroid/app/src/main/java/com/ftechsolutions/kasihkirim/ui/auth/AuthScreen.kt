@@ -104,5 +104,10 @@ internal fun AppError.messageRes(): Int = when (this) {
     AppError.InvalidCredentials -> R.string.err_credentials
     AppError.Network, AppError.Timeout -> R.string.err_network
     AppError.NotConfigured -> R.string.err_not_configured
+    is AppError.Server -> when (code) {
+        "BUDGET_CAP_EXCEEDED" -> R.string.err_budget_cap_exceeded
+        "CATEGORY_NOT_FOUND" -> R.string.err_category_not_found
+        else -> R.string.err_unexpected
+    }
     else -> R.string.err_unexpected
 }
