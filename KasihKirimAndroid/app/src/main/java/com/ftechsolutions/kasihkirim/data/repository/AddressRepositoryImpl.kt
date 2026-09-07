@@ -37,7 +37,7 @@ class AddressRepositoryImpl : AddressRepository {
     override suspend fun listAddresses(): AppResult<List<Address>> = runCatchingResult {
         SupabaseClientProvider.client.postgrest.from("addresses")
             .select(columns = Columns.raw(ADDRESS_COLUMNS)) {
-                filter { is_("deleted_at", null) }
+                filter { exact("deleted_at", null) }
                 order("is_default", Order.DESCENDING)
             }
             .decodeList<AddressDto>()
