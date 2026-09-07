@@ -25,7 +25,18 @@ jobs:
 
       - name: Install pgTAP test helpers
         run: |
-          supabase db query --file supabase/test_helpers/00_helpers.sql
+          set -euo pipefail
+
+          DB_URL="$(supabase status | sed -n 's/.*DB URL:[[:space:]]*//p' | head -n 1)"
+
+          test -n "$DB_URL" || {
+            echo "::error::Could not determine local Supabase DB URL"
+            exit 1
+          }
+
+          echo "Installing pgTAP test helpers into local database..."
+          psql "$DB_URL" -v ON_ERROR_STOP=1 \
+            -f supabase/test_helpers/00_helpers.sql
 
       - name: pgTAP
         run: supabase test db
