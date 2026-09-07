@@ -43,12 +43,20 @@ fun AddressesScreen(vm: AddressesViewModel, onBack: () -> Unit) {
                 item { Text(stringResource(R.string.addresses_empty)) }
             }
             items(state.addresses, key = { it.id }) { address ->
-                AddressCard(address, onSetDefault = { vm.setDefault(address.id) }, onDelete = { vm.delete(address.id) })
+                AddressCard(
+                    address,
+                    onSetDefault = { vm.setDefault(address.id) },
+                    onDelete = { vm.delete(address.id) },
+                    onEdit = { vm.startEdit(address) },
+                )
             }
 
             item {
                 Spacer(Modifier.height(16.dp))
-                Text(stringResource(R.string.addresses_add_title), style = MaterialTheme.typography.titleMedium)
+                Text(
+                    stringResource(if (state.form.isEditing) R.string.addresses_edit_title else R.string.addresses_add_title),
+                    style = MaterialTheme.typography.titleMedium,
+                )
             }
             item { AddressForm(vm) }
 
@@ -59,7 +67,7 @@ fun AddressesScreen(vm: AddressesViewModel, onBack: () -> Unit) {
 }
 
 @Composable
-private fun AddressCard(address: Address, onSetDefault: () -> Unit, onDelete: () -> Unit) {
+private fun AddressCard(address: Address, onSetDefault: () -> Unit, onDelete: () -> Unit, onEdit: () -> Unit) {
     ElevatedCard {
         Column(Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -81,6 +89,7 @@ private fun AddressCard(address: Address, onSetDefault: () -> Unit, onDelete: ()
                 if (!address.isDefault) {
                     TextButton(onClick = onSetDefault) { Text(stringResource(R.string.addresses_set_default)) }
                 }
+                TextButton(onClick = onEdit) { Text(stringResource(R.string.addresses_edit)) }
                 Spacer(Modifier.weight(1f))
                 TextButton(onClick = onDelete) { Text(stringResource(R.string.addresses_delete)) }
             }
@@ -145,7 +154,12 @@ private fun AddressForm(vm: AddressesViewModel) {
             if (state.isSubmitting) {
                 CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
             } else {
-                Text(stringResource(R.string.addresses_save))
+                Text(stringResource(if (form.isEditing) R.string.addresses_update else R.string.addresses_save))
+            }
+        }
+        if (form.isEditing) {
+            TextButton(onClick = vm::cancelEdit, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.addresses_cancel_edit))
             }
         }
     }

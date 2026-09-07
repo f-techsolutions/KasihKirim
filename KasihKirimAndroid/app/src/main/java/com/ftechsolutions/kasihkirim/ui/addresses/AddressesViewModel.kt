@@ -28,7 +28,12 @@ data class AddressFormState(
     val selectedCommunity: Community? = null,
     val communityQuery: String = "",
     val communityResults: List<Community> = emptyList(),
+    /** Null means "new address"; set means submit() updates this id instead
+     *  of creating a new row. */
+    val editingId: String? = null,
 ) {
+    val isEditing: Boolean get() = editingId != null
+
     val canSubmit: Boolean
         get() = label.isNotBlank() &&
             recipientName.isNotBlank() &&
@@ -80,10 +85,25 @@ class AddressesViewModel(private val repo: AddressRepository) : ViewModel() {
     fun onCommunitySelected(community: Community) =
         updateForm { it.copy(selectedCommunity = community, communityResults = emptyList(), communityQuery = community.name) }
 
+    fun startEdit(address: Address) = updateForm {
+        AddressFormState(
+            label = address.label,
+            recipientName = address.recipientName,
+            recipientPhone = address.recipientPhone,
+            landmarkNote = address.landmarkNote,
+            selectedCommunity = address.community,
+            communityQuery = address.community.name,
+            editingId = address.id,
+        )
+    }
+
+    fun cancelEdit() = updateForm { AddressFormState() }
+
     fun submit() {
         val form = _state.value.form
         if (!form.canSubmit) return
         val community = form.selectedCommunity ?: return
+        val editingId = form.editingId
         viewModelScope.launch {
             _state.update { it.copy(isSubmitting = true, error = null) }
             val draft = NewAddress(
@@ -93,11 +113,16 @@ class AddressesViewModel(private val repo: AddressRepository) : ViewModel() {
                 communityId = community.id,
                 landmarkNote = form.landmarkNote,
             )
-            when (val result = repo.createAddress(draft)) {
+            val result = if (editingId != null) repo.updateAddress(editingId, draft) else repo.createAddress(draft)
+            when (result) {
                 is AppResult.Success -> _state.update {
                     it.copy(
                         isSubmitting = false,
-                        addresses = listOf(result.data) + it.addresses,
+                        addresses = if (editingId != null) {
+                            it.addresses.map { a -> if (a.id == editingId) result.data else a }
+                        } else {
+                            listOf(result.data) + it.addresses
+                        },
                         form = AddressFormState(),
                     )
                 }

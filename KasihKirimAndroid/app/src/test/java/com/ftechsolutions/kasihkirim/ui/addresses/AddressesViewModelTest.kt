@@ -21,6 +21,7 @@ private class FakeAddressRepository(
     var createResult: AppResult<Address>? = null,
 ) : AddressRepository {
     var createCalls = 0
+    var updateCalls = 0
     var setDefaultCalls = 0
     var deleteCalls = 0
 
@@ -39,6 +40,19 @@ private class FakeAddressRepository(
                 isDefault = false,
             ),
         )
+    }
+
+    override suspend fun updateAddress(id: String, draft: NewAddress): AppResult<Address> {
+        updateCalls++
+        val existing = addresses.first { it.id == id }
+        val updated = existing.copy(
+            label = draft.label,
+            recipientName = draft.recipientName,
+            recipientPhone = draft.recipientPhone,
+            landmarkNote = draft.landmarkNote,
+        )
+        addresses = addresses.map { if (it.id == id) updated else it }
+        return AppResult.Success(updated)
     }
 
     override suspend fun setDefaultAddress(id: String): AppResult<Unit> {
@@ -146,5 +160,37 @@ class AddressesViewModelTest {
 
         assertEquals(1, repo.deleteCalls)
         assertTrue(vm.state.value.addresses.isEmpty())
+    }
+
+    @Test fun `startEdit populates the form and submit updates in place`() = runTest(dispatcher) {
+        val existing = Address("a1", "Rumah", "Aisyah", "+60123456789", KAMPUNG_A, "Sebelah kedai runcit", true)
+        val repo = FakeAddressRepository(addresses = listOf(existing))
+        val vm = AddressesViewModel(repo); advanceUntilIdle()
+
+        vm.startEdit(existing)
+        assertTrue(vm.state.value.form.isEditing)
+        assertEquals("Rumah", vm.state.value.form.label)
+        assertTrue(vm.state.value.form.canSubmit)
+
+        vm.onLabelChange("Rumah Baru")
+        vm.submit(); advanceUntilIdle()
+
+        assertEquals(1, repo.updateCalls)
+        assertEquals(0, repo.createCalls)
+        assertEquals(1, vm.state.value.addresses.size)
+        assertEquals("Rumah Baru", vm.state.value.addresses.first().label)
+        assertFalse("form clears after a successful update", vm.state.value.form.isEditing)
+    }
+
+    @Test fun `cancelEdit clears the form without submitting`() = runTest(dispatcher) {
+        val existing = Address("a1", "Rumah", "Aisyah", "+60123456789", KAMPUNG_A, "Sebelah kedai runcit", true)
+        val repo = FakeAddressRepository(addresses = listOf(existing))
+        val vm = AddressesViewModel(repo); advanceUntilIdle()
+
+        vm.startEdit(existing)
+        vm.cancelEdit()
+
+        assertFalse(vm.state.value.form.isEditing)
+        assertEquals("", vm.state.value.form.label)
     }
 }

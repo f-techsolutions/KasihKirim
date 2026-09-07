@@ -45,4 +45,8 @@
     <string name="addresses_default_badge">(Utama)</string>
     <string name="addresses_set_default">Jadikan Utama</string>
     <string name="addresses_delete">Padam</string>
+    <string name="addresses_edit">Kemas Kini</string>
+    <string name="addresses_edit_title">Kemas Kini Alamat</string>
+    <string name="addresses_update">Simpan Perubahan</string>
+    <string name="addresses_cancel_edit">Batal</string>
 </resources>

@@ -5,6 +5,7 @@ import com.ftechsolutions.kasihkirim.core.result.AppResult
 import com.ftechsolutions.kasihkirim.core.security.SafeLog
 import com.ftechsolutions.kasihkirim.data.remote.SupabaseClientProvider
 import com.ftechsolutions.kasihkirim.data.remote.dto.AddressDto
+import com.ftechsolutions.kasihkirim.data.remote.dto.AddressUpdateDto
 import com.ftechsolutions.kasihkirim.data.remote.dto.CommunityDto
 import com.ftechsolutions.kasihkirim.data.remote.dto.NewAddressDto
 import com.ftechsolutions.kasihkirim.domain.model.Address
@@ -85,6 +86,24 @@ class AddressRepositoryImpl : AddressRepository {
                     landmarkNote = draft.landmarkNote,
                 ),
             ) { select(columns = Columns.raw(ADDRESS_COLUMNS)) }
+            .decodeSingle<AddressDto>()
+            .toDomain()
+    }
+
+    override suspend fun updateAddress(id: String, draft: NewAddress): AppResult<Address> = runCatchingResult {
+        SupabaseClientProvider.client.postgrest.from("addresses")
+            .update(
+                AddressUpdateDto(
+                    label = draft.label,
+                    recipientName = draft.recipientName,
+                    recipientPhone = draft.recipientPhone,
+                    communityId = draft.communityId,
+                    landmarkNote = draft.landmarkNote,
+                ),
+            ) {
+                filter { eq("id", id) }
+                select(columns = Columns.raw(ADDRESS_COLUMNS))
+            }
             .decodeSingle<AddressDto>()
             .toDomain()
     }

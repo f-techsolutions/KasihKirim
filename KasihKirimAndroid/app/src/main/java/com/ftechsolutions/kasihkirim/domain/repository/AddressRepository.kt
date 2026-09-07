@@ -14,6 +14,7 @@ interface AddressRepository {
     /** Excludes soft-deleted rows. */
     suspend fun listAddresses(): AppResult<List<Address>>
     suspend fun createAddress(draft: NewAddress): AppResult<Address>
+    suspend fun updateAddress(id: String, draft: NewAddress): AppResult<Address>
 
     /** Clears is_default on the user's other addresses first, then sets it
      *  on this one -- ux_addresses_one_default only allows one row with

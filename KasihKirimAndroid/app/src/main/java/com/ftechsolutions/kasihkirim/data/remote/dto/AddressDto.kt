@@ -55,3 +55,14 @@ data class NewAddressDto(
     @SerialName("community_id") val communityId: String,
     @SerialName("landmark_note") val landmarkNote: String,
 )
+
+/** Update body for public.addresses. No user_id here: ownership is
+ *  immutable from the client and RLS's "own" policy scopes the row anyway. */
+@Serializable
+data class AddressUpdateDto(
+    val label: String,
+    @SerialName("recipient_name") val recipientName: String,
+    @SerialName("recipient_phone") val recipientPhone: String,
+    @SerialName("community_id") val communityId: String,
+    @SerialName("landmark_note") val landmarkNote: String,
+)
