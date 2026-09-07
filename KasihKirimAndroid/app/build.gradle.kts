@@ -1,8 +1,10 @@
 import java.util.Properties
 
+// org.jetbrains.kotlin.android is intentionally not applied: AGP 9's
+// built-in Kotlin support covers it, and the plugin now conflicts if applied.
+// https://developer.android.com/build/migrate-to-built-in-kotlin
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
 }
@@ -56,11 +58,14 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlin { jvmToolchain(17) }
 
     buildFeatures { compose = true; buildConfig = true }
     packaging { resources { excludes += "/META-INF/{AL2.0,LGPL2.1}" } }
 }
+
+// Top-level, not nested inside android {} -- that nested-call convenience
+// was provided by the kotlin-android plugin, which is no longer applied.
+kotlin { jvmToolchain(17) }
 
 dependencies {
     implementation(libs.androidx.core.ktx)

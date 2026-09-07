@@ -61,10 +61,16 @@ jobs:
           "$ANDROID_HOME/cmdline-tools/16.0/bin/sdkmanager" "cmdline-tools;latest"
           echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
 
+      # android-37 / build-tools 37.0.0 (Android 17) are pre-release: the
+      # latest platform published to the stable channel is still API 36
+      # (https://developer.android.com/tools/releases/platforms), so this
+      # pin only resolves from the canary channel. --channel=3 is
+      # cumulative (stable+beta+dev+canary), so this keeps working once
+      # android-37 reaches stable too.
       - name: Install Android SDK packages
         run: |
-          yes | sdkmanager --licenses >/dev/null || true
-          sdkmanager "platform-tools" "platforms;${ANDROID_PLATFORM}" "build-tools;${BUILD_TOOLS}"
+          yes | sdkmanager --licenses --channel=3 >/dev/null || true
+          sdkmanager --channel=3 "platform-tools" "platforms;${ANDROID_PLATFORM}" "build-tools;${BUILD_TOOLS}"
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v5
