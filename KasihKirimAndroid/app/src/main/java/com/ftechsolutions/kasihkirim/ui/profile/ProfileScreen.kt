@@ -11,7 +11,7 @@ import com.ftechsolutions.kasihkirim.domain.model.AuthUser
 import com.ftechsolutions.kasihkirim.ui.auth.AuthViewModel
 
 @Composable
-fun ProfileScreen(user: AuthUser, vm: AuthViewModel) {
+fun ProfileScreen(user: AuthUser, vm: AuthViewModel, onOpenAddresses: () -> Unit) {
     Column(Modifier.fillMaxSize().padding(24.dp)) {
         Text(stringResource(R.string.nav_profile), style = MaterialTheme.typography.headlineSmall)
         Spacer(Modifier.height(16.dp))
@@ -23,6 +23,12 @@ fun ProfileScreen(user: AuthUser, vm: AuthViewModel) {
             Spacer(Modifier.height(4.dp))
             Text("Status: $it", style = MaterialTheme.typography.bodySmall)
         }
+        Spacer(Modifier.height(16.dp))
+        OutlinedButton(
+            onClick = onOpenAddresses,
+            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+        ) { Text(stringResource(R.string.addresses_title)) }
+
         Spacer(Modifier.weight(1f))
         OutlinedButton(
             onClick = vm::signOut,

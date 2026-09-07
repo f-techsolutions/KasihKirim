@@ -30,4 +30,16 @@
     <string name="nav_sales">Jualan</string>
 
     <string name="phase1_placeholder">Skrin ini akan dibina dalam fasa seterusnya.</string>
+
+    <string name="back">Kembali</string>
+
+    <string name="addresses_title">Alamat Saya</string>
+    <string name="addresses_empty">Tiada alamat lagi.</string>
+    <string name="addresses_add_title">Tambah Alamat</string>
+    <string name="addresses_label">Label (cth. Rumah)</string>
+    <string name="addresses_recipient_name">Nama Penerima</string>
+    <string name="addresses_recipient_phone">Telefon Penerima</string>
+    <string name="addresses_community">Kampung / Pekan</string>
+    <string name="addresses_landmark">Petunjuk Lokasi</string>
+    <string name="addresses_save">Simpan Alamat</string>
 </resources>
