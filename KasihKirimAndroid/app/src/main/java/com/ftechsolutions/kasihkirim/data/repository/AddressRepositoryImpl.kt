@@ -11,6 +11,7 @@ import com.ftechsolutions.kasihkirim.data.remote.dto.NewAddressDto
 import com.ftechsolutions.kasihkirim.domain.model.Address
 import com.ftechsolutions.kasihkirim.domain.model.Community
 import com.ftechsolutions.kasihkirim.domain.model.NewAddress
+import com.ftechsolutions.kasihkirim.domain.model.Serviceability
 import com.ftechsolutions.kasihkirim.domain.repository.AddressRepository
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.postgrest
@@ -18,18 +19,30 @@ import io.github.jan.supabase.postgrest.query.Columns
 import io.github.jan.supabase.postgrest.query.Order
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.boolean
+import kotlinx.serialization.json.content
+import kotlinx.serialization.json.double
+import kotlinx.serialization.json.int
+import kotlinx.serialization.json.jsonPrimitive
 import java.io.IOException
 import java.time.Instant
 
 private const val ADDRESS_COLUMNS =
     "id,label,recipient_name,recipient_phone,landmark_note,is_default," +
-        "community:communities(id,name,type,district,state)"
+        "community:communities(id,name,type,district,state,node_id)"
 
 @Serializable
 private data class IsDefaultUpdate(@SerialName("is_default") val isDefault: Boolean)
 
 @Serializable
 private data class DeletedAtUpdate(@SerialName("deleted_at") val deletedAt: String)
+
+@Serializable
+private data class ServiceabilityParams(
+    @SerialName("p_origin_node") val originNode: String,
+    @SerialName("p_dest_node") val destNode: String,
+)
 
 class AddressRepositoryImpl : AddressRepository {
 
@@ -122,6 +135,14 @@ class AddressRepositoryImpl : AddressRepository {
             .map { it.toDomain() }
     }
 
+    override suspend fun checkServiceability(originNodeId: String, destNodeId: String): AppResult<Serviceability> =
+        runCatchingResult {
+            SupabaseClientProvider.client.postgrest
+                .rpc("rpc_check_serviceability", ServiceabilityParams(originNodeId, destNodeId))
+                .decodeAs<JsonObject>()
+                .toServiceability()
+        }
+
     /** No stack trace, no raw payload to the caller -- mirrors
      *  AuthRepositoryImpl.toAppError() so both repositories fail the same way. */
     private inline fun <T> runCatchingResult(block: () -> T): AppResult<T> =
@@ -131,6 +152,37 @@ class AddressRepositoryImpl : AddressRepository {
             SafeLog.e(tag, "address call failed: ${t::class.simpleName}", t)
             AppResult.Failure(t.toAddressAppError())
         }
+}
+
+/** Maps public.rpc_check_serviceability's exact response shape
+ *  (0011_geography_identity.sql) to the sealed Serviceability model. */
+private fun JsonObject.toServiceability(): Serviceability {
+    val serviceable = this["serviceable"]?.jsonPrimitive?.boolean ?: false
+    if (serviceable) {
+        return Serviceability.Serviceable(
+            originDistrict = this.getValue("origin_district").jsonPrimitive.content,
+            destDistrict = this.getValue("dest_district").jsonPrimitive.content,
+            distanceKm = this.getValue("distance_km").jsonPrimitive.double,
+            estMinutes = this.getValue("est_minutes").jsonPrimitive.int,
+            requiresWaterTransport = this["requires_water_transport"]?.jsonPrimitive?.boolean ?: false,
+            hopCount = this.getValue("hop_count").jsonPrimitive.int,
+        )
+    }
+    return when (this["reason"]?.jsonPrimitive?.content) {
+        "ORIGIN_NOT_ACTIVE" -> Serviceability.OriginNotActive(
+            district = this.getValue("district").jsonPrimitive.content,
+            status = this.getValue("status").jsonPrimitive.content,
+        )
+        "DESTINATION_NOT_ACTIVE" -> Serviceability.DestinationNotActive(
+            district = this.getValue("district").jsonPrimitive.content,
+            status = this.getValue("status").jsonPrimitive.content,
+        )
+        "NO_ROUTE" -> Serviceability.NoRoute(
+            originDistrict = this["origin_district"]?.jsonPrimitive?.content,
+            destDistrict = this["dest_district"]?.jsonPrimitive?.content,
+        )
+        else -> Serviceability.GeographyUnknown(side = this["side"]?.jsonPrimitive?.content)
+    }
 }
 
 private fun Throwable.toAddressAppError(): AppError = when {

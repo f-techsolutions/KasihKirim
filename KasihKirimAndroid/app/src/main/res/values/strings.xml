@@ -49,4 +49,17 @@
     <string name="addresses_edit_title">Kemas Kini Alamat</string>
     <string name="addresses_update">Simpan Perubahan</string>
     <string name="addresses_cancel_edit">Batal</string>
+
+    <string name="serviceability_title">Semak Liputan</string>
+    <string name="serviceability_origin">Dari</string>
+    <string name="serviceability_destination">Ke</string>
+    <string name="serviceability_no_node">Kampung ini belum ada nod laluan.</string>
+    <string name="serviceability_check">Semak</string>
+    <string name="serviceability_ok">Boleh dihantar</string>
+    <string name="serviceability_distance">%1$.1f km, anggaran %2$d minit</string>
+    <string name="serviceability_water">Memerlukan pengangkutan air</string>
+    <string name="serviceability_origin_not_active">Kami belum sampai ke %1$s.</string>
+    <string name="serviceability_dest_not_active">Kami belum sampai ke %1$s.</string>
+    <string name="serviceability_no_route">Tiada laluan antara lokasi ini.</string>
+    <string name="serviceability_unknown">Lokasi tidak dikenali.</string>
 </resources>

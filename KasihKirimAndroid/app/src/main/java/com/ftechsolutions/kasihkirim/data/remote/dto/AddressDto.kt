@@ -13,8 +13,9 @@ data class CommunityDto(
     val type: String,
     val district: String,
     val state: String,
+    @SerialName("node_id") val nodeId: String? = null,
 ) {
-    fun toDomain() = Community(id = id, name = name, type = type, district = district, state = state)
+    fun toDomain() = Community(id = id, name = name, type = type, district = district, state = state, nodeId = nodeId)
 }
 
 /**

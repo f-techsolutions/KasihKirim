@@ -22,8 +22,11 @@ import com.ftechsolutions.kasihkirim.ui.home.HomeScreen
 import com.ftechsolutions.kasihkirim.ui.orders.OrdersScreen
 import com.ftechsolutions.kasihkirim.ui.profile.ProfileScreen
 import com.ftechsolutions.kasihkirim.ui.send.SendScreen
+import com.ftechsolutions.kasihkirim.ui.serviceability.ServiceabilityScreen
+import com.ftechsolutions.kasihkirim.ui.serviceability.ServiceabilityViewModel
 
 private const val ADDRESSES_ROUTE = "addresses"
+private const val SERVICEABILITY_ROUTE = "serviceability"
 
 @Composable
 fun AppNavHost(user: AuthUser, authViewModel: AuthViewModel, addressRepository: AddressRepository) {
@@ -59,11 +62,20 @@ fun AppNavHost(user: AuthUser, authViewModel: AuthViewModel, addressRepository: 
         ) {
             composable(Destination.HOME.route) { HomeScreen(user) }
             composable(Destination.PROFILE.route) {
-                ProfileScreen(user, authViewModel, onOpenAddresses = { nav.navigate(ADDRESSES_ROUTE) })
+                ProfileScreen(
+                    user,
+                    authViewModel,
+                    onOpenAddresses = { nav.navigate(ADDRESSES_ROUTE) },
+                    onOpenServiceability = { nav.navigate(SERVICEABILITY_ROUTE) },
+                )
             }
             composable(ADDRESSES_ROUTE) {
                 val vm: AddressesViewModel = viewModel(factory = AddressesViewModel.Factory(addressRepository))
                 AddressesScreen(vm, onBack = { nav.popBackStack() })
+            }
+            composable(SERVICEABILITY_ROUTE) {
+                val vm: ServiceabilityViewModel = viewModel(factory = ServiceabilityViewModel.Factory(addressRepository))
+                ServiceabilityScreen(vm, onBack = { nav.popBackStack() })
             }
             // Phase 1 renders honest placeholders. These are NOT mocks: they
             // claim nothing and call no backend. Phases 3-8 replace them.

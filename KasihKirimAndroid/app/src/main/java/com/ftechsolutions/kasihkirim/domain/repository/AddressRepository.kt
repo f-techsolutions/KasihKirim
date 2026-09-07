@@ -4,6 +4,7 @@ import com.ftechsolutions.kasihkirim.core.result.AppResult
 import com.ftechsolutions.kasihkirim.domain.model.Address
 import com.ftechsolutions.kasihkirim.domain.model.Community
 import com.ftechsolutions.kasihkirim.domain.model.NewAddress
+import com.ftechsolutions.kasihkirim.domain.model.Serviceability
 
 /**
  * public.addresses is RLS-scoped to "own" for select/insert/update, soft
@@ -28,4 +29,9 @@ interface AddressRepository {
      *  communities in Sabah, most recently added first is NOT guaranteed --
      *  callers should not assume an order beyond what's documented. */
     suspend fun searchCommunities(query: String): AppResult<List<Community>>
+
+    /** Asks the SERVER whether a lane is served -- never decided in Kotlin.
+     *  originNodeId/destNodeId are ref.route_nodes(id), reached here only via
+     *  Community.nodeId (ref itself is not PostgREST-exposed). */
+    suspend fun checkServiceability(originNodeId: String, destNodeId: String): AppResult<Serviceability>
 }

@@ -69,6 +69,9 @@ private class FakeAddressRepository(
 
     override suspend fun searchCommunities(query: String): AppResult<List<Community>> =
         AppResult.Success(communities.filter { query.isBlank() || it.name.contains(query, ignoreCase = true) })
+
+    override suspend fun checkServiceability(originNodeId: String, destNodeId: String) =
+        throw NotImplementedError("not exercised by AddressesViewModelTest")
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
