@@ -77,7 +77,10 @@ class BoardViewModel(
             when (val result = tripRepo.acceptOffer(tripId, kirimId)) {
                 // The matched item leaves the board server-side (status != POSTED);
                 // reload rather than guess at the new state locally.
-                is AppResult.Success -> { load() }
+                is AppResult.Success -> {
+                    _state.update { it.copy(acceptingKirimId = null) }
+                    load()
+                }
                 is AppResult.Failure -> _state.update { it.copy(acceptingKirimId = null, error = result.error) }
             }
         }
