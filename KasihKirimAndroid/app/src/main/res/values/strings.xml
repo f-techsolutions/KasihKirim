@@ -79,4 +79,10 @@
 
     <string name="err_budget_cap_exceeded">Bajet melebihi had yang dibenarkan.</string>
     <string name="err_category_not_found">Kategori tidak sah.</string>
+
+    <string name="earnings_title">Pendapatan Saya</string>
+    <string name="earnings_available">Boleh dikeluarkan</string>
+    <string name="earnings_pending">Belum selesai</string>
+    <string name="earnings_cod_held">COD dipegang</string>
+    <string name="earnings_float_limit">Had float</string>
 </resources>
