@@ -30,6 +30,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
+      # First (and, so far, only) real run of this workflow failed here:
+      # "FATAL | Not enough space to create userdata partition. Available:
+      # 7160.92 MB ... need 7372.80 MB." -- an infra problem, not a test
+      # failure, and a ~212 MB shortfall against preinstalled tooling this
+      # job never uses. Standard fix for GitHub-hosted runners: reclaim
+      # space from the largest preinstalled SDKs before anything else runs.
+      - name: Free disk space
+        run: |
+          set -x
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup "$AGENT_TOOLSDIRECTORY"
+          sudo docker image prune -af || true
+          df -h /
+
       - name: Set up JDK 17
         uses: actions/setup-java@v5
         with:
