@@ -14,11 +14,14 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.ftechsolutions.kasihkirim.domain.model.AuthUser
 import com.ftechsolutions.kasihkirim.domain.repository.AddressRepository
+import com.ftechsolutions.kasihkirim.domain.repository.EarningsRepository
 import com.ftechsolutions.kasihkirim.domain.repository.KirimRepository
 import com.ftechsolutions.kasihkirim.ui.addresses.AddressesScreen
 import com.ftechsolutions.kasihkirim.ui.addresses.AddressesViewModel
 import com.ftechsolutions.kasihkirim.ui.auth.AuthViewModel
 import com.ftechsolutions.kasihkirim.ui.board.BoardScreen
+import com.ftechsolutions.kasihkirim.ui.earnings.EarningsScreen
+import com.ftechsolutions.kasihkirim.ui.earnings.EarningsViewModel
 import com.ftechsolutions.kasihkirim.ui.home.HomeScreen
 import com.ftechsolutions.kasihkirim.ui.orders.OrdersScreen
 import com.ftechsolutions.kasihkirim.ui.profile.ProfileScreen
@@ -36,6 +39,7 @@ fun AppNavHost(
     authViewModel: AuthViewModel,
     addressRepository: AddressRepository,
     kirimRepository: KirimRepository,
+    earningsRepository: EarningsRepository,
 ) {
     val nav: NavHostController = rememberNavController()
     val tabs = tabsFor(user.primaryRole)
@@ -89,12 +93,15 @@ fun AppNavHost(
                     viewModel(factory = KirimQuoteViewModel.Factory(kirimRepository, addressRepository))
                 SendScreen(vm)
             }
+            composable(Destination.EARNINGS.route) {
+                val vm: EarningsViewModel = viewModel(factory = EarningsViewModel.Factory(earningsRepository))
+                EarningsScreen(vm)
+            }
             // Phase 1 renders honest placeholders. These are NOT mocks: they
-            // claim nothing and call no backend. Phases 4-8 replace them.
+            // claim nothing and call no backend. Phases 4-6/8 replace them.
             composable(Destination.BOARD.route) { BoardScreen() }
             composable(Destination.ORDERS.route) { OrdersScreen() }
             composable(Destination.TRIPS.route) { PlaceholderScreen(Destination.TRIPS) }
-            composable(Destination.EARNINGS.route) { PlaceholderScreen(Destination.EARNINGS) }
             composable(Destination.MUATAN_JUAL.route) { PlaceholderScreen(Destination.MUATAN_JUAL) }
             composable(Destination.SALES.route) { PlaceholderScreen(Destination.SALES) }
         }
