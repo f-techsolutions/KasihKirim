@@ -107,6 +107,9 @@ internal fun AppError.messageRes(): Int = when (this) {
     is AppError.Server -> when (code) {
         "BUDGET_CAP_EXCEEDED" -> R.string.err_budget_cap_exceeded
         "CATEGORY_NOT_FOUND" -> R.string.err_category_not_found
+        "VEHICLE_NOT_FOUND" -> R.string.err_vehicle_not_found
+        "INVALID_CORRIDOR" -> R.string.err_invalid_corridor
+        "DEPART_TIME_IN_PAST" -> R.string.err_depart_time_in_past
         else -> R.string.err_unexpected
     }
     else -> R.string.err_unexpected

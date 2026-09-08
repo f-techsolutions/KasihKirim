@@ -85,4 +85,34 @@
     <string name="earnings_pending">Belum selesai</string>
     <string name="earnings_cod_held">COD dipegang</string>
     <string name="earnings_float_limit">Had float</string>
+
+    <string name="vehicles_title">Kenderaan Saya</string>
+    <string name="vehicles_empty">Tiada kenderaan lagi.</string>
+    <string name="vehicles_add_title">Tambah Kenderaan</string>
+    <string name="vehicles_edit_title">Kemas Kini Kenderaan</string>
+    <string name="vehicles_plate_no">No. Plat</string>
+    <string name="vehicles_make_model">Jenama / Model</string>
+    <string name="vehicles_capacity_weight">Kapasiti Berat (gram)</string>
+    <string name="vehicles_capacity_volume">Kapasiti Isipadu (cm³)</string>
+    <string name="vehicles_capacity_parcels">Kapasiti Bungkusan</string>
+    <string name="vehicles_save">Simpan Kenderaan</string>
+    <string name="vehicles_update">Simpan Perubahan</string>
+    <string name="vehicles_edit">Kemas Kini</string>
+    <string name="vehicles_cancel_edit">Batal</string>
+    <string name="vehicles_deactivate">Nyahaktifkan</string>
+    <string name="vehicles_activate">Aktifkan</string>
+    <string name="vehicles_inactive_badge">(Tidak Aktif)</string>
+
+    <string name="trips_title">Trip Saya</string>
+    <string name="trips_empty">Tiada trip lagi.</string>
+    <string name="trips_new_title">Umumkan Trip Baharu</string>
+    <string name="trips_vehicle">Kenderaan</string>
+    <string name="trips_no_vehicles">Tambah kenderaan dahulu sebelum mengumumkan trip.</string>
+    <string name="trips_pick_date">Pilih Tarikh</string>
+    <string name="trips_pick_time">Pilih Masa</string>
+    <string name="trips_create">Umumkan Trip</string>
+
+    <string name="err_vehicle_not_found">Kenderaan tidak dijumpai.</string>
+    <string name="err_invalid_corridor">Asal dan destinasi mesti berbeza.</string>
+    <string name="err_depart_time_in_past">Masa berlepas mesti pada masa hadapan.</string>
 </resources>
