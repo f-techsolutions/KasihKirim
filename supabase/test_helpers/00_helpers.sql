@@ -244,9 +244,16 @@ END $$;
 --   * schema `tests` is created by this file, never by a migration;
 --   * it does not exist in staging or production;
 --   * nothing is granted on any production schema, table or function.
+--
+-- INSERT/UPDATE (not just SELECT): a test that calls tests.authenticate_as()
+-- and then registers a handle for whatever it just created via a real
+-- SECURITY DEFINER RPC call -- the only way to get a fixture that a
+-- function reading auth.uid() will actually accept -- needs to write to
+-- tests.handles from inside that same authenticated session, not just read
+-- it back afterwards.
 -- ============================================================================
 GRANT USAGE ON SCHEMA tests TO authenticated, anon;
-GRANT SELECT ON tests.handles TO authenticated, anon;
+GRANT SELECT, INSERT, UPDATE ON tests.handles TO authenticated, anon;
 GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA tests TO authenticated, anon;
 
 -- Functions created after this point inherit the same grant, so a future
