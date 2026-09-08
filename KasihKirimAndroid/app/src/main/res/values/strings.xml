@@ -62,4 +62,21 @@
     <string name="serviceability_dest_not_active">Kami belum sampai ke %1$s.</string>
     <string name="serviceability_no_route">Tiada laluan antara lokasi ini.</string>
     <string name="serviceability_unknown">Lokasi tidak dikenali.</string>
+
+    <string name="kirim_title">Sebut Harga Kirim</string>
+    <string name="kirim_quote_only_notice">Sebut harga sahaja buat masa ini. Hantar pesanan akan tersedia tidak lama lagi.</string>
+    <string name="kirim_type_beli">Beli (carrier beli untuk saya)</string>
+    <string name="kirim_type_hantar">Hantar (barang saya sendiri)</string>
+    <string name="kirim_category">Kategori</string>
+    <string name="kirim_weight">Berat (gram)</string>
+    <string name="kirim_budget">Bajet (RM)</string>
+    <string name="kirim_get_quote">Dapatkan Sebut Harga</string>
+    <string name="kirim_quote_title">Sebut Harga</string>
+    <string name="kirim_quote_corridor">%1$.1f km — %2$s</string>
+    <string name="kirim_quote_goods">Bajet barang: %1$s</string>
+    <string name="kirim_quote_delivery">Yuran penghantaran: %1$s</string>
+    <string name="kirim_quote_total">Jumlah: %1$s</string>
+
+    <string name="err_budget_cap_exceeded">Bajet melebihi had yang dibenarkan.</string>
+    <string name="err_category_not_found">Kategori tidak sah.</string>
 </resources>
