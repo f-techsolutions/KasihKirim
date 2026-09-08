@@ -17,6 +17,8 @@ import com.ftechsolutions.kasihkirim.domain.model.AuthState
 import com.ftechsolutions.kasihkirim.domain.repository.AddressRepository
 import com.ftechsolutions.kasihkirim.domain.repository.EarningsRepository
 import com.ftechsolutions.kasihkirim.domain.repository.KirimRepository
+import com.ftechsolutions.kasihkirim.domain.repository.TripRepository
+import com.ftechsolutions.kasihkirim.domain.repository.VehicleRepository
 import com.ftechsolutions.kasihkirim.ui.auth.AuthScreen
 import com.ftechsolutions.kasihkirim.ui.auth.AuthViewModel
 import com.ftechsolutions.kasihkirim.ui.auth.messageRes
@@ -33,6 +35,8 @@ fun App(
     addressRepository: AddressRepository,
     kirimRepository: KirimRepository,
     earningsRepository: EarningsRepository,
+    vehicleRepository: VehicleRepository,
+    tripRepository: TripRepository,
 ) {
     val state by vm.authState.collectAsStateWithLifecycle()
 
@@ -44,7 +48,9 @@ fun App(
                 Text(stringResource(R.string.auth_checking))
             }
             AuthState.Unauthenticated -> AuthScreen(vm)
-            is AuthState.Authenticated -> AppNavHost(s.user, vm, addressRepository, kirimRepository, earningsRepository)
+            is AuthState.Authenticated -> AppNavHost(
+                s.user, vm, addressRepository, kirimRepository, earningsRepository, vehicleRepository, tripRepository,
+            )
             is AuthState.Error -> Centered {
                 Text(stringResource(s.error.messageRes()),
                     color = MaterialTheme.colorScheme.error)

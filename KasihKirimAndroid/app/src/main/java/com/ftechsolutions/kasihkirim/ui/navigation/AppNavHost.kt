@@ -16,6 +16,8 @@ import com.ftechsolutions.kasihkirim.domain.model.AuthUser
 import com.ftechsolutions.kasihkirim.domain.repository.AddressRepository
 import com.ftechsolutions.kasihkirim.domain.repository.EarningsRepository
 import com.ftechsolutions.kasihkirim.domain.repository.KirimRepository
+import com.ftechsolutions.kasihkirim.domain.repository.TripRepository
+import com.ftechsolutions.kasihkirim.domain.repository.VehicleRepository
 import com.ftechsolutions.kasihkirim.ui.addresses.AddressesScreen
 import com.ftechsolutions.kasihkirim.ui.addresses.AddressesViewModel
 import com.ftechsolutions.kasihkirim.ui.auth.AuthViewModel
@@ -29,9 +31,14 @@ import com.ftechsolutions.kasihkirim.ui.send.KirimQuoteViewModel
 import com.ftechsolutions.kasihkirim.ui.send.SendScreen
 import com.ftechsolutions.kasihkirim.ui.serviceability.ServiceabilityScreen
 import com.ftechsolutions.kasihkirim.ui.serviceability.ServiceabilityViewModel
+import com.ftechsolutions.kasihkirim.ui.trips.TripsScreen
+import com.ftechsolutions.kasihkirim.ui.trips.TripsViewModel
+import com.ftechsolutions.kasihkirim.ui.vehicles.VehiclesScreen
+import com.ftechsolutions.kasihkirim.ui.vehicles.VehiclesViewModel
 
 private const val ADDRESSES_ROUTE = "addresses"
 private const val SERVICEABILITY_ROUTE = "serviceability"
+private const val VEHICLES_ROUTE = "vehicles"
 
 @Composable
 fun AppNavHost(
@@ -40,6 +47,8 @@ fun AppNavHost(
     addressRepository: AddressRepository,
     kirimRepository: KirimRepository,
     earningsRepository: EarningsRepository,
+    vehicleRepository: VehicleRepository,
+    tripRepository: TripRepository,
 ) {
     val nav: NavHostController = rememberNavController()
     val tabs = tabsFor(user.primaryRole)
@@ -97,11 +106,19 @@ fun AppNavHost(
                 val vm: EarningsViewModel = viewModel(factory = EarningsViewModel.Factory(earningsRepository))
                 EarningsScreen(vm)
             }
+            composable(Destination.TRIPS.route) {
+                val vm: TripsViewModel =
+                    viewModel(factory = TripsViewModel.Factory(tripRepository, vehicleRepository, addressRepository))
+                TripsScreen(vm, onOpenVehicles = { nav.navigate(VEHICLES_ROUTE) })
+            }
+            composable(VEHICLES_ROUTE) {
+                val vm: VehiclesViewModel = viewModel(factory = VehiclesViewModel.Factory(vehicleRepository))
+                VehiclesScreen(vm, onBack = { nav.popBackStack() })
+            }
             // Phase 1 renders honest placeholders. These are NOT mocks: they
-            // claim nothing and call no backend. Phases 4-6/8 replace them.
+            // claim nothing and call no backend. Phases 6/8 replace them.
             composable(Destination.BOARD.route) { BoardScreen() }
             composable(Destination.ORDERS.route) { OrdersScreen() }
-            composable(Destination.TRIPS.route) { PlaceholderScreen(Destination.TRIPS) }
             composable(Destination.MUATAN_JUAL.route) { PlaceholderScreen(Destination.MUATAN_JUAL) }
             composable(Destination.SALES.route) { PlaceholderScreen(Destination.SALES) }
         }
