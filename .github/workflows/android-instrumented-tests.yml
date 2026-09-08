@@ -1,0 +1,93 @@
+name: KasihKirim Android Instrumented Tests
+
+# Manual only, and deliberately NOT part of android-cloud-build.yml's PR/push
+# pipeline: an emulator-backed job is slower and less reliable than the pure
+# JVM unit tests that gate every PR, and a flaky instrumented run should
+# never be what blocks a merge. Run this on demand to check the Compose UI
+# test suite (docs/TESTING.md §8's "Compose UI tests for auth..." gate).
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  GRADLE_VERSION: '9.6.0'
+  # API 34, not the app's own compileSdk/targetSdk (37): android-cloud-build.yml's
+  # own comments note 37 only resolves from the SDK's canary channel today,
+  # and reactivecircus/android-emulator-runner needs a real, published system
+  # image. minSdk is 26, so an API 34 emulator is a realistic, well-supported
+  # target for these tests, not a compromise on what the app actually runs.
+  EMULATOR_API_LEVEL: '34'
+
+jobs:
+  instrumented-tests:
+    name: Compose UI Tests (emulator)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v5
+        with:
+          gradle-version: ${{ env.GRADLE_VERSION }}
+
+      - name: Generate Gradle wrapper
+        working-directory: KasihKirimAndroid
+        run: gradle wrapper --gradle-version "${GRADLE_VERSION}" --distribution-type bin
+
+      - name: Configure Supabase build values
+        working-directory: KasihKirimAndroid
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_PUBLISHABLE_KEY" ]; then
+            echo "::error::Missing SUPABASE_URL and/or SUPABASE_PUBLISHABLE_KEY secret."
+            exit 1
+          fi
+          printf 'sdk.dir=%s\nSUPABASE_URL=%s\nSUPABASE_PUBLISHABLE_KEY=%s\n' "$ANDROID_HOME" "$SUPABASE_URL" "$SUPABASE_PUBLISHABLE_KEY" > local.properties
+
+      # KVM must be available for the emulator to run at a usable speed on a
+      # GitHub-hosted runner. If this fails, the runner doesn't support
+      # nested virtualization for this job -- that's an infra limit, not a
+      # test failure, and enabling it is outside what this workflow controls.
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run Compose UI tests on an emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ env.EMULATOR_API_LEVEL }}
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          working-directory: KasihKirimAndroid
+          script: ./gradlew :app:connectedDebugAndroidTest --no-daemon
+
+      - name: Upload instrumented test reports (failure only)
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: KasihKirim-instrumented-test-reports
+          path: KasihKirimAndroid/app/build/reports/androidTests/
+          if-no-files-found: warn
+          retention-days: 14
