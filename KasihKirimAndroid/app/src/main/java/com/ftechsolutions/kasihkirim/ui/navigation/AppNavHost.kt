@@ -17,6 +17,7 @@ import com.ftechsolutions.kasihkirim.domain.repository.AddressRepository
 import com.ftechsolutions.kasihkirim.domain.repository.DeliveryRepository
 import com.ftechsolutions.kasihkirim.domain.repository.EarningsRepository
 import com.ftechsolutions.kasihkirim.domain.repository.KirimRepository
+import com.ftechsolutions.kasihkirim.domain.repository.MuatanJualRepository
 import com.ftechsolutions.kasihkirim.domain.repository.TripRepository
 import com.ftechsolutions.kasihkirim.domain.repository.VehicleRepository
 import com.ftechsolutions.kasihkirim.ui.addresses.AddressesScreen
@@ -29,6 +30,8 @@ import com.ftechsolutions.kasihkirim.ui.deliveries.DeliveriesViewModel
 import com.ftechsolutions.kasihkirim.ui.earnings.EarningsScreen
 import com.ftechsolutions.kasihkirim.ui.earnings.EarningsViewModel
 import com.ftechsolutions.kasihkirim.ui.home.HomeScreen
+import com.ftechsolutions.kasihkirim.ui.muatanjual.MuatanJualScreen
+import com.ftechsolutions.kasihkirim.ui.muatanjual.MuatanJualViewModel
 import com.ftechsolutions.kasihkirim.ui.orders.OrdersScreen
 import com.ftechsolutions.kasihkirim.ui.orders.OrdersViewModel
 import com.ftechsolutions.kasihkirim.ui.profile.ProfileScreen
@@ -56,6 +59,7 @@ fun AppNavHost(
     vehicleRepository: VehicleRepository,
     tripRepository: TripRepository,
     deliveryRepository: DeliveryRepository,
+    muatanJualRepository: MuatanJualRepository,
 ) {
     val nav: NavHostController = rememberNavController()
     val tabs = tabsFor(user.primaryRole)
@@ -142,9 +146,14 @@ fun AppNavHost(
                 val vm: OrdersViewModel = viewModel(factory = OrdersViewModel.Factory(kirimRepository, addressRepository))
                 OrdersScreen(vm, onOpenDeliveries = { nav.navigate(DELIVERIES_ROUTE) })
             }
+            composable(Destination.MUATAN_JUAL.route) {
+                val vm: MuatanJualViewModel = viewModel(factory = MuatanJualViewModel.Factory(muatanJualRepository))
+                MuatanJualScreen(vm)
+            }
             // Phase 1 renders an honest placeholder. NOT a mock: it claims
-            // nothing and calls no backend. Phase 8 replaces it.
-            composable(Destination.MUATAN_JUAL.route) { PlaceholderScreen(Destination.MUATAN_JUAL) }
+            // nothing and calls no backend. Selling one's own lots is a
+            // separate, not-yet-scoped surface from Phase 8's browse-only
+            // Muatan Jual screen above.
             composable(Destination.SALES.route) { PlaceholderScreen(Destination.SALES) }
         }
     }

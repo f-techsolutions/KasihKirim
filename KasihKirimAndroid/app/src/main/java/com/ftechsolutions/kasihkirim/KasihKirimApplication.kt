@@ -6,6 +6,7 @@ import com.ftechsolutions.kasihkirim.data.repository.AuthRepositoryImpl
 import com.ftechsolutions.kasihkirim.data.repository.DeliveryRepositoryImpl
 import com.ftechsolutions.kasihkirim.data.repository.EarningsRepositoryImpl
 import com.ftechsolutions.kasihkirim.data.repository.KirimRepositoryImpl
+import com.ftechsolutions.kasihkirim.data.repository.MuatanJualRepositoryImpl
 import com.ftechsolutions.kasihkirim.data.repository.TripRepositoryImpl
 import com.ftechsolutions.kasihkirim.data.repository.VehicleRepositoryImpl
 import com.ftechsolutions.kasihkirim.domain.repository.AddressRepository
@@ -13,6 +14,7 @@ import com.ftechsolutions.kasihkirim.domain.repository.AuthRepository
 import com.ftechsolutions.kasihkirim.domain.repository.DeliveryRepository
 import com.ftechsolutions.kasihkirim.domain.repository.EarningsRepository
 import com.ftechsolutions.kasihkirim.domain.repository.KirimRepository
+import com.ftechsolutions.kasihkirim.domain.repository.MuatanJualRepository
 import com.ftechsolutions.kasihkirim.domain.repository.TripRepository
 import com.ftechsolutions.kasihkirim.domain.repository.VehicleRepository
 
@@ -29,4 +31,5 @@ class KasihKirimApplication : Application() {
     val vehicleRepository: VehicleRepository by lazy { VehicleRepositoryImpl() }
     val tripRepository: TripRepository by lazy { TripRepositoryImpl() }
     val deliveryRepository: DeliveryRepository by lazy { DeliveryRepositoryImpl() }
+    val muatanJualRepository: MuatanJualRepository by lazy { MuatanJualRepositoryImpl() }
 }
