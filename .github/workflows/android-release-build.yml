@@ -1,0 +1,151 @@
+name: KasihKirim Android Release Build
+
+# Manual only. This produces a real, signed release artifact -- never run
+# it from a PR or an untrusted push, and never automatically. Bump
+# versionCode/versionName in app/build.gradle.kts before dispatching.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  GRADLE_VERSION: '9.6.0'
+  ANDROID_PLATFORM: 'android-37'
+  BUILD_TOOLS: '37.0.0'
+
+jobs:
+  build:
+    name: Signed Release AAB
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      # See android-cloud-build.yml for why this step exists: the bundled
+      # cmdline-tools (16.0) can't see platforms;android-37.
+      - name: Update Android cmdline-tools
+        run: |
+          rm -rf "$ANDROID_HOME/cmdline-tools/latest"
+          yes | "$ANDROID_HOME/cmdline-tools/16.0/bin/sdkmanager" --licenses >/dev/null || true
+          "$ANDROID_HOME/cmdline-tools/16.0/bin/sdkmanager" "cmdline-tools;latest"
+          echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
+
+      - name: Install Android SDK packages
+        run: |
+          yes | sdkmanager --licenses --channel=3 >/dev/null || true
+          sdkmanager --channel=3 "platform-tools" "platforms;${ANDROID_PLATFORM}" "build-tools;${BUILD_TOOLS}"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v5
+        with:
+          gradle-version: ${{ env.GRADLE_VERSION }}
+
+      - name: Generate Gradle wrapper
+        working-directory: KasihKirimAndroid
+        run: gradle wrapper --gradle-version "${GRADLE_VERSION}" --distribution-type bin
+
+      # Same fail-closed behaviour as android-cloud-build.yml: no Supabase
+      # config, no build. This workflow only ever runs on this repository
+      # (workflow_dispatch, never a fork PR), so the secrets are always
+      # present here in practice -- fail closed anyway rather than assume.
+      - name: Configure Supabase build values
+        working-directory: KasihKirimAndroid
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_PUBLISHABLE_KEY" ]; then
+            echo "::error::Missing SUPABASE_URL and/or SUPABASE_PUBLISHABLE_KEY secret."
+            exit 1
+          fi
+          printf 'sdk.dir=%s\nSUPABASE_URL=%s\nSUPABASE_PUBLISHABLE_KEY=%s\n' "$ANDROID_HOME" "$SUPABASE_URL" "$SUPABASE_PUBLISHABLE_KEY" > local.properties
+
+      # The keystore lives only on this runner's ephemeral disk: decoded
+      # here, read by Gradle via RELEASE_KEYSTORE_PATH, never written to
+      # the repository and never referenced by any upload-artifact step.
+      # See docs/RELEASE_SIGNING.md for what generates RELEASE_KEYSTORE_BASE64.
+      - name: Decode release keystore
+        working-directory: KasihKirimAndroid
+        env:
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+        run: |
+          set -euo pipefail
+          if [ -z "$RELEASE_KEYSTORE_BASE64" ]; then
+            echo "::error::RELEASE_KEYSTORE_BASE64 secret is not set. See docs/RELEASE_SIGNING.md."
+            exit 1
+          fi
+          echo "$RELEASE_KEYSTORE_BASE64" | base64 -d > release-signing.jks
+          echo "RELEASE_KEYSTORE_PATH=$PWD/release-signing.jks" >> "$GITHUB_ENV"
+
+      - name: GATE — no forbidden secret in Android sources
+        run: |
+          set -euo pipefail
+          fail=0
+          if grep -rIn --include='*.kt' --include='*.kts' --include='*.xml' -E \
+               -e 'sb_secret_[A-Za-z0-9_-]+' \
+               -e 'eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}' \
+               -e '(SERVICE_ROLE|SERVICE_KEY)[A-Z_]*\s*[:=]\s*["'"'"'][^"'"'"']+' \
+               -e 'postgres(ql)?://[^\s"]+' \
+               KasihKirimAndroid/ | grep -vE '^\S+:[0-9]+:\s*(//|\*|#|<!--)' ; then
+            echo "::error::key material found in Android sources"; fail=1
+          fi
+          if git ls-files --error-unmatch KasihKirimAndroid/local.properties >/dev/null 2>&1; then
+            echo "::error::local.properties is tracked"; fail=1
+          fi
+          exit $fail
+
+      - name: Run JVM tests
+        working-directory: KasihKirimAndroid
+        run: ./gradlew test --no-daemon
+
+      - name: Build signed release AAB
+        working-directory: KasihKirimAndroid
+        env:
+          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+        run: ./gradlew :app:bundleRelease --no-daemon
+
+      # Inspect the packaged bundle itself, not just the sources. An AAB is
+      # a zip of per-module zips, so extract everything before scanning --
+      # `strings` on the outer file alone would only see the zip's own
+      # (compressed, meaningless) bytes.
+      - name: GATE — no secret survived into the AAB
+        working-directory: KasihKirimAndroid
+        run: |
+          set -euo pipefail
+          AAB=$(find app/build/outputs/bundle/release -name '*.aab' | head -1)
+          test -n "$AAB" || { echo "::error::AAB not produced"; exit 1; }
+          rm -rf /tmp/aab-scan && mkdir -p /tmp/aab-scan
+          unzip -q "$AAB" -d /tmp/aab-scan
+          if grep -rIl -E 'service_role|sb_secret_|postgres(ql)?://' /tmp/aab-scan | grep -q .; then
+            echo "::error::secret-shaped string found inside the AAB"; exit 1
+          fi
+          echo "AAB OK: $(du -h "$AAB" | cut -f1)"
+
+      - name: Remove decoded keystore before upload
+        if: always()
+        working-directory: KasihKirimAndroid
+        run: rm -f release-signing.jks
+
+      - name: Upload signed AAB
+        uses: actions/upload-artifact@v6
+        with:
+          name: KasihKirim-release-aab
+          path: KasihKirimAndroid/app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+          retention-days: 90

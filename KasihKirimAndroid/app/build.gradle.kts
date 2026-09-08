@@ -17,6 +17,24 @@ val localProps = Properties().apply {
 }
 fun localOr(key: String, fallback: String): String = localProps.getProperty(key) ?: fallback
 
+// Release signing material. Never committed (see .gitignore), never routed
+// through BuildConfig or local.properties defaults the way the Supabase
+// publishable key is: a keystore password is an actual secret, not a public
+// value. CI supplies these as environment variables from repository secrets;
+// a developer who wants a local signed release build may set the same keys
+// in local.properties instead (still gitignored). Any single missing value
+// leaves the release build type unsigned -- R8 shrinking and the forbidden-
+// secret gates still run against it, just without a distributable artifact.
+fun secretEnvOrLocal(key: String): String? = System.getenv(key) ?: localProps.getProperty(key)
+val releaseKeystorePath = secretEnvOrLocal("RELEASE_KEYSTORE_PATH")
+val releaseKeystorePassword = secretEnvOrLocal("RELEASE_KEYSTORE_PASSWORD")
+val releaseKeyAlias = secretEnvOrLocal("RELEASE_KEY_ALIAS")
+val releaseKeyPassword = secretEnvOrLocal("RELEASE_KEY_PASSWORD")
+val hasReleaseSigningConfig = !releaseKeystorePath.isNullOrBlank() &&
+    !releaseKeystorePassword.isNullOrBlank() &&
+    !releaseKeyAlias.isNullOrBlank() &&
+    !releaseKeyPassword.isNullOrBlank()
+
 android {
     namespace = "com.ftechsolutions.kasihkirim"
     compileSdk = 37
@@ -40,6 +58,17 @@ android {
         manifestPlaceholders["authHost"] = "auth"
     }
 
+    if (hasReleaseSigningConfig) {
+        signingConfigs {
+            create("release") {
+                storeFile = file(releaseKeystorePath!!)
+                storePassword = releaseKeystorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         debug {
             isMinifyEnabled = false
@@ -49,8 +78,12 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            // signingConfig is intentionally absent: release signing is supplied
-            // by CI secrets, never committed.
+            // Absent when the RELEASE_KEYSTORE_* secrets aren't set (e.g. a
+            // PR build): the R8-shrunk release build type still exists for
+            // verification, it just isn't distributable. See docs/RELEASE_SIGNING.md.
+            if (hasReleaseSigningConfig) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
 
