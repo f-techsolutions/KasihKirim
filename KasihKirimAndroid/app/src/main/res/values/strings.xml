@@ -112,6 +112,13 @@
     <string name="earnings_cod_held">COD dipegang</string>
     <string name="earnings_float_limit">Had float</string>
 
+    <string name="muatan_jual_title">Muatan Jual</string>
+    <string name="muatan_jual_empty">Tiada muatan dijual buat masa ini.</string>
+    <string name="muatan_jual_notice">Pembelian belum dibuka lagi. Anda boleh lihat apa yang ada, tetapi tidak boleh beli dalam aplikasi ini buat masa ini.</string>
+    <string name="muatan_jual_price_per_unit">%1$s / %2$s</string>
+    <string name="muatan_jual_qty_available">%1$s %2$s tersedia</string>
+    <string name="muatan_jual_sell_by">Jual sebelum: %1$s</string>
+
     <string name="vehicles_title">Kenderaan Saya</string>
     <string name="vehicles_empty">Tiada kenderaan lagi.</string>
     <string name="vehicles_add_title">Tambah Kenderaan</string>
