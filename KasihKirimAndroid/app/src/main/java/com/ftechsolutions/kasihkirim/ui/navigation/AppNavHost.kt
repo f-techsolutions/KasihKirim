@@ -22,10 +22,12 @@ import com.ftechsolutions.kasihkirim.ui.addresses.AddressesScreen
 import com.ftechsolutions.kasihkirim.ui.addresses.AddressesViewModel
 import com.ftechsolutions.kasihkirim.ui.auth.AuthViewModel
 import com.ftechsolutions.kasihkirim.ui.board.BoardScreen
+import com.ftechsolutions.kasihkirim.ui.board.BoardViewModel
 import com.ftechsolutions.kasihkirim.ui.earnings.EarningsScreen
 import com.ftechsolutions.kasihkirim.ui.earnings.EarningsViewModel
 import com.ftechsolutions.kasihkirim.ui.home.HomeScreen
 import com.ftechsolutions.kasihkirim.ui.orders.OrdersScreen
+import com.ftechsolutions.kasihkirim.ui.orders.OrdersViewModel
 import com.ftechsolutions.kasihkirim.ui.profile.ProfileScreen
 import com.ftechsolutions.kasihkirim.ui.send.KirimQuoteViewModel
 import com.ftechsolutions.kasihkirim.ui.send.SendScreen
@@ -115,10 +117,20 @@ fun AppNavHost(
                 val vm: VehiclesViewModel = viewModel(factory = VehiclesViewModel.Factory(vehicleRepository))
                 VehiclesScreen(vm, onBack = { nav.popBackStack() })
             }
-            // Phase 1 renders honest placeholders. These are NOT mocks: they
-            // claim nothing and call no backend. Phases 6/8 replace them.
-            composable(Destination.BOARD.route) { BoardScreen() }
-            composable(Destination.ORDERS.route) { OrdersScreen() }
+            composable(Destination.BOARD.route) {
+                val vm: BoardViewModel = viewModel(
+                    factory = BoardViewModel.Factory(
+                        kirimRepository, tripRepository, addressRepository, isCarrier = user.carrierId != null,
+                    ),
+                )
+                BoardScreen(vm, isCarrier = user.carrierId != null)
+            }
+            composable(Destination.ORDERS.route) {
+                val vm: OrdersViewModel = viewModel(factory = OrdersViewModel.Factory(kirimRepository, addressRepository))
+                OrdersScreen(vm)
+            }
+            // Phase 1 renders an honest placeholder. NOT a mock: it claims
+            // nothing and calls no backend. Phase 8 replaces it.
             composable(Destination.MUATAN_JUAL.route) { PlaceholderScreen(Destination.MUATAN_JUAL) }
             composable(Destination.SALES.route) { PlaceholderScreen(Destination.SALES) }
         }

@@ -17,6 +17,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import java.io.IOException
+import java.util.UUID
 
 private const val TRIP_COLUMNS =
     "id,status,origin_node_id,dest_node_id,depart_at,capacity_weight_grams," +
@@ -64,6 +65,19 @@ class TripRepositoryImpl : TripRepository {
             .toDomain()
     }
 
+    override suspend fun acceptOffer(tripId: String, kirimId: String): AppResult<Unit> = runCatchingResult {
+        SupabaseClientProvider.client.postgrest
+            .rpc(
+                "rpc_accept_offer",
+                buildJsonObject {
+                    put("p_trip", tripId)
+                    put("p_kirim", kirimId)
+                    put("p_idempotency_key", UUID.randomUUID().toString())
+                },
+            )
+        Unit
+    }
+
     private fun requireCarrierId(): String {
         val meta: JsonObject? = SupabaseClientProvider.client.auth.currentUserOrNull()?.appMetadata
         return (meta?.get("carrier_id") as? JsonPrimitive)?.content?.takeIf { it.isNotBlank() && it != "null" }
@@ -85,6 +99,12 @@ private fun Throwable.toTripAppError(): AppError = when {
     message?.contains("INVALID_CORRIDOR", true) == true -> AppError.Server("INVALID_CORRIDOR")
     message?.contains("DEPART_TIME_IN_PAST", true) == true -> AppError.Server("DEPART_TIME_IN_PAST")
     message?.contains("STATE_ACTOR_NOT_PERMITTED", true) == true -> AppError.NotAuthorized
+    message?.contains("STATE_INVALID_TRANSITION", true) == true -> AppError.Server("STATE_INVALID_TRANSITION")
+    message?.contains("SELF_DEALING", true) == true -> AppError.Server("SELF_DEALING")
+    message?.contains("FLOAT_LIMIT_EXCEEDED", true) == true -> AppError.Server("FLOAT_LIMIT_EXCEEDED")
+    message?.contains("CAPACITY_EXCEEDED", true) == true -> AppError.Server("CAPACITY_EXCEEDED")
+    message?.contains("TRIP_NOT_FOUND", true) == true -> AppError.Server("TRIP_NOT_FOUND")
+    message?.contains("TRIP_NOT_BOARDING", true) == true -> AppError.Server("TRIP_NOT_BOARDING")
     this is IOException -> AppError.Network
     message?.contains("timeout", true) == true -> AppError.Timeout
     message?.contains("JWT", true) == true -> AppError.SessionExpired

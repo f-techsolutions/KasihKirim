@@ -110,6 +110,18 @@ internal fun AppError.messageRes(): Int = when (this) {
         "VEHICLE_NOT_FOUND" -> R.string.err_vehicle_not_found
         "INVALID_CORRIDOR" -> R.string.err_invalid_corridor
         "DEPART_TIME_IN_PAST" -> R.string.err_depart_time_in_past
+        "QUOTE_NOT_FOUND" -> R.string.err_quote_not_found
+        "QUOTE_ALREADY_CONSUMED" -> R.string.err_quote_consumed
+        "QUOTE_EXPIRED" -> R.string.err_quote_expired
+        "ADDRESS_NOT_FOUND" -> R.string.err_address_not_found
+        "ORIGIN_ADDRESS_REQUIRED" -> R.string.err_origin_address_required
+        "BELI_REQUIRES_BUDGET" -> R.string.err_beli_requires_budget
+        "STATE_INVALID_TRANSITION" -> R.string.err_state_invalid_transition
+        "SELF_DEALING" -> R.string.err_self_dealing
+        "FLOAT_LIMIT_EXCEEDED" -> R.string.err_float_limit_exceeded
+        "CAPACITY_EXCEEDED" -> R.string.err_capacity_exceeded
+        "TRIP_NOT_FOUND" -> R.string.err_trip_not_found
+        "TRIP_NOT_BOARDING" -> R.string.err_trip_not_boarding
         else -> R.string.err_unexpected
     }
     else -> R.string.err_unexpected

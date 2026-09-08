@@ -5,10 +5,13 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.ftechsolutions.kasihkirim.core.result.AppError
 import com.ftechsolutions.kasihkirim.core.result.AppResult
+import com.ftechsolutions.kasihkirim.domain.model.Address
 import com.ftechsolutions.kasihkirim.domain.model.Community
 import com.ftechsolutions.kasihkirim.domain.model.KirimCategory
+import com.ftechsolutions.kasihkirim.domain.model.KirimCreated
 import com.ftechsolutions.kasihkirim.domain.model.KirimDraft
 import com.ftechsolutions.kasihkirim.domain.model.KirimQuote
+import com.ftechsolutions.kasihkirim.domain.model.KirimSubmission
 import com.ftechsolutions.kasihkirim.domain.model.KirimType
 import com.ftechsolutions.kasihkirim.domain.repository.AddressRepository
 import com.ftechsolutions.kasihkirim.domain.repository.KirimRepository
@@ -38,6 +41,9 @@ data class KirimFormState(
     val destQuery: String = "",
     val destResults: List<Community> = emptyList(),
     val selectedDest: Community? = null,
+    val itemDescription: String = "",
+    val selectedDestAddress: Address? = null,
+    val selectedOriginAddress: Address? = null,
 ) {
     private val weightValue: Int? get() = weightGrams.toIntOrNull()
     val weightValid: Boolean get() = weightValue?.let { it in MIN_WEIGHT_GRAMS..MAX_WEIGHT_GRAMS } == true
@@ -56,6 +62,12 @@ data class KirimFormState(
     val canQuote: Boolean
         get() = category != null && weightValid && budgetValid &&
             selectedOrigin?.nodeId != null && selectedDest?.nodeId != null
+
+    /** ck_hantar_has_origin (0001_schema.sql): only HANTAR requires a pickup
+     *  address; other types don't need one. */
+    val canSubmit: Boolean
+        get() = itemDescription.isNotBlank() && selectedDestAddress != null &&
+            (kirimType != KirimType.HANTAR || selectedOriginAddress != null)
 
     fun toDraftOrNull(): KirimDraft? {
         val category = category ?: return null
@@ -78,6 +90,9 @@ data class KirimUiState(
     val form: KirimFormState = KirimFormState(),
     val isQuoting: Boolean = false,
     val quote: KirimQuote? = null,
+    val addresses: List<Address> = emptyList(),
+    val isSubmitting: Boolean = false,
+    val created: KirimCreated? = null,
     val error: AppError? = null,
 )
 
@@ -89,10 +104,24 @@ class KirimQuoteViewModel(
     private val _state = MutableStateFlow(KirimUiState())
     val state: StateFlow<KirimUiState> = _state.asStateFlow()
 
+    init { loadAddresses() }
+
+    private fun loadAddresses() {
+        viewModelScope.launch {
+            when (val result = addressRepo.listAddresses()) {
+                is AppResult.Success -> _state.update { it.copy(addresses = result.data) }
+                is AppResult.Failure -> _state.update { it.copy(error = result.error) }
+            }
+        }
+    }
+
     fun onKirimTypeChange(type: KirimType) = updateForm { it.copy(kirimType = type) }
     fun onCategorySelected(category: KirimCategory) = updateForm { it.copy(category = category) }
     fun onWeightChange(v: String) = updateForm { it.copy(weightGrams = v.filter(Char::isDigit)) }
     fun onBudgetChange(v: String) = updateForm { it.copy(budgetRinggit = v) }
+    fun onItemDescriptionChange(v: String) = updateForm { it.copy(itemDescription = v) }
+    fun onDestAddressSelected(address: Address) = updateForm { it.copy(selectedDestAddress = address) }
+    fun onOriginAddressSelected(address: Address) = updateForm { it.copy(selectedOriginAddress = address) }
 
     fun onOriginQueryChange(v: String) {
         updateForm { it.copy(originQuery = v) }
@@ -122,10 +151,32 @@ class KirimQuoteViewModel(
     fun quote() {
         val draft = _state.value.form.toDraftOrNull() ?: return
         viewModelScope.launch {
-            _state.update { it.copy(isQuoting = true, error = null, quote = null) }
+            _state.update { it.copy(isQuoting = true, error = null, quote = null, created = null) }
             when (val result = kirimRepo.quoteKirim(draft)) {
                 is AppResult.Success -> _state.update { it.copy(isQuoting = false, quote = result.data) }
                 is AppResult.Failure -> _state.update { it.copy(isQuoting = false, error = result.error) }
+            }
+        }
+    }
+
+    fun submitKirim() {
+        val quote = _state.value.quote ?: return
+        val form = _state.value.form
+        if (!form.canSubmit) return
+        val destAddress = form.selectedDestAddress ?: return
+        viewModelScope.launch {
+            _state.update { it.copy(isSubmitting = true, error = null) }
+            val submission = KirimSubmission(
+                quoteId = quote.quoteId,
+                itemDescription = form.itemDescription,
+                destAddressId = destAddress.id,
+                originAddressId = form.selectedOriginAddress?.id,
+            )
+            when (val result = kirimRepo.createKirim(submission)) {
+                is AppResult.Success -> _state.update {
+                    KirimUiState(addresses = it.addresses, created = result.data)
+                }
+                is AppResult.Failure -> _state.update { it.copy(isSubmitting = false, error = result.error) }
             }
         }
     }

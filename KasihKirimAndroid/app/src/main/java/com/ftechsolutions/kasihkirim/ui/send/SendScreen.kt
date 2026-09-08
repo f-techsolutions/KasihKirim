@@ -16,20 +16,17 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.ftechsolutions.kasihkirim.R
+import com.ftechsolutions.kasihkirim.domain.model.Address
 import com.ftechsolutions.kasihkirim.domain.model.Community
 import com.ftechsolutions.kasihkirim.domain.model.KirimCategory
+import com.ftechsolutions.kasihkirim.domain.model.KirimCreated
 import com.ftechsolutions.kasihkirim.domain.model.KirimQuote
 import com.ftechsolutions.kasihkirim.domain.model.KirimType
 import com.ftechsolutions.kasihkirim.ui.auth.messageRes
 
-/** Quote only -- there is nowhere for a "submit" button to go yet.
- *  rpc_create_kirim doesn't exist in the backend (docs/
- *  CLAUDE_IMPLEMENTATION_PLAN.md §3 gap list); this screen calls
- *  rpc_quote_kirim, the one part of Phase 3 that's actually callable today. */
 @Composable
 fun SendScreen(vm: KirimQuoteViewModel) {
     val state by vm.state.collectAsState()
-    val form = state.form
 
     Column(
         modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp).verticalScroll(rememberScrollState()),
@@ -37,9 +34,24 @@ fun SendScreen(vm: KirimQuoteViewModel) {
     ) {
         Spacer(Modifier.height(16.dp))
         Text(stringResource(R.string.kirim_title), style = MaterialTheme.typography.headlineSmall)
-        Text(stringResource(R.string.kirim_quote_only_notice), style = MaterialTheme.typography.bodySmall)
         Spacer(Modifier.height(8.dp))
 
+        val created = state.created
+        if (created != null) {
+            KirimCreatedResult(created)
+        } else {
+            KirimForm(vm, state)
+        }
+
+        Spacer(Modifier.height(24.dp))
+    }
+}
+
+@Composable
+private fun KirimForm(vm: KirimQuoteViewModel, state: KirimUiState) {
+    val form = state.form
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             KirimType.entries.filter { it != KirimType.PASARAN }.forEach { type ->
                 FilterChip(
@@ -119,9 +131,78 @@ fun SendScreen(vm: KirimQuoteViewModel) {
         state.error?.let {
             Text(stringResource(it.messageRes()), color = MaterialTheme.colorScheme.error)
         }
-        state.quote?.let { QuoteResult(it) }
+        state.quote?.let { quote ->
+            QuoteResult(quote)
+            SubmissionForm(vm, state.addresses)
+        }
 
         Spacer(Modifier.height(24.dp))
+    }
+}
+
+@Composable
+private fun SubmissionForm(vm: KirimQuoteViewModel, addresses: List<Address>) {
+    val state by vm.state.collectAsState()
+    val form = state.form
+
+    Spacer(Modifier.height(8.dp))
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedTextField(
+            value = form.itemDescription,
+            onValueChange = vm::onItemDescriptionChange,
+            label = { Text(stringResource(R.string.kirim_item_description)) },
+            minLines = 2,
+            modifier = Modifier.fillMaxWidth(),
+        )
+
+        if (form.kirimType == KirimType.HANTAR) {
+            Text(stringResource(R.string.kirim_origin_address), style = MaterialTheme.typography.labelLarge)
+            AddressChips(addresses, form.selectedOriginAddress, vm::onOriginAddressSelected)
+        }
+
+        Text(stringResource(R.string.kirim_dest_address), style = MaterialTheme.typography.labelLarge)
+        AddressChips(addresses, form.selectedDestAddress, vm::onDestAddressSelected)
+        if (addresses.isEmpty()) {
+            Text(stringResource(R.string.kirim_no_addresses), style = MaterialTheme.typography.bodySmall)
+        }
+
+        Button(
+            onClick = vm::submitKirim,
+            enabled = form.canSubmit && !state.isSubmitting,
+            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+        ) {
+            if (state.isSubmitting) {
+                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+            } else {
+                Text(stringResource(R.string.kirim_submit))
+            }
+        }
+    }
+}
+
+@Composable
+private fun AddressChips(addresses: List<Address>, selected: Address?, onSelect: (Address) -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        addresses.forEach { address ->
+            FilterChip(
+                selected = selected?.id == address.id,
+                onClick = { onSelect(address) },
+                label = { Text(address.label) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun KirimCreatedResult(created: KirimCreated) {
+    ElevatedCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(stringResource(R.string.kirim_posted_title), style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.kirim_posted_reference, created.referenceCode))
+        }
     }
 }
 
