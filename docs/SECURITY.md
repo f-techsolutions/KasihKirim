@@ -403,6 +403,43 @@ Signals accumulate into a score per subject. Thresholds drive: review queue → 
 
 ## 10. Mobile application security
 
+> **Native build note (Phase 10, `docs/CLAUDE_IMPLEMENTATION_PLAN.md` §0.1):**
+> this table was written for the Expo/React Native app (`expo-secure-store`,
+> `AsyncStorage`, Hermes) that `KasihKirimAndroid/` replaced. Re-verified for
+> the native build below; unverified rows are marked so this doesn't read as
+> a completed audit for a stack that's no longer what ships.
+>
+> - **Token storage** — supabase-kt's `Auth` plugin is installed with
+>   `autoLoadFromStorage = true` (`SupabaseClientProvider.kt`) but no custom
+>   `sessionManager` is supplied, so it falls back to the SDK's default
+>   (`SettingsSessionManager`, backed by `multiplatform-settings`, which on
+>   Android typically wraps plain `SharedPreferences`). `androidx.security.crypto`
+>   is already a dependency (`app/build.gradle.kts`) but nothing in the app
+>   actually calls it — **the equivalent of the forbidden "never AsyncStorage"
+>   row may currently be true for the native build too.** Not fixed here: the
+>   SDK's exact session-storage customization API for the pinned `3.5.0` BOM
+>   couldn't be confirmed from source in this pass (search results disagreed,
+>   and Google has since deprecated `EncryptedSharedPreferences` itself in
+>   favour of DataStore+Tink), and writing an unverified custom
+>   `SessionManager` risks silently breaking session persistence — worse than
+>   leaving this flagged. Needs a real Android Studio session against the
+>   pinned SDK version to confirm the API before implementing.
+> - **Dependencies** — `.github/dependabot.yml` now covers the Gradle
+>   ecosystem (it previously only would have covered `npm`/JS, and didn't
+>   exist as a file at all until Phase 10).
+> - **Code protection, Network, Rooted devices** — re-verified true for the
+>   native build: R8 + resource shrinking (`isMinifyEnabled`/`isShrinkResources`,
+>   Phase 1), `usesCleartextTraffic="false"` in `AndroidManifest.xml`, no
+>   certificate pinning, no root check anywhere in the Kotlin sources.
+> - **Screenshots, Clipboard** — not yet applicable: no KYC capture,
+>   handover QR, payout, or OTP screen exists in the native build yet (email/
+>   password auth only, per Phase 1's `[auth.sms]` gap). Apply `FLAG_SECURE`
+>   when those screens are actually built, not preemptively to screens that
+>   don't exist.
+> - **Deep links** — re-verified true: the PKCE callback
+>   (`kasihkirim://auth/callback`) is validated by the Supabase Auth SDK's own
+>   PKCE code-verifier exchange, not by trusting anything in the link itself.
+
 | Control | Implementation |
 |---|---|
 | Token storage | `expo-secure-store` (Android Keystore). Never `AsyncStorage`. |

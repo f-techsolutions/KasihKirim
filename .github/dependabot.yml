@@ -1,0 +1,16 @@
+version: 2
+updates:
+  # docs/SECURITY.md §10 requires dependency scanning with a failing build
+  # on a critical advisory. npm audit + Dependabot already cover the JS
+  # workspaces; this adds the equivalent for KasihKirimAndroid's Gradle
+  # dependencies, which had no automated update/advisory coverage at all.
+  - package-ecosystem: gradle
+    directory: /KasihKirimAndroid
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
