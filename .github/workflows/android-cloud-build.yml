@@ -86,22 +86,43 @@ jobs:
       # by design, to stop a fork from exfiltrating secrets via a crafted
       # workflow change. That means this step fails closed for fork PRs
       # rather than silently building with an empty Supabase config.
+      #
+      # Dependabot-authored PRs hit the same empty-secrets situation even
+      # though their branch lives in this repository, not a fork: GitHub
+      # separately withholds repository secrets from pull_request runs
+      # triggered by dependabot[bot] unless the same values are also stored
+      # as distinct "Dependabot secrets" (Settings -> Secrets and variables
+      # -> Dependabot). Confirmed via PR #22/#23's job logs: IS_FORK_PR was
+      # false but SUPABASE_URL/SUPABASE_PUBLISHABLE_KEY were still empty. A
+      # version-bump PR only needs to prove the bump still compiles and
+      # passes the JVM unit tests -- which run against fakes and never call
+      # real Supabase (this codebase's established test discipline) -- so a
+      # harmless placeholder is enough for an accurate signal here, without
+      # this workflow ever handling the real secret on Dependabot's behalf.
+      # Fork PRs above are unaffected and still fail closed.
       - name: Configure Supabase build values
         working-directory: KasihKirimAndroid
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
           IS_FORK_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+          IS_DEPENDABOT_PR: ${{ github.event_name == 'pull_request' && github.actor == 'dependabot[bot]' && github.event.pull_request.head.repo.full_name == github.repository }}
         run: |
           set -euo pipefail
           if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_PUBLISHABLE_KEY" ]; then
-            echo "::error::Missing SUPABASE_URL and/or SUPABASE_PUBLISHABLE_KEY secret."
-            if [ "$IS_FORK_PR" = "true" ]; then
+            if [ "$IS_DEPENDABOT_PR" = "true" ]; then
+              echo "::notice::Dependabot PRs don't receive repository secrets (a GitHub restriction, not a misconfiguration). Using placeholder Supabase values so the dependency bump can still be compiled and unit-tested -- this build's APK is not a representative config."
+              SUPABASE_URL="https://placeholder.supabase.co"
+              SUPABASE_PUBLISHABLE_KEY="placeholder-publishable-key"
+            elif [ "$IS_FORK_PR" = "true" ]; then
+              echo "::error::Missing SUPABASE_URL and/or SUPABASE_PUBLISHABLE_KEY secret."
               echo "::error::This build was triggered by a pull request from a fork. GitHub does not expose repository secrets (SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY) to workflows run for fork pull requests -- this is a GitHub security restriction, not a misconfiguration, and it cannot be worked around from within the workflow. A maintainer must build this change from a branch on the base repository (or via workflow_dispatch) instead."
+              exit 1
             else
+              echo "::error::Missing SUPABASE_URL and/or SUPABASE_PUBLISHABLE_KEY secret."
               echo "::error::Add SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY under Settings -> Secrets and variables -> Actions for this repository."
+              exit 1
             fi
-            exit 1
           fi
           printf 'sdk.dir=%s\nSUPABASE_URL=%s\nSUPABASE_PUBLISHABLE_KEY=%s\n' "$ANDROID_HOME" "$SUPABASE_URL" "$SUPABASE_PUBLISHABLE_KEY" > local.properties
 
