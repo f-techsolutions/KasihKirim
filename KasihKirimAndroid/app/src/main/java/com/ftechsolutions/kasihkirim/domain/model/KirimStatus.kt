@@ -41,6 +41,31 @@ enum class KirimStatus(val wire: String) {
     val isFailure: Boolean
         get() = this in setOf(FAILED_PICKUP, FAILED_DELIVERY, PROCUREMENT_FAILED, RETURNED, DISPUTED)
 
+    /** Presentation only -- the status itself is always the server's word. */
+    val labelMs: String
+        get() = when (this) {
+            DRAFT -> "Draf"
+            POSTED -> "Di Papan"
+            MATCHED -> "Dipadan"
+            PROCURING -> "Membeli"
+            AWAITING_PICKUP -> "Menunggu Ambil"
+            PICKED_UP -> "Sudah Diambil"
+            IN_TRANSIT -> "Dalam Perjalanan"
+            AT_HUB -> "Di Hab"
+            OUT_FOR_DELIVERY -> "Dalam Penghantaran"
+            DELIVERED -> "Sudah Sampai"
+            COMPLETED -> "Selesai"
+            FAILED_PICKUP -> "Gagal Ambil"
+            FAILED_DELIVERY -> "Gagal Hantar"
+            PROCUREMENT_FAILED -> "Belian Gagal"
+            RETURNING -> "Dipulangkan"
+            RETURNED -> "Sudah Dipulangkan"
+            CANCELLED -> "Dibatalkan"
+            EXPIRED -> "Luput"
+            DISPUTED -> "Pertikaian"
+            REFUNDED -> "Dibayar Balik"
+        }
+
     companion object {
         fun fromWire(value: String): KirimStatus? = entries.firstOrNull { it.wire == value }
     }

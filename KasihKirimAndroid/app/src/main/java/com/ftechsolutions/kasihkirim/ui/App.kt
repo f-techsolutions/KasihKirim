@@ -15,6 +15,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ftechsolutions.kasihkirim.R
 import com.ftechsolutions.kasihkirim.domain.model.AuthState
 import com.ftechsolutions.kasihkirim.domain.repository.AddressRepository
+import com.ftechsolutions.kasihkirim.domain.repository.DeliveryRepository
 import com.ftechsolutions.kasihkirim.domain.repository.EarningsRepository
 import com.ftechsolutions.kasihkirim.domain.repository.KirimRepository
 import com.ftechsolutions.kasihkirim.domain.repository.TripRepository
@@ -37,6 +38,7 @@ fun App(
     earningsRepository: EarningsRepository,
     vehicleRepository: VehicleRepository,
     tripRepository: TripRepository,
+    deliveryRepository: DeliveryRepository,
 ) {
     val state by vm.authState.collectAsStateWithLifecycle()
 
@@ -49,7 +51,8 @@ fun App(
             }
             AuthState.Unauthenticated -> AuthScreen(vm)
             is AuthState.Authenticated -> AppNavHost(
-                s.user, vm, addressRepository, kirimRepository, earningsRepository, vehicleRepository, tripRepository,
+                s.user, vm, addressRepository, kirimRepository, earningsRepository,
+                vehicleRepository, tripRepository, deliveryRepository,
             )
             is AuthState.Error -> Centered {
                 Text(stringResource(s.error.messageRes()),

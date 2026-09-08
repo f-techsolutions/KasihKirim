@@ -63,8 +63,7 @@
     <string name="serviceability_no_route">Tiada laluan antara lokasi ini.</string>
     <string name="serviceability_unknown">Lokasi tidak dikenali.</string>
 
-    <string name="kirim_title">Sebut Harga Kirim</string>
-    <string name="kirim_quote_only_notice">Sebut harga sahaja buat masa ini. Hantar pesanan akan tersedia tidak lama lagi.</string>
+    <string name="kirim_title">Kirim Barang</string>
     <string name="kirim_type_beli">Beli (carrier beli untuk saya)</string>
     <string name="kirim_type_hantar">Hantar (barang saya sendiri)</string>
     <string name="kirim_category">Kategori</string>
@@ -76,9 +75,36 @@
     <string name="kirim_quote_goods">Bajet barang: %1$s</string>
     <string name="kirim_quote_delivery">Yuran penghantaran: %1$s</string>
     <string name="kirim_quote_total">Jumlah: %1$s</string>
+    <string name="kirim_item_description">Perihal Barang</string>
+    <string name="kirim_origin_address">Alamat Ambil</string>
+    <string name="kirim_dest_address">Alamat Hantar</string>
+    <string name="kirim_no_addresses">Tiada alamat lagi. Tambah alamat di Profil dahulu.</string>
+    <string name="kirim_submit">Hantar Sekarang</string>
+    <string name="kirim_posted_title">Kirim Dihantar</string>
+    <string name="kirim_posted_reference">Rujukan: %1$s</string>
 
     <string name="err_budget_cap_exceeded">Bajet melebihi had yang dibenarkan.</string>
     <string name="err_category_not_found">Kategori tidak sah.</string>
+    <string name="err_quote_not_found">Sebut harga tidak dijumpai. Sila cuba lagi.</string>
+    <string name="err_quote_consumed">Sebut harga ini sudah digunakan.</string>
+    <string name="err_quote_expired">Sebut harga sudah luput. Sila dapatkan sebut harga baharu.</string>
+    <string name="err_address_not_found">Alamat tidak dijumpai.</string>
+    <string name="err_origin_address_required">Sila pilih alamat ambil.</string>
+    <string name="err_beli_requires_budget">Bajet diperlukan untuk jenis Beli.</string>
+
+    <string name="board_title">Papan Kirim</string>
+    <string name="board_empty">Tiada kirim di papan buat masa ini.</string>
+    <string name="board_accept">Terima</string>
+    <string name="board_accept_for_trip">Terima untuk trip: %1$s</string>
+    <string name="board_no_trips">Anda tiada trip aktif untuk menerima kirim ini.</string>
+
+    <string name="orders_title">Pesanan Saya</string>
+    <string name="orders_empty">Tiada pesanan lagi.</string>
+
+    <string name="deliveries_title">Penghantaran Saya</string>
+    <string name="deliveries_empty">Tiada penghantaran lagi.</string>
+    <string name="deliveries_carrier_earning">Pendapatan carrier: %1$s</string>
+    <string name="err_delivery_not_found">Penghantaran tidak dijumpai.</string>
 
     <string name="earnings_title">Pendapatan Saya</string>
     <string name="earnings_available">Boleh dikeluarkan</string>
@@ -115,4 +141,10 @@
     <string name="err_vehicle_not_found">Kenderaan tidak dijumpai.</string>
     <string name="err_invalid_corridor">Asal dan destinasi mesti berbeza.</string>
     <string name="err_depart_time_in_past">Masa berlepas mesti pada masa hadapan.</string>
+    <string name="err_state_invalid_transition">Kirim ini sudah tidak lagi di papan.</string>
+    <string name="err_self_dealing">Anda tidak boleh menerima kirim anda sendiri.</string>
+    <string name="err_float_limit_exceeded">Had float anda tidak mencukupi untuk kirim ini.</string>
+    <string name="err_capacity_exceeded">Trip ini tidak lagi mempunyai ruang yang cukup.</string>
+    <string name="err_trip_not_found">Trip tidak dijumpai.</string>
+    <string name="err_trip_not_boarding">Trip ini tidak lagi menerima kirim.</string>
 </resources>

@@ -24,6 +24,7 @@ class MainActivity : ComponentActivity() {
                     app.earningsRepository,
                     app.vehicleRepository,
                     app.tripRepository,
+                    app.deliveryRepository,
                 )
             }
         }
