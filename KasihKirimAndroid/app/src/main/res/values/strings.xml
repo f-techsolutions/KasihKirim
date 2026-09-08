@@ -101,6 +101,11 @@
     <string name="orders_title">Pesanan Saya</string>
     <string name="orders_empty">Tiada pesanan lagi.</string>
 
+    <string name="deliveries_title">Penghantaran Saya</string>
+    <string name="deliveries_empty">Tiada penghantaran lagi.</string>
+    <string name="deliveries_carrier_earning">Pendapatan carrier: %1$s</string>
+    <string name="err_delivery_not_found">Penghantaran tidak dijumpai.</string>
+
     <string name="earnings_title">Pendapatan Saya</string>
     <string name="earnings_available">Boleh dikeluarkan</string>
     <string name="earnings_pending">Belum selesai</string>

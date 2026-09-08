@@ -122,6 +122,7 @@ internal fun AppError.messageRes(): Int = when (this) {
         "CAPACITY_EXCEEDED" -> R.string.err_capacity_exceeded
         "TRIP_NOT_FOUND" -> R.string.err_trip_not_found
         "TRIP_NOT_BOARDING" -> R.string.err_trip_not_boarding
+        "DELIVERY_NOT_FOUND" -> R.string.err_delivery_not_found
         else -> R.string.err_unexpected
     }
     else -> R.string.err_unexpected

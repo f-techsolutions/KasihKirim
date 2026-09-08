@@ -28,7 +28,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 @Composable
-fun TripsScreen(vm: TripsViewModel, onOpenVehicles: () -> Unit) {
+fun TripsScreen(vm: TripsViewModel, onOpenVehicles: () -> Unit, onOpenDeliveries: () -> Unit) {
     val state by vm.state.collectAsState()
 
     LazyColumn(
@@ -46,6 +46,10 @@ fun TripsScreen(vm: TripsViewModel, onOpenVehicles: () -> Unit) {
         items(state.trips, key = { it.id }) { trip -> TripCard(trip, state.nodeNames) }
 
         item {
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(onClick = onOpenDeliveries, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.deliveries_title))
+            }
             Spacer(Modifier.height(8.dp))
             OutlinedButton(onClick = onOpenVehicles, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.vehicles_title))
