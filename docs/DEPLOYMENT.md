@@ -1,17 +1,38 @@
 # KasihKirim — Deployment & Release
 
-GitHub · Supabase · Vercel · Expo EAS · Google Play
+GitHub · Supabase · Vercel · Native Android (Kotlin/Gradle) · Google Play
+
+> **Native build note (added Phase 10).** `CLAUDE_IMPLEMENTATION_PLAN.md` §0.1
+> chose **native Kotlin** (`KasihKirimAndroid/`) over the Expo/React Native
+> app this document was written for. As of this note both still physically
+> exist in the repo (`apps/mobile/` hasn't been deleted), so treat every
+> **mobile-specific** claim below as describing the *retired* stack unless a
+> section explicitly says otherwise. Sections §1–§7 and §9–§15 that describe
+> Supabase, the admin console, migrations, secrets rotation, and Play policy
+> in general are stack-agnostic and were not re-verified in this pass.
+> §8 (EAS) and §10.2 (API levels) are corrected below with values read
+> directly from `KasihKirimAndroid/app/build.gradle.kts`. §12's Sentry row
+> and §16's OTA/Expo-SDK rows do not apply to the native build — there is no
+> crash-reporting SDK and no OTA-update mechanism in `KasihKirimAndroid/`
+> today. See `docs/RELEASE_SIGNING.md` for the native build's actual signing
+> and CI pipeline.
 
 ---
 
 ## 1. Environments
 
-| Env | Supabase | Vercel | Mobile | Data |
+| Env | Supabase | Vercel | Mobile (native build) | Data |
 |---|---|---|---|---|
-| **local** | Supabase CLI (Docker) | `next dev` | Expo Dev Client | Seed fixtures |
-| **dev** | `kasihkirim-dev` | Preview | EAS `development` | Synthetic |
-| **staging** | `kasihkirim-staging` | Preview (protected) | EAS `preview` → internal track | Synthetic, production-shaped |
-| **production** | `kasihkirim-prod` | Production | EAS `production` → Play | Real |
+| **local** | Supabase CLI (Docker) | `next dev` | Android Studio / `adb install`, `local.properties` pointed at whichever Supabase project you're testing against | Seed fixtures |
+| **dev** | `kasihkirim-dev` | Preview | `android-cloud-build.yml` debug APK, downloaded as a CI artifact | Synthetic |
+| **staging** | `kasihkirim-staging` | Preview (protected) | Same debug APK pipeline, sideloaded for internal testing — no distinct "preview" build type exists | Synthetic, production-shaped |
+| **production** | `kasihkirim-prod` | Production | `android-release-build.yml` signed AAB → manual Play Console upload (§8, §10.6) | Real |
+
+The Supabase/Vercel columns above were not re-verified in this pass — only
+the Mobile column, which is squarely this document's Android scope, was
+corrected. Whether `kasihkirim-dev`/`-staging`/`-prod` actually exist as
+separate projects, and which one `KasihKirimAndroid/`'s CI secrets
+currently point at, wasn't checked.
 
 **Separate Supabase projects per environment**, not separate schemas. Shared-project separation eventually leaks — one mistaken connection string and a test writes to production. Separate projects make that impossible rather than unlikely.
 
@@ -26,21 +47,26 @@ Single repository, npm workspaces. Small team, tightly coupled contracts — a p
 ```
 kasihkirim/
 ├── apps/
-│   ├── mobile/              Expo — Android only
-│   └── admin/               Next.js
-├── packages/
-│   ├── shared-types/        Generated Supabase types + domain types
-│   ├── shared-schemas/      Zod — validated identically on client and Edge
-│   └── shared-config/       ESLint, TS, Prettier
+│   ├── mobile/              Expo — retired per CLAUDE_IMPLEMENTATION_PLAN.md §0.1,
+│   │                        still physically present in the repo, not deleted
+│   └── admin/               Next.js (not re-verified in this pass)
+├── KasihKirimAndroid/       Native Kotlin/Compose — the app that actually ships
+├── packages/                Not re-verified in this pass
 ├── supabase/
 │   ├── migrations/          Timestamped, forward-only
 │   ├── functions/           Edge Functions (Deno)
-│   ├── seed/                Beluran corridor, categories, pricing v1
-│   └── tests/               pgTAP
-├── e2e/                     Maestro flows
+│   ├── seed.sql             Single file, not a seed/ directory
+│   └── tests/                pgTAP
 ├── docs/                    This document set
-└── .github/workflows/
+└── .github/workflows/       android-cloud-build.yml, android-release-build.yml
+                              (see docs/RELEASE_SIGNING.md), plus whatever
+                              covers Supabase/admin CI (not re-verified here)
 ```
+
+The `packages/`, `apps/admin/`, and `e2e/` rows in the original tree could
+not be confirmed to exist as described in this pass — this document's
+Android-facing claims were checked against the actual repository; its
+Supabase/Next.js/e2e claims were not.
 
 `shared-schemas` matters more than it looks: the same Zod schema validates a Kirim on the phone and again in the Edge Function. Client validation is UX; server validation is the control. One definition prevents them drifting.
 
@@ -77,10 +103,9 @@ jobs:
   integration:    # against the local stack
   payload-budget: # every catalogued endpoint vs API.md §6
   security:       # semgrep, gitleaks, npm audit
-  build-check:    # expo prebuild --no-install; APK size gate
 ```
 
-The `database` job is the slowest and the most valuable. It boots real Postgres, applies every migration from zero, and runs the full RLS matrix. It catches the class of bug that would otherwise reach production as a data breach.
+The `database` job is the slowest and the most valuable. It boots real Postgres, applies every migration from zero, and runs the full RLS matrix. It catches the class of bug that would otherwise reach production as a data breach. (This whole block was not re-verified against the actual `pr.yml` in this pass — only the `build-check` row was, and it's removed here because it doesn't exist: Android CI runs as its own separate workflow, `.github/workflows/android-cloud-build.yml`, not as a job inside `pr.yml`. It runs `./gradlew test` + `:app:assembleDebug` + two forbidden-secret gates, not `expo prebuild`. See §8.1.)
 
 ### 4.2 Merge to `main`
 
@@ -89,15 +114,22 @@ jobs:
   migrate-staging:    supabase db push --project-ref $STAGING
   deploy-functions:   supabase functions deploy --project-ref $STAGING
   deploy-admin:       vercel deploy (staging)
-  build-mobile:       eas build -p android --profile preview
-  submit-internal:    eas submit --track internal
-  e2e:                maestro test e2e/ (floor + mid-range device)
+  # android-cloud-build.yml already runs on every push to main on its own
+  # trigger (push: branches: [main]) -- it isn't a job inside this pipeline,
+  # and it produces a debug APK artifact, not a staging/internal-track build.
+  e2e:                maestro test e2e/ (not re-verified in this pass)
   smoke:              staging health checks
 ```
 
 ### 4.3 Production release
 
-Manually triggered, tagged, and gated on a human approval in a GitHub Environment.
+Manually triggered, tagged, and gated on a human approval in a GitHub Environment
+for the Supabase/admin side. The native Android release is **not** part of
+this pipeline at all: `android-release-build.yml` is its own
+`workflow_dispatch`-only workflow (§8.1), run separately, whenever a signed
+AAB is actually wanted — there is no auto-build-and-submit-on-tag step for
+mobile today, and no staged-rollout automation (§10.6's staged rollout is a
+manual Play Console action).
 
 ```yaml
 jobs:
@@ -106,9 +138,10 @@ jobs:
   migrate-prod:
   deploy-functions:
   deploy-admin:
-  build-mobile:       eas build -p android --profile production --auto-submit
-  staged-rollout:     # Play: 5% → 20% → 50% → 100%
+  # Mobile release is a separate, manually-dispatched workflow -- see above.
   monitor:            # crash rate, payment failures, reconciliation
+                       # (mobile crash-rate monitoring specifically: not
+                       # wired up yet, per §12)
 ```
 
 ---
@@ -170,103 +203,86 @@ A CI check greps the client bundle for the service-role key pattern. A leak ther
 
 ---
 
-## 8. Mobile — EAS
+## 8. Mobile — native build (Kotlin/Gradle/GitHub Actions)
 
-### 8.1 Build profiles
+**This section describes `KasihKirimAndroid/` as it actually builds today.**
+There is no EAS profile system, no `eas.json`, and no OTA channel — see §16
+for what that means for how a fix ships.
 
-```json
-{
-  "build": {
-    "development": {
-      "developmentClient": true,
-      "distribution": "internal",
-      "android": { "buildType": "apk", "gradleCommand": ":app:assembleDebug" },
-      "channel": "development"
-    },
-    "preview": {
-      "distribution": "internal",
-      "android": { "buildType": "apk" },
-      "channel": "preview",
-      "env": { "APP_ENV": "staging" }
-    },
-    "production": {
-      "android": { "buildType": "app-bundle" },
-      "channel": "production",
-      "env": { "APP_ENV": "production" },
-      "autoIncrement": "versionCode"
-    }
-  },
-  "submit": {
-    "production": {
-      "android": {
-        "serviceAccountKeyPath": "./play-service-account.json",
-        "track": "production",
-        "releaseStatus": "inProgress",
-        "rollout": 0.05
-      }
-    }
-  }
-}
-```
+### 8.1 Build pipelines
 
-**No iOS profiles.** Android-only is a scope decision, and leaving iOS configuration in place invites accidental effort.
+| Pipeline | File | Trigger | Produces |
+|---|---|---|---|
+| PR / main CI | `.github/workflows/android-cloud-build.yml` | `push` to `main`, every PR, manual | Debug APK, R8-shrunk but unsigned release build type exercised, two forbidden-secret gates |
+| Release | `.github/workflows/android-release-build.yml` | `workflow_dispatch` only, never a push or PR | Signed release **AAB** (`:app:bundleRelease`) |
 
-Production ships an **AAB**, so Play generates per-ABI splits and the download stays inside the 25 MB budget (`PRD.md` NFR-101).
+Both jobs run the same `SUPABASE_URL`/`SUPABASE_PUBLISHABLE_KEY`-from-secrets
+step and the same forbidden-secret source gate; the release pipeline adds a
+second gate that scans the *extracted* AAB contents, and needs four more
+secrets (`RELEASE_KEYSTORE_BASE64`, `RELEASE_KEYSTORE_PASSWORD`,
+`RELEASE_KEY_ALIAS`, `RELEASE_KEY_PASSWORD`) the PR pipeline doesn't. See
+`docs/RELEASE_SIGNING.md` for exactly what those are and how to generate
+them.
+
+**No iOS.** There never was an iOS target for the native build; Android-only
+is still the scope decision, it's just no longer expressed as "no iOS EAS
+profile" since EAS itself doesn't apply.
+
+Production ships an **AAB** (`:app:bundleRelease`), so Play generates
+per-ABI splits — the `PRD.md` NFR-101 25 MB budget still applies and hasn't
+been re-measured against the native build's actual APK/AAB size in this
+pass.
 
 ### 8.2 Credentials
 
-- **Play App Signing** enabled; Google holds the app signing key.
-- Upload key held in EAS credentials, backed up offline in the founders' password manager.
-- Play service account JSON in EAS secrets, never in the repository.
+- Whether to enrol in **Play App Signing** (Google holds the app signing
+  key; you upload with a separate, replaceable upload key) is a Play
+  Console decision at first upload — `RELEASE_SIGNING.md` doesn't presume
+  either way, and neither does this document.
+- The release keystore is generated and held by whoever runs
+  `docs/RELEASE_SIGNING.md`'s `keytool` command — not EAS credentials,
+  since there is no EAS. Same principle as the old row below: losing all
+  four `RELEASE_KEYSTORE_*`/`RELEASE_KEY_*` values means losing the
+  ability to ship an update to the same `applicationId` ever again, so they
+  belong in a password manager, not only in GitHub Actions secrets.
+- No Play service account JSON exists in this repository's secrets yet —
+  `android-release-build.yml` produces an artifact for **manual** upload,
+  it does not call the Play Publishing API. Automating that needs a
+  service-account JSON this repository hasn't been given, and wasn't asked
+  to add.
 
-Losing the upload key is recoverable through Play support; losing it *and* having no record of which key was used is not. It is documented in the runbook.
+Losing the upload key is recoverable through Play support; losing it *and*
+having no record of which key was used is not. It is documented in the
+runbook.
 
 ---
 
-## 9. OTA updates (EAS Update)
+## 9. OTA updates — does not apply to the native build
 
-### 9.1 What may ship over the air
+Everything below this heading described `expo-updates`: a JS bundle
+downloaded and swapped without a Play Store review, possible because an
+Expo/React Native app's logic mostly lives in an interpreted JS bundle
+separate from the compiled native shell. `KasihKirimAndroid/` is a compiled
+Kotlin APK/AAB with no such split — **there is no mechanism in this
+repository today for shipping a fix without a new Play build.** No
+Firebase Remote Config, no custom update channel, nothing has been
+substituted for it; this is a real gap relative to the plan this document
+was originally written against, not a documented equivalent.
 
-| Change | OTA | Store build |
-|---|---|---|
-| JS logic, copy, styling | ✅ | |
-| New screen using existing native modules | ✅ | |
-| Bug fix in an existing flow | ✅ | |
-| Images, translations | ✅ | |
-| New native module | | ✅ |
-| **Permission change** | | ✅ |
-| Expo SDK upgrade | | ✅ |
-| `app.json` native config | | ✅ |
-| **Anything altering payment behaviour** | | ✅ |
+**What this means in practice:** every bug fix, copy change, and feature
+ships through the same path — `android-release-build.yml` → a new signed
+AAB → Play Console upload → staged rollout (§10.6). A typo in a string
+resource takes exactly as long to ship as a new screen. If shipping small
+fixes without a full review cycle turns out to matter for this product,
+that's a build to scope deliberately (e.g. Play's own in-app update API for
+prompting a refresh, or a server-driven config/feature-flag layer for the
+subset of behavior that's safe to toggle remotely) — not something to
+assume is already covered.
 
-The last row is policy, not technical necessity. A change to how money is presented or taken should go through store review and staged rollout, not slip in silently overnight.
-
-### 9.2 Update strategy for slow connections
-
-```json
-{
-  "updates": {
-    "enabled": true,
-    "checkAutomatically": "ON_LOAD",
-    "fallbackToCacheTimeout": 0,
-    "url": "https://u.expo.dev/{project-id}"
-  },
-  "runtimeVersion": { "policy": "fingerprint" }
-}
-```
-
-`fallbackToCacheTimeout: 0` is essential. It means the app **never blocks launch** waiting to download an update. On a 3G link in Beluran, a blocking update check is indistinguishable from a broken app. The update downloads in the background and applies on the next launch.
-
-Updates are published per channel; `production` only after the same build has run clean on `preview`.
-
-### 9.3 Rollback
-
-```bash
-eas update:rollback --channel production          # instant, JS-level
-eas update:republish --group <previous-group-id>  # explicit known-good
-```
-
-Rollback takes effect on next app launch. For a bad **native** build, halt the Play rollout and resume the previous release.
+Rollback for a bad native release is the same as before: halt the Play
+staged rollout and let it fall back to the last version already at 100%
+(§10.6). There is no `eas update:rollback` equivalent because there is no
+OTA layer for it to roll back.
 
 ---
 
@@ -289,14 +305,33 @@ Rollback takes effect on next app launch. For a bad **native** build, halt the P
 
 ### 10.2 API level requirements
 
-| Setting | Value | Note |
-|---|---|---|
-| `minSdkVersion` | **24** (Android 7.0) | Covers the old budget devices in the target market |
-| `targetSdkVersion` | **36** (Android 16) | Google Play requires new apps to target API 36 as of 31 August 2026 |
-| `compileSdkVersion` | 36 | |
-| **16 KB page size** | **Required** | All native libraries must support 16 KB page alignment. Hard requirement for updates to apps targeting Android 15+ from **1 February 2027**. Verify with `bundletool`/`check_elf_alignment.sh` in CI. |
+**Actual values, read from `KasihKirimAndroid/app/build.gradle.kts`** (this
+table previously stated 24/36/36, which doesn't match what's shipped):
 
-The 16 KB requirement is a build-time gate in CI, not a pre-release check. A native dependency added in month three that breaks alignment should fail the PR, not surface as a blocked release in 2027.
+| Setting | Planned (this doc, originally) | Actual (`build.gradle.kts`) |
+|---|---|---|
+| `minSdk` | 24 (Android 7.0) | **26** (Android 8.0) |
+| `targetSdk` | 36 (Android 16) | **37** |
+| `compileSdk` | 36 | **37** |
+
+**`minSdk` is a real discrepancy worth a decision, not just a docs fix.**
+This document's stated reason for 24 — "covers the old budget devices in
+the target market" — is a product requirement, and 26 silently narrows
+that: any Android 7.0/7.1 device (API 24–25) in the Sabah target market
+cannot install this app as it stands. This may have been a deliberate
+Phase 1 engineering call (a dependency or language feature needing 26+) or
+an oversight; either way it wasn't re-confirmed against the original
+product requirement when set, and rechecking that against actual budget
+Android device data for Sabah is a business decision, not something to
+silently resolve either direction here.
+
+**16 KB page size** — every native library must support 16 KB page
+alignment for updates to apps targeting Android 15+ from 1 February 2027,
+and `targetSdk = 37` is already well past that threshold. **No CI check
+for this exists yet** in either `android-cloud-build.yml` or
+`android-release-build.yml` — the `bundletool`/`check_elf_alignment.sh`
+gate this document called for was never added. Worth adding before the
+16 KB deadline, not discovered as a blocked release when it arrives.
 
 ### 10.3 Data Safety declaration
 
@@ -376,14 +411,15 @@ Production, staged: 5% → 20% → 50% → 100%
 
 | Secret | Stored in | Rotation |
 |---|---|---|
-| Supabase service role | GitHub Environments, Vercel (server), EAS | 6 months |
+| Supabase service role | GitHub Environments, Vercel (server) — the EAS entry no longer applies; not re-verified whether the native build's CI needs it at all (it shouldn't: only the publishable key is used, per `SupabaseClientProvider.kt`) | 6 months |
 | Gateway API + webhook keys | Supabase secrets | Per provider policy |
 | SMS/WhatsApp provider | Supabase secrets | 12 months |
 | Ed25519 QR signing key | **Supabase Vault** | 12 months, dual-key window |
 | OTP pepper | **Supabase Vault** | 12 months |
-| Play service account | EAS secrets | 12 months |
-| Sentry DSN | Public — not a secret | — |
-| Android upload key | EAS credentials + offline backup | Never |
+| Play service account | **Does not exist yet.** `android-release-build.yml` doesn't publish to Play — see §8.2 | — |
+| Sentry DSN | N/A on mobile — no Sentry integration exists in `KasihKirimAndroid/` (§12) | — |
+| Android release keystore | Held by whoever generates it per `docs/RELEASE_SIGNING.md`; `RELEASE_KEYSTORE_BASE64`/`RELEASE_KEYSTORE_PASSWORD`/`RELEASE_KEY_ALIAS`/`RELEASE_KEY_PASSWORD` in GitHub Actions secrets, not "EAS credentials" | Never |
+| `SUPABASE_URL` / `SUPABASE_PUBLISHABLE_KEY` (Android) | GitHub Actions secrets, read into `local.properties` at build time — public by design, not sensitive, but still not committed | N/A |
 
 Rotation is scheduled work with a runbook, not an incident response. The QR key rotation specifically supports two active keys simultaneously, because a carrier may be holding a token issued before rotation and be out of coverage until after it.
 
@@ -391,9 +427,15 @@ Rotation is scheduled work with a runbook, not an incident response. The QR key 
 
 ## 12. Observability
 
+**Mobile-specific note:** `KasihKirimAndroid/` has no crash-reporting SDK
+of any kind today — not Sentry, not Play Vitals wiring, nothing (confirmed
+by grepping the app's dependencies and sources). The Edge/Postgres/admin-
+console side of this table was not re-checked in this pass and may still
+be accurate; only the mobile row is confirmed stale.
+
 | Signal | Tool | Alert |
 |---|---|---|
-| Crashes / ANR | Sentry + Play Vitals | Crash-free < 99 %; ANR > 0.4 % |
+| Crashes / ANR | **Not yet wired up on the native build.** Sentry + Play Vitals, below, describes the plan this table was originally written against. | Crash-free < 99 %; ANR > 0.4 % |
 | Edge errors | Sentry + Supabase logs | > 2 % over 5 min |
 | Payment failures | Custom metric | > 10 % over 15 min |
 | Webhook lag | `received_at → processed_at` | p95 > 60 s |
@@ -458,13 +500,17 @@ Each is a separate document in `docs/runbooks/`, written to be followed at 3 a.m
 
 | Type | Cadence | Path |
 |---|---|---|
-| OTA fix | As needed | EAS Update → `production` channel |
-| Feature release | Every 2 weeks | Full pipeline, staged rollout |
-| Native release | Monthly, or when native changes require | Play, staged |
-| Security hotfix | Immediate | Expedited, `min_supported_version` bump if warranted |
-| Expo SDK upgrade | Quarterly, ~1 major behind latest | Dedicated branch, full regression |
+| Feature / fix release | As needed — **every** change ships this way now, per §9 | `android-release-build.yml` → signed AAB → manual Play upload → staged rollout (§10.6) |
+| Security hotfix | Immediate | Same path as above, expedited — there's no separate OTA channel to push it through faster |
+| Android Gradle Plugin / Kotlin / Compose upgrade | As needed | `.github/dependabot.yml` (added Phase 10) opens PRs for Gradle dependency updates; still needs a human to actually review and merge them |
 
-Staying one Expo SDK behind the latest is deliberate. The newest release absorbs breaking changes from React Native and Android; a small team on a product where a failed release strands parcels benefits more from stability than from being current.
+The "OTA fix" and "Expo SDK upgrade" rows from the original plan don't
+translate to the native build (§9) — there is no OTA channel to push a fix
+through faster than a full release, and no Expo SDK to stay a version
+behind. What replaced the discipline those rows enforced (small team,
+stability over being current) hasn't been decided for the native build;
+this table should be revisited once there's real release history to base
+a cadence on rather than inheriting the Expo-era numbers unchanged.
 
 ---
 

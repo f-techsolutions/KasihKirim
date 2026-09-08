@@ -1,15 +1,17 @@
 # KasihKirimAndroid — Release Signing
 
-Scope note: `docs/DEPLOYMENT.md` describes the Expo/EAS pipeline for the
-`apps/mobile/` React Native app. That plan predates
+Scope note: `docs/DEPLOYMENT.md` was originally written for the Expo/EAS
+pipeline of the `apps/mobile/` React Native app, predating
 `docs/CLAUDE_IMPLEMENTATION_PLAN.md` §0.1's decision to build a native
-Kotlin app instead (`KasihKirimAndroid/`), and it names a different
-package (`my.kasihkirim.app`) than the one actually shipped since Phase 1
-(`com.ftechsolutions.kasihkirim`, set in `app/build.gradle.kts`). This
-document covers only the real, native build's release signing — it does
-not attempt to reconcile the rest of `DEPLOYMENT.md` (Vercel, EAS,
-Supabase environments, OTA updates), which is unrelated infrastructure
-outside the Android build's own CI.
+Kotlin app instead (`KasihKirimAndroid/`), and names a different package
+(`my.kasihkirim.app`) than the one actually shipped since Phase 1
+(`com.ftechsolutions.kasihkirim`, set in `app/build.gradle.kts`). Its §8
+(mobile build pipeline), §9 (OTA — doesn't apply natively), §10.2 (API
+levels), §11 (secrets), §12's mobile crash-reporting row, and §15 (release
+cadence) have since been corrected in place to describe the real native
+build. Its Vercel/admin-console, Supabase environment, and e2e/Maestro
+content was not re-verified and may still be stale — this document stays
+scoped to signing specifically.
 
 ## What's already wired
 
