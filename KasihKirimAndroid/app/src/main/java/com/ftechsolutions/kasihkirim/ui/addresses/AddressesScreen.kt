@@ -245,6 +245,16 @@ private fun AddressFormCard(vm: AddressesViewModel) {
                 label = { Text(stringResource(R.string.addresses_recipient_phone)) },
                 placeholder = { Text("+60123456789") },
                 singleLine = true,
+                isError = form.phoneInvalid,
+                supportingText = {
+                    Text(
+                        if (form.phoneInvalid) {
+                            stringResource(R.string.addresses_phone_format_error)
+                        } else {
+                            stringResource(R.string.addresses_phone_format_hint)
+                        },
+                    )
+                },
                 shape = MaterialTheme.shapes.small,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                 modifier = Modifier.fillMaxWidth(),

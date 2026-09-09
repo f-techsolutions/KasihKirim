@@ -34,6 +34,13 @@ data class AddressFormState(
 ) {
     val isEditing: Boolean get() = editingId != null
 
+    /** True only once there's something to validate -- an empty field isn't
+     *  "wrong" yet, it just hasn't been filled in. Drives the phone field's
+     *  inline error so a malformed number is visible before Save is even
+     *  tapped, instead of the button just silently staying disabled. */
+    val phoneInvalid: Boolean
+        get() = recipientPhone.isNotEmpty() && !PHONE_PATTERN.matches(recipientPhone)
+
     val canSubmit: Boolean
         get() = label.isNotBlank() &&
             recipientName.isNotBlank() &&
