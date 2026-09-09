@@ -3,7 +3,6 @@ package com.ftechsolutions.kasihkirim.ui.earnings
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -16,6 +15,7 @@ import com.ftechsolutions.kasihkirim.R
 import com.ftechsolutions.kasihkirim.domain.model.Earnings
 import com.ftechsolutions.kasihkirim.ui.auth.messageRes
 import com.ftechsolutions.kasihkirim.ui.common.AppCard
+import com.ftechsolutions.kasihkirim.ui.common.GradientHeroCard
 import com.ftechsolutions.kasihkirim.ui.common.ScreenHeader
 
 @Composable
@@ -45,12 +45,8 @@ fun EarningsScreen(vm: EarningsViewModel) {
 @Composable
 private fun EarningsContent(earnings: Earnings) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Surface(
-            shape = MaterialTheme.shapes.extraLarge,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Column(Modifier.padding(24.dp)) {
+        GradientHeroCard {
+            Column {
                 Text(
                     stringResource(R.string.earnings_available),
                     style = MaterialTheme.typography.bodyMedium,

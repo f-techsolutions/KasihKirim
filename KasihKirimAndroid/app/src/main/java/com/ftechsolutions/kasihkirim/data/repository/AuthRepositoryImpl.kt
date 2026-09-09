@@ -97,10 +97,13 @@ class AuthRepositoryImpl : AuthRepository {
 /**
  * Roles come from the JWT app_metadata claim written by
  * public.custom_access_token_hook -- never from a client-side table read, and
- * never from user input (§4).
+ * never from user input (§4). Deliberately reads the decoded access token
+ * (SupabaseClientProvider.currentJwtAppMetadata()), not this UserInfo's own
+ * appMetadata field: that field mirrors auth.users.raw_app_meta_data, which
+ * the hook never writes to -- its enrichment only ever lands in the JWT.
  */
 internal fun UserInfo.toAuthUser(): AuthUser {
-    val meta: JsonObject? = appMetadata
+    val meta: JsonObject? = SupabaseClientProvider.currentJwtAppMetadata()
     val roles = (meta?.get("roles") as? JsonArray)
         ?.mapNotNull { (it as? JsonPrimitive)?.content }
         .orEmpty()

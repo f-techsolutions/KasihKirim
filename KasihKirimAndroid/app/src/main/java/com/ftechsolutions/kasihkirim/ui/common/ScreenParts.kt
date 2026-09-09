@@ -1,6 +1,8 @@
 package com.ftechsolutions.kasihkirim.ui.common
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Spacer
@@ -12,6 +14,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.unit.dp
 
 /** The one card shape used everywhere -- rounded corners, a hairline of
@@ -78,6 +81,28 @@ fun EmptyStateCard(title: String, hint: String? = null) {
                 )
             }
         }
+    }
+}
+
+/** A primary-to-secondary diagonal gradient card, used for the one or two
+ *  "headline" surfaces per screen (a balance, a success state) that should
+ *  read as more prominent than an ordinary AppCard. */
+@Composable
+fun GradientHeroCard(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    Surface(
+        shape = MaterialTheme.shapes.extraLarge,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        Box(
+            Modifier
+                .background(
+                    Brush.linearGradient(
+                        listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary),
+                    ),
+                )
+                .padding(24.dp),
+        ) { content() }
     }
 }
 

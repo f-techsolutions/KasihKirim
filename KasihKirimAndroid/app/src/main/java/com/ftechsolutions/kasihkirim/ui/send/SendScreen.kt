@@ -27,6 +27,7 @@ import com.ftechsolutions.kasihkirim.domain.model.KirimType
 import com.ftechsolutions.kasihkirim.ui.auth.messageRes
 import com.ftechsolutions.kasihkirim.ui.common.AppCard
 import com.ftechsolutions.kasihkirim.ui.common.CommunityPicker
+import com.ftechsolutions.kasihkirim.ui.common.GradientHeroCard
 import com.ftechsolutions.kasihkirim.ui.common.ScreenHeader
 
 @Composable
@@ -236,12 +237,8 @@ private fun AddressChips(addresses: List<Address>, selected: Address?, onSelect:
 
 @Composable
 private fun KirimCreatedResult(created: KirimCreated) {
-    Surface(
-        shape = MaterialTheme.shapes.extraLarge,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Column(Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+    GradientHeroCard {
+        Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
             Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(40.dp))
             Spacer(Modifier.height(12.dp))
             Text(

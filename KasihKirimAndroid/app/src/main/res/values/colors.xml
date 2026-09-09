@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The KasihKirim logo mark is designed on a plain white plate; the
+         adaptive icon background matches it so there's no visible seam. -->
+    <color name="ic_launcher_background">#FFFFFF</color>
+</resources>

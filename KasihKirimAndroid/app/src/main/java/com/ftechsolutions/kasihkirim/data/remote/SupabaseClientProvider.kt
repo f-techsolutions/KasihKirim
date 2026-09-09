@@ -6,8 +6,12 @@ import com.ftechsolutions.kasihkirim.core.security.EncryptedSessionManager
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.Auth
 import io.github.jan.supabase.auth.FlowType
+import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.postgrest.Postgrest
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
 
 /**
  * ONE shared client for the whole app (§13). Creating one per screen would
@@ -56,6 +60,29 @@ object SupabaseClientProvider {
                 sessionManager = EncryptedSessionManager(appContext)
             }
             install(Postgrest)
+        }
+    }
+
+    /**
+     * app_metadata as enriched by public.custom_access_token_hook (roles,
+     * carrier_id, seller_id, account_status).
+     *
+     * This is deliberately NOT `client.auth.currentUserOrNull()?.appMetadata`
+     * -- that object mirrors auth.users.raw_app_meta_data, a column the hook
+     * never writes to. The hook only enriches the claims of the JWT it mints;
+     * that enrichment exists solely inside the access token itself, so
+     * reading it back means decoding the current access token's payload, not
+     * asking the SDK's cached user object.
+     */
+    fun currentJwtAppMetadata(): JsonObject? {
+        val token = client.auth.currentSessionOrNull()?.accessToken ?: return null
+        return try {
+            val payload = token.split(".").getOrNull(1) ?: return null
+            val padded = payload + "=".repeat((4 - payload.length % 4) % 4)
+            val bytes = java.util.Base64.getUrlDecoder().decode(padded)
+            Json.parseToJsonElement(bytes.decodeToString()).jsonObject["app_metadata"] as? JsonObject
+        } catch (e: Exception) {
+            null
         }
     }
 }
