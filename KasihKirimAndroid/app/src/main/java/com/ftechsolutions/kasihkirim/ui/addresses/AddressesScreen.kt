@@ -3,7 +3,6 @@
 package com.ftechsolutions.kasihkirim.ui.addresses
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -15,12 +14,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.ftechsolutions.kasihkirim.R
 import com.ftechsolutions.kasihkirim.domain.model.Address
-import com.ftechsolutions.kasihkirim.domain.model.Community
+import com.ftechsolutions.kasihkirim.ui.common.CommunityPicker
+import com.ftechsolutions.kasihkirim.ui.common.InlineNotice
+import com.ftechsolutions.kasihkirim.ui.common.NoticeTone
 
 @Composable
 fun AddressesScreen(vm: AddressesViewModel, onBack: () -> Unit) {
@@ -192,24 +192,6 @@ private fun Pill(text: String) {
     }
 }
 
-private enum class NoticeTone { ERROR, HINT }
-
-@Composable
-private fun InlineNotice(text: String, tone: NoticeTone) {
-    val (container, content) = when (tone) {
-        NoticeTone.ERROR -> MaterialTheme.colorScheme.errorContainer to MaterialTheme.colorScheme.onErrorContainer
-        NoticeTone.HINT -> MaterialTheme.colorScheme.surfaceVariant to MaterialTheme.colorScheme.onSurfaceVariant
-    }
-    Surface(shape = MaterialTheme.shapes.small, color = container, modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text,
-            style = MaterialTheme.typography.bodySmall,
-            color = content,
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-        )
-    }
-}
-
 @Composable
 private fun AddressFormCard(vm: AddressesViewModel) {
     val state by vm.state.collectAsState()
@@ -261,6 +243,10 @@ private fun AddressFormCard(vm: AddressesViewModel) {
             )
 
             CommunityPicker(
+                label = stringResource(R.string.addresses_community),
+                hint = stringResource(R.string.picker_search_hint),
+                changeLabel = stringResource(R.string.picker_change),
+                notSelectedHint = stringResource(R.string.picker_not_selected),
                 query = form.communityQuery,
                 selected = form.selectedCommunity,
                 results = form.communityResults,
@@ -306,97 +292,3 @@ private fun AddressFormCard(vm: AddressesViewModel) {
     }
 }
 
-/** Typing a name here never selected anything on its own -- only tapping a
- *  result did -- so `canSubmit` stayed false with no visible reason why. Now
- *  the field has two unambiguous states: searching (with a hint and a
- *  dropdown you tap) and selected (a locked pill with an explicit "Tukar"
- *  to go back and search again). */
-@Composable
-private fun CommunityPicker(
-    query: String,
-    selected: Community?,
-    results: List<Community>,
-    onQueryChange: (String) -> Unit,
-    onSelect: (Community) -> Unit,
-    onClear: () -> Unit,
-) {
-    Column {
-        if (selected != null) {
-            Surface(
-                shape = MaterialTheme.shapes.small,
-                color = MaterialTheme.colorScheme.secondaryContainer,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Row(
-                    Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            stringResource(R.string.addresses_community),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer,
-                        )
-                        Text(
-                            "${selected.name}, ${selected.district}",
-                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                            color = MaterialTheme.colorScheme.onSecondaryContainer,
-                        )
-                    }
-                    TextButton(onClick = onClear) { Text(stringResource(R.string.addresses_community_change)) }
-                }
-            }
-        } else {
-            OutlinedTextField(
-                value = query,
-                onValueChange = onQueryChange,
-                label = { Text(stringResource(R.string.addresses_community)) },
-                singleLine = true,
-                shape = MaterialTheme.shapes.small,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Spacer(Modifier.height(6.dp))
-            Text(
-                stringResource(R.string.addresses_community_hint),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-
-            if (results.isNotEmpty()) {
-                Spacer(Modifier.height(8.dp))
-                Surface(
-                    shape = MaterialTheme.shapes.small,
-                    color = MaterialTheme.colorScheme.surface,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Column {
-                        results.forEachIndexed { index, community ->
-                            if (index > 0) {
-                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                            }
-                            Row(
-                                Modifier
-                                    .fillMaxWidth()
-                                    .clickable { onSelect(community) }
-                                    .padding(horizontal = 14.dp, vertical = 12.dp),
-                            ) {
-                                Text(
-                                    "${community.name}, ${community.district}",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                )
-                            }
-                        }
-                    }
-                }
-            } else if (query.isNotBlank()) {
-                Spacer(Modifier.height(10.dp))
-                InlineNotice(
-                    text = stringResource(R.string.addresses_community_not_selected),
-                    tone = NoticeTone.HINT,
-                )
-            }
-        }
-    }
-}

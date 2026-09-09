@@ -42,9 +42,6 @@
     <string name="addresses_phone_format_hint">Format: +60 diikuti nombor telefon, cth. +60111234567</string>
     <string name="addresses_phone_format_error">Nombor tidak sah. Guna format +60111234567.</string>
     <string name="addresses_community">Kampung / Pekan</string>
-    <string name="addresses_community_hint">Taip untuk cari, kemudian ketik nama dari senarai</string>
-    <string name="addresses_community_change">Tukar</string>
-    <string name="addresses_community_not_selected">Sila pilih kampung/pekan dari senarai carian sebelum simpan.</string>
     <string name="addresses_landmark">Petunjuk Lokasi</string>
     <string name="addresses_save">Simpan Alamat</string>
     <string name="addresses_default_badge">Utama</string>
@@ -159,4 +156,11 @@
     <string name="err_capacity_exceeded">Trip ini tidak lagi mempunyai ruang yang cukup.</string>
     <string name="err_trip_not_found">Trip tidak dijumpai.</string>
     <string name="err_trip_not_boarding">Trip ini tidak lagi menerima kirim.</string>
+
+    <string name="picker_search_hint">Taip untuk cari, kemudian ketik nama dari senarai</string>
+    <string name="picker_change">Tukar</string>
+    <string name="picker_not_selected">Sila pilih dari senarai carian.</string>
+
+    <string name="kirim_weight_hint">Minimum 100g, maksimum 500,000g (500kg)</string>
+    <string name="kirim_weight_error">Berat mesti antara 100g hingga 500,000g.</string>
 </resources>

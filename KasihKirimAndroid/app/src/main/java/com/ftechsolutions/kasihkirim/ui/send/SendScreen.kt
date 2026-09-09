@@ -17,12 +17,12 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.ftechsolutions.kasihkirim.R
 import com.ftechsolutions.kasihkirim.domain.model.Address
-import com.ftechsolutions.kasihkirim.domain.model.Community
 import com.ftechsolutions.kasihkirim.domain.model.KirimCategory
 import com.ftechsolutions.kasihkirim.domain.model.KirimCreated
 import com.ftechsolutions.kasihkirim.domain.model.KirimQuote
 import com.ftechsolutions.kasihkirim.domain.model.KirimType
 import com.ftechsolutions.kasihkirim.ui.auth.messageRes
+import com.ftechsolutions.kasihkirim.ui.common.CommunityPicker
 
 @Composable
 fun SendScreen(vm: KirimQuoteViewModel) {
@@ -73,11 +73,22 @@ private fun KirimForm(vm: KirimQuoteViewModel, state: KirimUiState) {
             }
         }
 
+        val weightInvalid = form.weightGrams.isNotEmpty() && !form.weightValid
         OutlinedTextField(
             value = form.weightGrams,
             onValueChange = vm::onWeightChange,
             label = { Text(stringResource(R.string.kirim_weight)) },
             singleLine = true,
+            isError = weightInvalid,
+            supportingText = {
+                Text(
+                    if (weightInvalid) {
+                        stringResource(R.string.kirim_weight_error)
+                    } else {
+                        stringResource(R.string.kirim_weight_hint)
+                    },
+                )
+            },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             modifier = Modifier.fillMaxWidth(),
         )
@@ -93,27 +104,31 @@ private fun KirimForm(vm: KirimQuoteViewModel, state: KirimUiState) {
             )
         }
 
-        OutlinedTextField(
-            value = form.originQuery,
-            onValueChange = vm::onOriginQueryChange,
-            label = { Text(stringResource(R.string.serviceability_origin)) },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
+        CommunityPicker(
+            label = stringResource(R.string.serviceability_origin),
+            hint = stringResource(R.string.picker_search_hint),
+            changeLabel = stringResource(R.string.picker_change),
+            notSelectedHint = stringResource(R.string.picker_not_selected),
+            query = form.originQuery,
+            selected = form.selectedOrigin,
+            results = form.originResults,
+            onQueryChange = vm::onOriginQueryChange,
+            onSelect = vm::onOriginSelected,
+            onClear = vm::onOriginCleared,
         )
-        if (form.originResults.isNotEmpty() && form.selectedOrigin == null) {
-            CommunityResults(form.originResults, onSelect = vm::onOriginSelected)
-        }
 
-        OutlinedTextField(
-            value = form.destQuery,
-            onValueChange = vm::onDestQueryChange,
-            label = { Text(stringResource(R.string.serviceability_destination)) },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
+        CommunityPicker(
+            label = stringResource(R.string.serviceability_destination),
+            hint = stringResource(R.string.picker_search_hint),
+            changeLabel = stringResource(R.string.picker_change),
+            notSelectedHint = stringResource(R.string.picker_not_selected),
+            query = form.destQuery,
+            selected = form.selectedDest,
+            results = form.destResults,
+            onQueryChange = vm::onDestQueryChange,
+            onSelect = vm::onDestSelected,
+            onClear = vm::onDestCleared,
         )
-        if (form.destResults.isNotEmpty() && form.selectedDest == null) {
-            CommunityResults(form.destResults, onSelect = vm::onDestSelected)
-        }
 
         Spacer(Modifier.height(8.dp))
         Button(
@@ -234,18 +249,3 @@ private fun FlowOfChips(content: @Composable () -> Unit) {
     ) { content() }
 }
 
-@Composable
-private fun CommunityResults(results: List<Community>, onSelect: (Community) -> Unit) {
-    ElevatedCard {
-        Column {
-            results.forEach { community ->
-                TextButton(
-                    onClick = { onSelect(community) },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text("${community.name}, ${community.district}", modifier = Modifier.fillMaxWidth())
-                }
-            }
-        }
-    }
-}

@@ -139,6 +139,12 @@ class KirimQuoteViewModel(
     fun onDestSelected(community: Community) =
         updateForm { it.copy(selectedDest = community, destResults = emptyList(), destQuery = community.name) }
 
+    fun onOriginCleared() =
+        updateForm { it.copy(selectedOrigin = null, originQuery = "", originResults = emptyList()) }
+
+    fun onDestCleared() =
+        updateForm { it.copy(selectedDest = null, destQuery = "", destResults = emptyList()) }
+
     private fun searchCommunities(query: String, onResult: (List<Community>) -> Unit) {
         viewModelScope.launch {
             when (val result = addressRepo.searchCommunities(query)) {
