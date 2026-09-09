@@ -6,7 +6,7 @@
 -- real seller/product row, not a stand-in.
 -- ============================================================================
 BEGIN;
-SELECT plan(17);
+SELECT plan(19);
 SELECT tests.clear_auth();      -- deterministic role: start as postgres
 SELECT tests.seed_fixture();
 
@@ -115,12 +115,24 @@ UPDATE public.products SET status = 'pending_review' WHERE id = tests.uid('_prod
 SELECT is((SELECT status FROM public.products WHERE id = tests.uid('_product')),
   'pending_review', 'draft -> pending_review (submit for review) is allowed');
 
--- Admin can do what the seller cannot.
+-- Admin can do what the seller cannot -- but not via a raw UPDATE.
+-- products_write (pre-existing RLS, confirmed live) is seller-own-row
+-- only, with no admin clause at all: an admin's direct UPDATE here is
+-- silently filtered to zero rows by RLS before the moderation trigger is
+-- even reached (this is exactly what 0018_admin_product_review.sql's own
+-- header documents finding). rpc_admin_set_product_status is the actual
+-- admin write path.
+SELECT tests.authenticate_as('aisyah');
+SELECT throws_ok(
+  format($$SELECT public.rpc_admin_set_product_status(%L, 'active')$$, tests.uid('_product')),
+  NULL, NULL, 'a non-admin caller cannot call rpc_admin_set_product_status at all');
+
 SELECT tests.authenticate_as('admin');
-UPDATE public.products SET status = 'active', approved_at = now()
-  WHERE id = tests.uid('_product');
+SELECT public.rpc_admin_set_product_status(tests.uid('_product'), 'active');
 SELECT is((SELECT status FROM public.products WHERE id = tests.uid('_product')),
-  'active', 'admin_ops can approve a product directly');
+  'active', 'admin_ops can approve a product via rpc_admin_set_product_status');
+SELECT is((SELECT approved_by FROM public.products WHERE id = tests.uid('_product')),
+  tests.uid('admin'), 'approving records the approving admin');
 
 -- Once active, the seller may pause/unpause it themselves (not a moderation
 -- action -- just going dark), but still cannot jump back to active from
