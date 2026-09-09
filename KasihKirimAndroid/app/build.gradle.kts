@@ -113,6 +113,7 @@ dependencies {
     implementation(libs.compose.graphics)
     implementation(libs.compose.preview)
     implementation(libs.compose.material3)
+    implementation(libs.compose.icons)
     debugImplementation(libs.compose.tooling)
 
     implementation(platform(libs.supabase.bom))

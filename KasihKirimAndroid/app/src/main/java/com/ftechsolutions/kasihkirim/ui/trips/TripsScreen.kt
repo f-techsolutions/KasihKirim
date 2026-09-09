@@ -7,6 +7,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -14,15 +17,21 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.ftechsolutions.kasihkirim.R
-import com.ftechsolutions.kasihkirim.domain.model.Community
 import com.ftechsolutions.kasihkirim.domain.model.Trip
 import com.ftechsolutions.kasihkirim.domain.model.TripStatus
 import com.ftechsolutions.kasihkirim.domain.model.Vehicle
 import com.ftechsolutions.kasihkirim.ui.auth.messageRes
+import com.ftechsolutions.kasihkirim.ui.common.AppCard
+import com.ftechsolutions.kasihkirim.ui.common.BadgeTone
+import com.ftechsolutions.kasihkirim.ui.common.CommunityPicker
+import com.ftechsolutions.kasihkirim.ui.common.EmptyStateCard
+import com.ftechsolutions.kasihkirim.ui.common.ScreenHeader
+import com.ftechsolutions.kasihkirim.ui.common.StatusBadge
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -32,41 +41,42 @@ fun TripsScreen(vm: TripsViewModel, onOpenVehicles: () -> Unit, onOpenDeliveries
     val state by vm.state.collectAsState()
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         item {
-            Spacer(Modifier.height(16.dp))
-            Text(stringResource(R.string.trips_title), style = MaterialTheme.typography.headlineSmall)
+            Spacer(Modifier.height(12.dp))
+            ScreenHeader(stringResource(R.string.trips_title))
         }
 
         if (state.trips.isEmpty() && !state.isLoading) {
-            item { Text(stringResource(R.string.trips_empty)) }
+            item { EmptyStateCard(stringResource(R.string.trips_empty)) }
         }
         items(state.trips, key = { it.id }) { trip -> TripCard(trip, state.nodeNames) }
 
         item {
-            Spacer(Modifier.height(8.dp))
-            OutlinedButton(onClick = onOpenDeliveries, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.deliveries_title))
-            }
-            Spacer(Modifier.height(8.dp))
-            OutlinedButton(onClick = onOpenVehicles, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.vehicles_title))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedButton(onClick = onOpenDeliveries, shape = MaterialTheme.shapes.medium, modifier = Modifier.weight(1f)) {
+                    Icon(Icons.Filled.LocalShipping, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(stringResource(R.string.deliveries_title))
+                }
+                OutlinedButton(onClick = onOpenVehicles, shape = MaterialTheme.shapes.medium, modifier = Modifier.weight(1f)) {
+                    Icon(Icons.Filled.DirectionsCar, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(stringResource(R.string.vehicles_title))
+                }
             }
         }
 
         if (state.vehicles.isEmpty() && !state.isLoading) {
-            item {
-                Spacer(Modifier.height(8.dp))
-                Text(stringResource(R.string.trips_no_vehicles), style = MaterialTheme.typography.bodyMedium)
-            }
+            item { EmptyStateCard(stringResource(R.string.trips_no_vehicles)) }
         } else {
             item {
-                Spacer(Modifier.height(16.dp))
-                Text(stringResource(R.string.trips_new_title), style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.height(4.dp))
+                ScreenHeader(stringResource(R.string.trips_new_title))
             }
-            item { TripForm(vm, state.vehicles) }
+            item { AppCard { TripForm(vm, state.vehicles) } }
         }
 
         state.error?.let { item { Text(stringResource(it.messageRes()), color = MaterialTheme.colorScheme.error) } }
@@ -76,20 +86,28 @@ fun TripsScreen(vm: TripsViewModel, onOpenVehicles: () -> Unit, onOpenDeliveries
 
 @Composable
 private fun TripCard(trip: Trip, nodeNames: Map<String, String>) {
-    ElevatedCard {
-        Column(Modifier.padding(16.dp)) {
-            Text(trip.status.labelMs(), style = MaterialTheme.typography.titleMedium)
+    AppCard {
+        Row(verticalAlignment = Alignment.Top) {
             Text(
                 "${nodeNames[trip.originNodeId] ?: "?"} → ${nodeNames[trip.destNodeId] ?: "?"}",
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.weight(1f),
             )
-            Text(formatDepartAt(trip.departAt), style = MaterialTheme.typography.bodySmall)
-            Text(
-                "${trip.reservedWeightGrams / 1000}/${trip.capacityWeightGrams / 1000}kg · " +
-                    "${trip.reservedParcels}/${trip.capacityParcels}x",
-                style = MaterialTheme.typography.bodySmall,
-            )
+            StatusBadge(trip.status.labelMs(), tone = trip.status.tone())
         }
+        Spacer(Modifier.height(4.dp))
+        Text(
+            formatDepartAt(trip.departAt),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(2.dp))
+        Text(
+            "${trip.reservedWeightGrams / 1000}/${trip.capacityWeightGrams / 1000}kg · " +
+                "${trip.reservedParcels}/${trip.capacityParcels}x",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -100,7 +118,7 @@ private fun TripForm(vm: TripsViewModel, vehicles: List<Vehicle>) {
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
 
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(stringResource(R.string.trips_vehicle), style = MaterialTheme.typography.labelLarge)
         Row(
             modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
@@ -115,37 +133,41 @@ private fun TripForm(vm: TripsViewModel, vehicles: List<Vehicle>) {
             }
         }
 
-        OutlinedTextField(
-            value = form.originQuery,
-            onValueChange = vm::onOriginQueryChange,
-            label = { Text(stringResource(R.string.serviceability_origin)) },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
+        CommunityPicker(
+            label = stringResource(R.string.serviceability_origin),
+            hint = stringResource(R.string.picker_search_hint),
+            changeLabel = stringResource(R.string.picker_change),
+            notSelectedHint = stringResource(R.string.picker_not_selected),
+            query = form.originQuery,
+            selected = form.selectedOrigin,
+            results = form.originResults,
+            onQueryChange = vm::onOriginQueryChange,
+            onSelect = vm::onOriginSelected,
+            onClear = vm::onOriginCleared,
         )
-        if (form.originResults.isNotEmpty() && form.selectedOrigin == null) {
-            CommunityResults(form.originResults, onSelect = vm::onOriginSelected)
-        }
 
-        OutlinedTextField(
-            value = form.destQuery,
-            onValueChange = vm::onDestQueryChange,
-            label = { Text(stringResource(R.string.serviceability_destination)) },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
+        CommunityPicker(
+            label = stringResource(R.string.serviceability_destination),
+            hint = stringResource(R.string.picker_search_hint),
+            changeLabel = stringResource(R.string.picker_change),
+            notSelectedHint = stringResource(R.string.picker_not_selected),
+            query = form.destQuery,
+            selected = form.selectedDest,
+            results = form.destResults,
+            onQueryChange = vm::onDestQueryChange,
+            onSelect = vm::onDestSelected,
+            onClear = vm::onDestCleared,
         )
-        if (form.destResults.isNotEmpty() && form.selectedDest == null) {
-            CommunityResults(form.destResults, onSelect = vm::onDestSelected)
-        }
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = { showDatePicker = true }, modifier = Modifier.weight(1f)) {
+            OutlinedButton(onClick = { showDatePicker = true }, shape = MaterialTheme.shapes.small, modifier = Modifier.weight(1f)) {
                 Text(
                     form.departDateMillis?.let {
                         Instant.ofEpochMilli(it).atZone(ZoneId.of("UTC")).format(DateTimeFormatter.ofPattern("d MMM"))
                     } ?: stringResource(R.string.trips_pick_date),
                 )
             }
-            OutlinedButton(onClick = { showTimePicker = true }, modifier = Modifier.weight(1f)) {
+            OutlinedButton(onClick = { showTimePicker = true }, shape = MaterialTheme.shapes.small, modifier = Modifier.weight(1f)) {
                 Text("%02d:%02d".format(form.departHour, form.departMinute))
             }
         }
@@ -153,7 +175,8 @@ private fun TripForm(vm: TripsViewModel, vehicles: List<Vehicle>) {
         Button(
             onClick = vm::createTrip,
             enabled = form.canSubmit && !state.isSubmitting,
-            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+            shape = MaterialTheme.shapes.medium,
+            modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp),
         ) {
             if (state.isSubmitting) {
                 CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
@@ -197,22 +220,6 @@ private fun TripForm(vm: TripsViewModel, vehicles: List<Vehicle>) {
     }
 }
 
-@Composable
-private fun CommunityResults(results: List<Community>, onSelect: (Community) -> Unit) {
-    ElevatedCard {
-        Column {
-            results.forEach { community ->
-                TextButton(
-                    onClick = { onSelect(community) },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text("${community.name}, ${community.district}", modifier = Modifier.fillMaxWidth())
-                }
-            }
-        }
-    }
-}
-
 private fun formatDepartAt(iso: String): String = try {
     DateTimeFormatter.ofPattern("d MMM yyyy, HH:mm").withZone(ZoneId.systemDefault()).format(Instant.parse(iso))
 } catch (e: Exception) {
@@ -228,4 +235,12 @@ private fun TripStatus.labelMs(): String = when (this) {
     TripStatus.ARRIVED -> "Sampai"
     TripStatus.CLOSED -> "Selesai"
     TripStatus.CANCELLED -> "Dibatalkan"
+}
+
+private fun TripStatus.tone(): BadgeTone = when (this) {
+    TripStatus.DRAFT -> BadgeTone.NEUTRAL
+    TripStatus.ANNOUNCED, TripStatus.BOARDING -> BadgeTone.INFO
+    TripStatus.DEPARTED, TripStatus.IN_PROGRESS -> BadgeTone.WARNING
+    TripStatus.ARRIVED, TripStatus.CLOSED -> BadgeTone.POSITIVE
+    TripStatus.CANCELLED -> BadgeTone.ERROR
 }

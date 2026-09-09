@@ -9,37 +9,45 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.ftechsolutions.kasihkirim.R
 import com.ftechsolutions.kasihkirim.domain.model.Delivery
+import com.ftechsolutions.kasihkirim.domain.model.KirimStatus
 import com.ftechsolutions.kasihkirim.domain.model.NON_PROOF_DELIVERY_TRANSITIONS
 import com.ftechsolutions.kasihkirim.domain.model.UserRole
 import com.ftechsolutions.kasihkirim.ui.auth.messageRes
+import com.ftechsolutions.kasihkirim.ui.common.AppCard
+import com.ftechsolutions.kasihkirim.ui.common.BadgeTone
+import com.ftechsolutions.kasihkirim.ui.common.EmptyStateCard
+import com.ftechsolutions.kasihkirim.ui.common.StatusBadge
 
 @Composable
 fun DeliveriesScreen(vm: DeliveriesViewModel, roles: Set<UserRole>, onBack: () -> Unit) {
     val state by vm.state.collectAsState()
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.deliveries_title)) },
                 navigationIcon = {
                     TextButton(onClick = onBack) { Text(stringResource(R.string.back)) }
                 },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
             )
         },
     ) { padding ->
         LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            item { Spacer(Modifier.height(8.dp)) }
+            item { Spacer(Modifier.height(4.dp)) }
 
             if (state.deliveries.isEmpty() && !state.isLoading) {
-                item { Text(stringResource(R.string.deliveries_empty)) }
+                item { EmptyStateCard(stringResource(R.string.deliveries_empty)) }
             }
             items(state.deliveries, key = { it.id }) { delivery ->
                 DeliveryCard(
@@ -74,35 +82,54 @@ private fun DeliveryCard(
         // just distinct-by-event for safety against a future duplicate.
         .distinctBy { it.event }
 
-    ElevatedCard {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(delivery.itemDescription, style = MaterialTheme.typography.titleMedium)
-            Text(delivery.referenceCode, style = MaterialTheme.typography.labelSmall)
-            Text(delivery.status.labelMs, style = MaterialTheme.typography.bodyMedium)
-            delivery.carrierEarningSen?.let { Text(stringResource(R.string.deliveries_carrier_earning, it.format())) }
-            delivery.failureReason?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+    AppCard {
+        Row(verticalAlignment = Alignment.Top) {
+            Text(delivery.itemDescription, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            StatusBadge(delivery.status.labelMs, tone = delivery.status.tone())
+        }
+        Spacer(Modifier.height(4.dp))
+        Text(
+            delivery.referenceCode,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        delivery.carrierEarningSen?.let {
+            Spacer(Modifier.height(2.dp))
+            Text(stringResource(R.string.deliveries_carrier_earning, it.format()), style = MaterialTheme.typography.bodySmall)
+        }
+        delivery.failureReason?.let {
+            Spacer(Modifier.height(2.dp))
+            Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+        }
 
-            if (availableEvents.isNotEmpty()) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    availableEvents.forEach { rule ->
-                        OutlinedButton(
-                            onClick = { onEvent(rule.event) },
-                            enabled = !isTransitioning,
-                        ) {
-                            if (isTransitioning) {
-                                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                            } else {
-                                Text(rule.event.labelMs())
-                            }
+        if (availableEvents.isNotEmpty()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                availableEvents.forEach { rule ->
+                    OutlinedButton(
+                        onClick = { onEvent(rule.event) },
+                        enabled = !isTransitioning,
+                        shape = MaterialTheme.shapes.small,
+                    ) {
+                        if (isTransitioning) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                        } else {
+                            Text(rule.event.labelMs())
                         }
                     }
                 }
             }
         }
     }
+}
+
+private fun KirimStatus.tone(): BadgeTone = when {
+    this == KirimStatus.DELIVERED || this == KirimStatus.COMPLETED -> BadgeTone.POSITIVE
+    isFailure || this == KirimStatus.CANCELLED || this == KirimStatus.EXPIRED -> BadgeTone.ERROR
+    this == KirimStatus.DRAFT || this == KirimStatus.POSTED -> BadgeTone.NEUTRAL
+    else -> BadgeTone.WARNING
 }
 
 private fun String.labelMs(): String = when (this) {

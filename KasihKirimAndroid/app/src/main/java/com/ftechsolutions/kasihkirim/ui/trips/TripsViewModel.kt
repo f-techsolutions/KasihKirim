@@ -125,6 +125,12 @@ class TripsViewModel(
     fun onDestSelected(community: Community) =
         updateForm { it.copy(selectedDest = community, destResults = emptyList(), destQuery = community.name) }
 
+    fun onOriginCleared() =
+        updateForm { it.copy(selectedOrigin = null, originQuery = "", originResults = emptyList()) }
+
+    fun onDestCleared() =
+        updateForm { it.copy(selectedDest = null, destQuery = "", destResults = emptyList()) }
+
     fun onDepartDateChange(millis: Long?) = updateForm { it.copy(departDateMillis = millis) }
     fun onDepartTimeChange(hour: Int, minute: Int) = updateForm { it.copy(departHour = hour, departMinute = minute) }
 

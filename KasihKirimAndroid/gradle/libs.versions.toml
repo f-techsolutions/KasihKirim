@@ -30,6 +30,7 @@ compose-graphics  = { module = "androidx.compose.ui:ui-graphics" }
 compose-tooling   = { module = "androidx.compose.ui:ui-tooling" }
 compose-preview   = { module = "androidx.compose.ui:ui-tooling-preview" }
 compose-material3 = { module = "androidx.compose.material3:material3" }
+compose-icons     = { module = "androidx.compose.material:material-icons-extended" }
 compose-test-junit4 = { module = "androidx.compose.ui:ui-test-junit4" }
 compose-test-manifest = { module = "androidx.compose.ui:ui-test-manifest" }
 

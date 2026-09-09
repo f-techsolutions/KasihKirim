@@ -30,6 +30,7 @@
     <string name="nav_sales">Jualan</string>
 
     <string name="phase1_placeholder">Skrin ini akan dibina dalam fasa seterusnya.</string>
+    <string name="home_more_soon_title">Lagi ciri akan datang</string>
 
     <string name="back">Kembali</string>
 
@@ -77,6 +78,9 @@
     <string name="kirim_quote_goods">Bajet barang: %1$s</string>
     <string name="kirim_quote_delivery">Yuran penghantaran: %1$s</string>
     <string name="kirim_quote_total">Jumlah: %1$s</string>
+    <string name="kirim_quote_goods_label">Bajet barang</string>
+    <string name="kirim_quote_delivery_label">Yuran penghantaran</string>
+    <string name="kirim_quote_total_label">Jumlah</string>
     <string name="kirim_item_description">Perihal Barang</string>
     <string name="kirim_origin_address">Alamat Ambil</string>
     <string name="kirim_dest_address">Alamat Hantar</string>

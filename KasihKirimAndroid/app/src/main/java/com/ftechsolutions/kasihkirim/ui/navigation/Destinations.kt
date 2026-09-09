@@ -1,5 +1,16 @@
 package com.ftechsolutions.kasihkirim.ui.navigation
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Dashboard
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.LocalShipping
+import androidx.compose.material.icons.filled.Payments
+import androidx.compose.material.icons.filled.PointOfSale
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.ReceiptLong
+import androidx.compose.material.icons.filled.Route
+import androidx.compose.material.icons.filled.Storefront
+import androidx.compose.ui.graphics.vector.ImageVector
 import com.ftechsolutions.kasihkirim.R
 import com.ftechsolutions.kasihkirim.domain.model.UserRole
 
@@ -9,16 +20,16 @@ import com.ftechsolutions.kasihkirim.domain.model.UserRole
  * what any of these screens can actually read, and admin surfaces are not in
  * this app at all -- they live in the separate console.
  */
-enum class Destination(val route: String, val labelRes: Int) {
-    HOME("home", R.string.nav_home),
-    SEND("send", R.string.nav_send),
-    BOARD("board", R.string.nav_board),
-    ORDERS("orders", R.string.nav_orders),
-    PROFILE("profile", R.string.nav_profile),
-    TRIPS("trips", R.string.nav_trips),
-    EARNINGS("earnings", R.string.nav_earnings),
-    MUATAN_JUAL("muatan-jual", R.string.nav_muatan_jual),
-    SALES("sales", R.string.nav_sales),
+enum class Destination(val route: String, val labelRes: Int, val icon: ImageVector) {
+    HOME("home", R.string.nav_home, Icons.Filled.Home),
+    SEND("send", R.string.nav_send, Icons.Filled.LocalShipping),
+    BOARD("board", R.string.nav_board, Icons.Filled.Dashboard),
+    ORDERS("orders", R.string.nav_orders, Icons.Filled.ReceiptLong),
+    PROFILE("profile", R.string.nav_profile, Icons.Filled.Person),
+    TRIPS("trips", R.string.nav_trips, Icons.Filled.Route),
+    EARNINGS("earnings", R.string.nav_earnings, Icons.Filled.Payments),
+    MUATAN_JUAL("muatan-jual", R.string.nav_muatan_jual, Icons.Filled.Storefront),
+    SALES("sales", R.string.nav_sales, Icons.Filled.PointOfSale),
 }
 
 fun tabsFor(role: UserRole): List<Destination> = when (role) {
