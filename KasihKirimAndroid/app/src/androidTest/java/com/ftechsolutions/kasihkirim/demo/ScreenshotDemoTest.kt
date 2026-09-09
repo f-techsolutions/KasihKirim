@@ -138,6 +138,12 @@ private class FakeDeliveryRepository : DeliveryRepository {
         )
     )
     override suspend fun transition(deliveryId: String, event: String) = AppResult.Success(KirimStatus.PICKED_UP)
+    override suspend fun submitProofAndTransition(
+        deliveryId: String,
+        leg: String,
+        event: String,
+        photoBytes: ByteArray,
+    ) = AppResult.Success(KirimStatus.PICKED_UP)
 }
 
 private class FakeMuatanJualRepository : MuatanJualRepository {

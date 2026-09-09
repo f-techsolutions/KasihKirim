@@ -6,10 +6,14 @@ package com.ftechsolutions.kasihkirim.domain.model
  *
  * Deliberately absent:
  *   - CONFIRM_PICKUP, CONFIRM_DELIVERY, CONFIRM_RETURN (requires_proof=true).
- *     internal.fn_delivery_transition reads that flag but never enforces
- *     it -- offering these buttons today would let a client fake a
- *     handover with zero photo evidence. Deferred until proof capture and
- *     a storage bucket exist.
+ *     See [PROOF_DELIVERY_TRANSITIONS] below -- these go through a photo
+ *     capture + rpc_submit_proof step first. (Correction: an earlier version
+ *     of this comment claimed internal.fn_delivery_transition never enforces
+ *     requires_proof; reading its live definition shows it does -- a
+ *     transition whose rule has requires_proof=true raises PROOF_REQUIRED if
+ *     no matching public.proofs row exists yet. The UI gap this comment
+ *     describes was real regardless: no button meant no way to create that
+ *     proofs row from the app at all.)
  *   - RECORD_PURCHASE. fn_delivery_transition never applies p_meta to
  *     kirim_requests.actual_goods_sen, so a form field for the actual
  *     purchase price would silently discard whatever the carrier typed.
@@ -64,4 +68,29 @@ val NON_PROOF_DELIVERY_TRANSITIONS = listOf(
         setOf(UserRole.CARRIER), ALL_TYPES),
     DeliveryTransitionRule(KirimStatus.DELIVERED, "CONFIRM_RECEIPT", KirimStatus.COMPLETED,
         setOf(UserRole.CUSTOMER, UserRole.AGENT), ALL_TYPES),
+)
+
+/**
+ * The three requires_proof=true rows of ref.delivery_transition_rules,
+ * exactly as read from the live schema (proof_leg/allowed_roles included).
+ * [leg] mirrors ref.handover_leg's wire values ("pickup"/"dropoff") and is
+ * exactly what rpc_submit_proof's p_leg expects -- the app must call
+ * rpc_submit_proof for this leg before rpc_delivery_transition's own event,
+ * or the server rejects the transition with PROOF_REQUIRED.
+ */
+data class ProofDeliveryTransitionRule(
+    val fromStatus: KirimStatus,
+    val event: String,
+    val toStatus: KirimStatus,
+    val leg: String,
+    val allowedRoles: Set<UserRole>,
+)
+
+val PROOF_DELIVERY_TRANSITIONS = listOf(
+    ProofDeliveryTransitionRule(KirimStatus.AWAITING_PICKUP, "CONFIRM_PICKUP", KirimStatus.PICKED_UP,
+        "pickup", setOf(UserRole.CARRIER, UserRole.AGENT)),
+    ProofDeliveryTransitionRule(KirimStatus.OUT_FOR_DELIVERY, "CONFIRM_DELIVERY", KirimStatus.DELIVERED,
+        "dropoff", setOf(UserRole.CARRIER, UserRole.AGENT)),
+    ProofDeliveryTransitionRule(KirimStatus.RETURNING, "CONFIRM_RETURN", KirimStatus.RETURNED,
+        "dropoff", setOf(UserRole.CARRIER, UserRole.AGENT)),
 )

@@ -164,6 +164,7 @@ fun AuthScreen(vm: AuthViewModel) {
  *  reach the user (§17). */
 internal fun AppError.messageRes(): Int = when (this) {
     AppError.InvalidCredentials -> R.string.err_credentials
+    AppError.EmailNotConfirmed -> R.string.err_email_not_confirmed
     AppError.Network, AppError.Timeout -> R.string.err_network
     AppError.NotConfigured -> R.string.err_not_configured
     is AppError.Server -> when (code) {
@@ -185,6 +186,8 @@ internal fun AppError.messageRes(): Int = when (this) {
         "TRIP_NOT_FOUND" -> R.string.err_trip_not_found
         "TRIP_NOT_BOARDING" -> R.string.err_trip_not_boarding
         "DELIVERY_NOT_FOUND" -> R.string.err_delivery_not_found
+        "PHOTO_PATH_REQUIRED" -> R.string.err_photo_path_required
+        "PROOF_REQUIRED" -> R.string.err_proof_required
         else -> R.string.err_unexpected
     }
     else -> R.string.err_unexpected

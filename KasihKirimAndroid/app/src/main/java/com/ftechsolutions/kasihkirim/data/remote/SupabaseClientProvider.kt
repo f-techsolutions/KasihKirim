@@ -9,6 +9,7 @@ import io.github.jan.supabase.auth.FlowType
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.postgrest.Postgrest
+import io.github.jan.supabase.storage.Storage
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
@@ -60,6 +61,9 @@ object SupabaseClientProvider {
                 sessionManager = EncryptedSessionManager(appContext)
             }
             install(Postgrest)
+            // Proof-of-delivery photo upload only (the `pod` bucket) -- no
+            // other feature in this app touches Storage.
+            install(Storage)
         }
     }
 

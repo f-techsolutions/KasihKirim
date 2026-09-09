@@ -25,10 +25,14 @@ private val MATCHED_DELIVERY = Delivery(
 private class FakeDeliveryRepository(
     var deliveries: List<Delivery> = listOf(MATCHED_DELIVERY),
     var transitionResult: AppResult<KirimStatus> = AppResult.Success(KirimStatus.AWAITING_PICKUP),
+    var proofResult: AppResult<KirimStatus> = AppResult.Success(KirimStatus.PICKED_UP),
 ) : DeliveryRepository {
     var transitionCalls = 0
     var lastDeliveryId: String? = null
     var lastEvent: String? = null
+    var proofCalls = 0
+    var lastProofLeg: String? = null
+    var lastProofBytes: ByteArray? = null
 
     override suspend fun listMyDeliveries(): AppResult<List<Delivery>> = AppResult.Success(deliveries)
 
@@ -37,6 +41,20 @@ private class FakeDeliveryRepository(
         lastDeliveryId = deliveryId
         lastEvent = event
         return transitionResult
+    }
+
+    override suspend fun submitProofAndTransition(
+        deliveryId: String,
+        leg: String,
+        event: String,
+        photoBytes: ByteArray,
+    ): AppResult<KirimStatus> {
+        proofCalls++
+        lastDeliveryId = deliveryId
+        lastProofLeg = leg
+        lastEvent = event
+        lastProofBytes = photoBytes
+        return proofResult
     }
 }
 
@@ -78,5 +96,69 @@ class DeliveriesViewModelTest {
 
         assertNull(vm.state.value.transitioningId)
         assertEquals(AppError.Server("STATE_INVALID_TRANSITION"), vm.state.value.error)
+    }
+
+    @Test fun `requestProof opens the pending-proof step for the right delivery, leg and event`() = runTest(dispatcher) {
+        val vm = DeliveriesViewModel(FakeDeliveryRepository())
+        advanceUntilIdle()
+
+        vm.requestProof("d1", "pickup", "CONFIRM_PICKUP")
+
+        val pending = vm.state.value.pendingProof
+        assertEquals("d1", pending?.deliveryId)
+        assertEquals("pickup", pending?.leg)
+        assertEquals("CONFIRM_PICKUP", pending?.event)
+    }
+
+    @Test fun `cancelProof closes the pending-proof step without calling the backend`() = runTest(dispatcher) {
+        val repo = FakeDeliveryRepository()
+        val vm = DeliveriesViewModel(repo)
+        advanceUntilIdle()
+
+        vm.requestProof("d1", "pickup", "CONFIRM_PICKUP")
+        vm.cancelProof()
+
+        assertNull(vm.state.value.pendingProof)
+        assertEquals(0, repo.proofCalls)
+    }
+
+    @Test fun `submitProof uploads the photo for the pending leg and event, then reloads`() = runTest(dispatcher) {
+        val repo = FakeDeliveryRepository()
+        val vm = DeliveriesViewModel(repo)
+        advanceUntilIdle()
+
+        vm.requestProof("d1", "pickup", "CONFIRM_PICKUP")
+        vm.submitProof(byteArrayOf(1, 2, 3)); advanceUntilIdle()
+
+        assertEquals(1, repo.proofCalls)
+        assertEquals("d1", repo.lastDeliveryId)
+        assertEquals("pickup", repo.lastProofLeg)
+        assertEquals("CONFIRM_PICKUP", repo.lastEvent)
+        assertArrayEquals(byteArrayOf(1, 2, 3), repo.lastProofBytes)
+        assertNull(vm.state.value.pendingProof)
+        assertNull(vm.state.value.transitioningId)
+    }
+
+    @Test fun `submitProof with no pending proof is a no-op`() = runTest(dispatcher) {
+        val repo = FakeDeliveryRepository()
+        val vm = DeliveriesViewModel(repo)
+        advanceUntilIdle()
+
+        vm.submitProof(byteArrayOf(1)); advanceUntilIdle()
+
+        assertEquals(0, repo.proofCalls)
+    }
+
+    @Test fun `a failed proof submission surfaces the error and clears pendingProof`() = runTest(dispatcher) {
+        val repo = FakeDeliveryRepository(proofResult = AppResult.Failure(AppError.Server("PROOF_REQUIRED")))
+        val vm = DeliveriesViewModel(repo)
+        advanceUntilIdle()
+
+        vm.requestProof("d1", "pickup", "CONFIRM_PICKUP")
+        vm.submitProof(byteArrayOf(1)); advanceUntilIdle()
+
+        assertNull(vm.state.value.pendingProof)
+        assertNull(vm.state.value.transitioningId)
+        assertEquals(AppError.Server("PROOF_REQUIRED"), vm.state.value.error)
     }
 }

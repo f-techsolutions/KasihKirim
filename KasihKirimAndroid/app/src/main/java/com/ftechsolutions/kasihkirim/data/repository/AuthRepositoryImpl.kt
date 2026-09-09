@@ -129,6 +129,10 @@ internal fun buildAuthUser(id: String, email: String?, appMetadata: JsonObject?)
 
 internal fun Throwable.toAppError(): AppError = when {
     this is IOException -> AppError.Network
+    // GoTrue's own literal message for a login attempt on an unconfirmed
+    // account -- checked before the broader "credentials" match below so it
+    // isn't swallowed into a generic wrong-password error.
+    message?.contains("Email not confirmed", true) == true -> AppError.EmailNotConfirmed
     message?.contains("Invalid login", true) == true -> AppError.InvalidCredentials
     message?.contains("credentials", true) == true -> AppError.InvalidCredentials
     message?.contains("timeout", true) == true -> AppError.Timeout

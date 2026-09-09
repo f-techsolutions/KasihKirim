@@ -20,7 +20,13 @@ data class DeliveriesUiState(
      *  buttons only, not the whole list. */
     val transitioningId: String? = null,
     val error: AppError? = null,
+    /** Non-null while the photo-capture flow for a requires_proof=true
+     *  transition is open, so the screen knows which delivery/leg/event a
+     *  captured photo belongs to once the camera returns. */
+    val pendingProof: PendingProof? = null,
 )
+
+data class PendingProof(val deliveryId: String, val leg: String, val event: String)
 
 class DeliveriesViewModel(private val repo: DeliveryRepository) : ViewModel() {
 
@@ -43,6 +49,38 @@ class DeliveriesViewModel(private val repo: DeliveryRepository) : ViewModel() {
         viewModelScope.launch {
             _state.update { it.copy(transitioningId = deliveryId, error = null) }
             when (val result = repo.transition(deliveryId, event)) {
+                is AppResult.Success -> {
+                    _state.update { it.copy(transitioningId = null) }
+                    load()
+                }
+                is AppResult.Failure -> _state.update { it.copy(transitioningId = null, error = result.error) }
+            }
+        }
+    }
+
+    /** Opens the photo-capture step for a requires_proof=true transition;
+     *  the screen launches the camera once this is set. */
+    fun requestProof(deliveryId: String, leg: String, event: String) {
+        _state.update { it.copy(pendingProof = PendingProof(deliveryId, leg, event), error = null) }
+    }
+
+    /** The camera launcher returned with no photo (user backed out) or a
+     *  capture failure -- close the flow without calling the backend. */
+    fun cancelProof() {
+        _state.update { it.copy(pendingProof = null) }
+    }
+
+    /** A photo was captured for the open [DeliveriesUiState.pendingProof] --
+     *  upload it, submit the proof, then advance the delivery's status. */
+    fun submitProof(photoBytes: ByteArray) {
+        val pending = _state.value.pendingProof ?: return
+        viewModelScope.launch {
+            _state.update { it.copy(transitioningId = pending.deliveryId, pendingProof = null, error = null) }
+            when (
+                val result = repo.submitProofAndTransition(
+                    pending.deliveryId, pending.leg, pending.event, photoBytes,
+                )
+            ) {
                 is AppResult.Success -> {
                     _state.update { it.copy(transitioningId = null) }
                     load()

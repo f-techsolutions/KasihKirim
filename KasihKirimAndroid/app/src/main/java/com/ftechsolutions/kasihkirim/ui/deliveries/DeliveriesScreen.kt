@@ -2,11 +2,15 @@
 
 package com.ftechsolutions.kasihkirim.ui.deliveries
 
+import android.graphics.Bitmap
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -17,16 +21,38 @@ import com.ftechsolutions.kasihkirim.R
 import com.ftechsolutions.kasihkirim.domain.model.Delivery
 import com.ftechsolutions.kasihkirim.domain.model.KirimStatus
 import com.ftechsolutions.kasihkirim.domain.model.NON_PROOF_DELIVERY_TRANSITIONS
+import com.ftechsolutions.kasihkirim.domain.model.PROOF_DELIVERY_TRANSITIONS
 import com.ftechsolutions.kasihkirim.domain.model.UserRole
 import com.ftechsolutions.kasihkirim.ui.auth.messageRes
 import com.ftechsolutions.kasihkirim.ui.common.AppCard
 import com.ftechsolutions.kasihkirim.ui.common.BadgeTone
 import com.ftechsolutions.kasihkirim.ui.common.EmptyStateCard
 import com.ftechsolutions.kasihkirim.ui.common.StatusBadge
+import java.io.ByteArrayOutputStream
 
 @Composable
 fun DeliveriesScreen(vm: DeliveriesViewModel, roles: Set<UserRole>, onBack: () -> Unit) {
     val state by vm.state.collectAsState()
+
+    // MediaStore's own camera app writes and returns a downscaled preview
+    // Bitmap directly -- no FileProvider/Uri plumbing or CAMERA permission
+    // declaration needed on this app's side, only on the camera app's.
+    val cameraLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.TakePicturePreview(),
+    ) { bitmap: Bitmap? ->
+        if (bitmap != null) {
+            val bytes = ByteArrayOutputStream()
+                .apply { bitmap.compress(Bitmap.CompressFormat.JPEG, 80, this) }
+                .toByteArray()
+            vm.submitProof(bytes)
+        } else {
+            vm.cancelProof()
+        }
+    }
+
+    LaunchedEffect(state.pendingProof) {
+        if (state.pendingProof != null) cameraLauncher.launch(null)
+    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -55,6 +81,7 @@ fun DeliveriesScreen(vm: DeliveriesViewModel, roles: Set<UserRole>, onBack: () -
                     roles = roles,
                     isTransitioning = state.transitioningId == delivery.id,
                     onEvent = { event -> vm.transition(delivery.id, event) },
+                    onRequestProof = { leg, event -> vm.requestProof(delivery.id, leg, event) },
                 )
             }
 
@@ -70,6 +97,7 @@ private fun DeliveryCard(
     roles: Set<UserRole>,
     isTransitioning: Boolean,
     onEvent: (String) -> Unit,
+    onRequestProof: (leg: String, event: String) -> Unit,
 ) {
     val availableEvents = NON_PROOF_DELIVERY_TRANSITIONS
         .filter {
@@ -81,6 +109,9 @@ private fun DeliveryCard(
         // never simultaneously available from the same status -- this is
         // just distinct-by-event for safety against a future duplicate.
         .distinctBy { it.event }
+
+    val availableProofEvents = PROOF_DELIVERY_TRANSITIONS
+        .filter { it.fromStatus == delivery.status && it.allowedRoles.any { role -> role in roles } }
 
     AppCard {
         Row(verticalAlignment = Alignment.Top) {
@@ -102,7 +133,7 @@ private fun DeliveryCard(
             Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
         }
 
-        if (availableEvents.isNotEmpty()) {
+        if (availableEvents.isNotEmpty() || availableProofEvents.isNotEmpty()) {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -120,9 +151,32 @@ private fun DeliveryCard(
                         }
                     }
                 }
+                // Filled, not outlined -- these open the camera before
+                // anything is submitted, a heavier action than the plain
+                // status buttons above.
+                availableProofEvents.forEach { rule ->
+                    Button(
+                        onClick = { onRequestProof(rule.leg, rule.event) },
+                        enabled = !isTransitioning,
+                        shape = MaterialTheme.shapes.small,
+                    ) {
+                        if (isTransitioning) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                        } else {
+                            Text(stringResource(rule.event.proofLabelRes()))
+                        }
+                    }
+                }
             }
         }
     }
+}
+
+private fun String.proofLabelRes(): Int = when (this) {
+    "CONFIRM_PICKUP" -> R.string.deliveries_confirm_pickup
+    "CONFIRM_DELIVERY" -> R.string.deliveries_confirm_delivery
+    "CONFIRM_RETURN" -> R.string.deliveries_confirm_return
+    else -> R.string.deliveries_confirm_pickup
 }
 
 private fun KirimStatus.tone(): BadgeTone = when {

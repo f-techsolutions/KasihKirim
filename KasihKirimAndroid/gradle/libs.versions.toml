@@ -37,6 +37,7 @@ compose-test-manifest = { module = "androidx.compose.ui:ui-test-manifest" }
 supabase-bom      = { module = "io.github.jan-tennert.supabase:bom",            version.ref = "supabaseBom" }
 supabase-auth     = { module = "io.github.jan-tennert.supabase:auth-kt" }
 supabase-postgrest= { module = "io.github.jan-tennert.supabase:postgrest-kt" }
+supabase-storage  = { module = "io.github.jan-tennert.supabase:storage-kt" }
 ktor-okhttp       = { module = "io.ktor:ktor-client-okhttp",                    version.ref = "ktor" }
 
 coroutines-test   = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }

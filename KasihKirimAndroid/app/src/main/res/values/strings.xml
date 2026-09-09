@@ -15,6 +15,7 @@
     <string name="err_invalid_email">Sila masukkan e-mel yang sah.</string>
     <string name="err_password_short">Kata laluan mesti sekurang-kurangnya 8 aksara.</string>
     <string name="err_credentials">E-mel atau kata laluan salah.</string>
+    <string name="err_email_not_confirmed">Sila sahkan e-mel anda dahulu. Semak peti masuk anda untuk pautan pengesahan.</string>
     <string name="err_network">Tiada talian. Sila cuba lagi.</string>
     <string name="err_unexpected">Ada masalah. Sila cuba lagi.</string>
     <string name="err_not_configured">Aplikasi belum dikonfigurasi. Sila hubungi sokongan.</string>
@@ -111,6 +112,16 @@
     <string name="deliveries_empty">Tiada penghantaran lagi.</string>
     <string name="deliveries_carrier_earning">Pendapatan carrier: %1$s</string>
     <string name="err_delivery_not_found">Penghantaran tidak dijumpai.</string>
+    <string name="err_photo_path_required">Sila ambil gambar bukti dahulu.</string>
+    <string name="err_proof_required">Bukti belum berjaya dihantar. Sila cuba ambil gambar semula.</string>
+    <string name="deliveries_confirm_pickup">Sahkan Ambil</string>
+    <string name="deliveries_confirm_delivery">Sahkan Hantar</string>
+    <string name="deliveries_confirm_return">Sahkan Pulang</string>
+    <string name="deliveries_proof_retake">Ambil Semula</string>
+    <string name="deliveries_proof_submit">Hantar Bukti</string>
+    <string name="deliveries_proof_cancel">Batal</string>
+    <string name="deliveries_proof_title">Gambar Bukti</string>
+    <string name="deliveries_proof_capture_failed">Gagal mengambil gambar. Sila cuba lagi.</string>
 
     <string name="earnings_title">Pendapatan Saya</string>
     <string name="earnings_available">Boleh dikeluarkan</string>
