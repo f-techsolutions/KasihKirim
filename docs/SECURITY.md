@@ -409,21 +409,30 @@ Signals accumulate into a score per subject. Thresholds drive: review queue → 
 > the native build below; unverified rows are marked so this doesn't read as
 > a completed audit for a stack that's no longer what ships.
 >
-> - **Token storage** — supabase-kt's `Auth` plugin is installed with
->   `autoLoadFromStorage = true` (`SupabaseClientProvider.kt`) but no custom
->   `sessionManager` is supplied, so it falls back to the SDK's default
->   (`SettingsSessionManager`, backed by `multiplatform-settings`, which on
->   Android typically wraps plain `SharedPreferences`). `androidx.security.crypto`
->   is already a dependency (`app/build.gradle.kts`) but nothing in the app
->   actually calls it — **the equivalent of the forbidden "never AsyncStorage"
->   row may currently be true for the native build too.** Not fixed here: the
->   SDK's exact session-storage customization API for the pinned `3.5.0` BOM
->   couldn't be confirmed from source in this pass (search results disagreed,
->   and Google has since deprecated `EncryptedSharedPreferences` itself in
->   favour of DataStore+Tink), and writing an unverified custom
->   `SessionManager` risks silently breaking session persistence — worse than
->   leaving this flagged. Needs a real Android Studio session against the
->   pinned SDK version to confirm the API before implementing.
+> - **Token storage** — **fixed.** supabase-kt's `Auth` plugin now installs
+>   with a custom `sessionManager` (`SupabaseClientProvider.kt` →
+>   `EncryptedSessionManager`), verified against the pinned `3.5.0` BOM's
+>   actual source (downloaded and read directly, not inferred): `Auth`'s
+>   `sessionManager: SessionManager?` config property, and `SessionManager`'s
+>   3-method interface (`saveSession`/`loadSession`/`deleteSession`), are
+>   both real, stable, public API. Previously no custom `sessionManager` was
+>   supplied, so `Auth` fell back to its own default — confirmed by reading
+>   `multiplatform-settings-no-arg-android` 1.3.0's source directly: it wrote
+>   the session to a plain, unencrypted SharedPreferences file, auto-wired
+>   via an androidx.startup `Initializer` with zero code in this app. The
+>   equivalent of the forbidden "never AsyncStorage" row *was* true for the
+>   native build.
+>   `EncryptedSessionManager` wraps the same SharedPreferences approach in
+>   AES-256-GCM with an AndroidKeyStore-backed key, rather than depending on
+>   `androidx.security.crypto`'s `EncryptedSharedPreferences`: that library's
+>   entire API was deprecated in `1.1.0-beta01` (June 2025) — "Deprecated
+>   all APIs in favour of existing platform APIs and direct use of Android
+>   Keystore" per its own release notes — so this implements that
+>   recommended replacement directly instead of depending on a library
+>   Google says not to use. The now-unused `androidx.security.crypto`
+>   dependency has been removed. Covered by an instrumented test
+>   (`EncryptedSessionManagerTest`, needs a real AndroidKeyStore) since a JVM
+>   unit test can't exercise it.
 > - **Dependencies** — `.github/dependabot.yml` now covers the Gradle
 >   ecosystem (it previously only would have covered `npm`/JS, and didn't
 >   exist as a file at all until Phase 10).
