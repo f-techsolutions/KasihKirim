@@ -35,8 +35,16 @@ BEGIN
     p_phone, now(), '', '{"provider":"phone","providers":["phone"]}'::jsonb, '{}'::jsonb,
     '', '', '', '',
     now(), now());
+  -- 0015_profile_on_auth_signup.sql's tg_auth_users_create_profile trigger
+  -- now fires on the auth.users insert above and creates a placeholder
+  -- profiles row before this statement runs -- UPSERT instead of a plain
+  -- INSERT so this helper still works whether that trigger is installed or
+  -- not, and still leaves the row exactly as this function has always
+  -- promised (status 'active', not the trigger's signup default 'pending').
   INSERT INTO public.profiles (id, phone, display_name, status)
-  VALUES (v_id, p_phone, p_handle, 'active');
+  VALUES (v_id, p_phone, p_handle, 'active')
+  ON CONFLICT (id) DO UPDATE SET
+    phone = EXCLUDED.phone, display_name = EXCLUDED.display_name, status = EXCLUDED.status;
   FOREACH r IN ARRAY p_roles LOOP
     INSERT INTO public.user_roles (user_id, role) VALUES (v_id, r::ref.user_role);
   END LOOP;
