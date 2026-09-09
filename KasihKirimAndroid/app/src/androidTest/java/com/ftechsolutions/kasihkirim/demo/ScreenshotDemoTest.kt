@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onRoot
 import androidx.test.platform.app.InstrumentationRegistry
 import com.ftechsolutions.kasihkirim.core.result.AppError
 import com.ftechsolutions.kasihkirim.core.result.AppResult
