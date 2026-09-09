@@ -1,5 +1,17 @@
 # KasihKirim — Android Platform
 
+> **Scope note:** this document predates `docs/CLAUDE_IMPLEMENTATION_PLAN.md`
+> §0.1's decision to build a native Kotlin app (`KasihKirimAndroid/`)
+> instead of the Expo/React Native app described below. The device
+> envelope (§1) and platform constraints still apply, but the Expo/RN
+> build config (§2's `app.json` snippet, `package: "my.kasihkirim.app"`,
+> Hermes/Fabric/TurboModules) does not reflect the real build. The
+> production `applicationId` is **`com.ftechsolutions.kasihkirim`** (see
+> `docs/RELEASE_SIGNING.md`); actual SDK levels and build settings live in
+> `KasihKirimAndroid/app/build.gradle.kts`. This file has not had a
+> native-build reconciliation pass — treat it as historical context, not
+> current configuration.
+
 **Android only.** No iOS targets, no iOS dependencies, no `ios/` directory.
 
 Target: a 2 GB Redmi in Beluran on 3G, not a Pixel in an office.

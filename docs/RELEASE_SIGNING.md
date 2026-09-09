@@ -103,9 +103,12 @@ artifact or written to the repository.
   artifact for you to upload manually. Automating `eas submit`-equivalent
   publishing would need a Play service account JSON this repository does
   not have and hasn't been asked to add.
-- **`applicationId` decision** — `com.ftechsolutions.kasihkirim` is what's
-  actually shipped since Phase 1 and is what this document and the
-  release workflow use. If `my.kasihkirim.app` (from the old
-  `DEPLOYMENT.md`) was the intended production identity, that's a call to
-  make **before** the first Play upload — a package name cannot be
-  changed afterward.
+- ~~**`applicationId` decision**~~ — **decided**: `com.ftechsolutions.kasihkirim`
+  is the production identity. It's what's actually been built, tested,
+  signed, and shipped since Phase 1; `my.kasihkirim.app` was only ever
+  present in the pre-pivot Expo/EAS `DEPLOYMENT.md`, superseded by
+  `docs/CLAUDE_IMPLEMENTATION_PLAN.md` §0.1's move to native Kotlin, and
+  was never wired into any actual build. Switching now would mean
+  reconfiguring and re-verifying everything already proven working, for
+  no benefit — and a package name cannot be changed after the first Play
+  upload, so this is now closed rather than left open.
