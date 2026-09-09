@@ -293,7 +293,7 @@ OTA layer for it to roll back.
 | Item | Value / note |
 |---|---|
 | Developer account | **Organisation account.** Also exempts from the 12-tester / 14-day closed-testing requirement that applies to new personal accounts. |
-| Package name | `my.kasihkirim.app` — permanent, cannot ever be changed |
+| Package name | `com.ftechsolutions.kasihkirim` — decided; permanent, cannot ever be changed. This section otherwise predates the native-Kotlin pivot (see the scope note at the top of this document and `docs/RELEASE_SIGNING.md`) and still needs a full native-build pass. |
 | App signing | Play App Signing enabled |
 | Category | Business, or Shopping |
 | Content rating | IARC questionnaire; expect 3+ / PEGI 3 with a commerce declaration |
