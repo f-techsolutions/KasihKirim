@@ -73,9 +73,24 @@ object SupabaseClientProvider {
      * that enrichment exists solely inside the access token itself, so
      * reading it back means decoding the current access token's payload, not
      * asking the SDK's cached user object.
+     *
+     * The decode itself is delegated to [JwtClaims.appMetadata], a pure
+     * function with no SupabaseClient/Context dependency, so the regression
+     * this fixed (silently falling back to the wrong, stale metadata source)
+     * has a real unit test -- see JwtClaimsTest.
      */
-    fun currentJwtAppMetadata(): JsonObject? {
-        val token = client.auth.currentSessionOrNull()?.accessToken ?: return null
+    fun currentJwtAppMetadata(): JsonObject? =
+        JwtClaims.appMetadata(client.auth.currentSessionOrNull()?.accessToken)
+}
+
+/** Split out of SupabaseClientProvider so the JWT-decoding logic itself is
+ *  unit-testable without a live SupabaseClient (which needs an Android
+ *  Context and network config to even construct). Behavior is unchanged from
+ *  before the split -- see JwtClaimsTest for the regression coverage this
+ *  exists to carry. */
+internal object JwtClaims {
+    fun appMetadata(accessToken: String?): JsonObject? {
+        val token = accessToken ?: return null
         return try {
             val payload = token.split(".").getOrNull(1) ?: return null
             val padded = payload + "=".repeat((4 - payload.length % 4) % 4)
