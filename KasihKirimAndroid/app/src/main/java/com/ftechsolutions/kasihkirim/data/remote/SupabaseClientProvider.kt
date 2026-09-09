@@ -1,6 +1,8 @@
 package com.ftechsolutions.kasihkirim.data.remote
 
+import android.content.Context
 import com.ftechsolutions.kasihkirim.BuildConfig
+import com.ftechsolutions.kasihkirim.core.security.EncryptedSessionManager
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.Auth
 import io.github.jan.supabase.auth.FlowType
@@ -17,6 +19,13 @@ import io.github.jan.supabase.postgrest.Postgrest
  */
 object SupabaseClientProvider {
 
+    /** Set once from [com.ftechsolutions.kasihkirim.KasihKirimApplication.onCreate]. */
+    private lateinit var appContext: Context
+
+    fun init(context: Context) {
+        appContext = context.applicationContext
+    }
+
     val isConfigured: Boolean
         get() = BuildConfig.SUPABASE_URL.isNotBlank() &&
                 BuildConfig.SUPABASE_PUBLISHABLE_KEY.isNotBlank()
@@ -25,6 +34,9 @@ object SupabaseClientProvider {
         check(isConfigured) {
             "SUPABASE_URL / SUPABASE_PUBLISHABLE_KEY missing. " +
                 "Copy local.properties.example to local.properties."
+        }
+        check(::appContext.isInitialized) {
+            "SupabaseClientProvider.init(context) was never called."
         }
         createSupabaseClient(
             supabaseUrl = BuildConfig.SUPABASE_URL,
@@ -38,6 +50,10 @@ object SupabaseClientProvider {
                 host = "auth"
                 autoLoadFromStorage = true
                 alwaysAutoRefresh = true
+                // Without this, Auth falls back to its own default
+                // SessionManager, which stores the session unencrypted --
+                // see EncryptedSessionManager's doc comment.
+                sessionManager = EncryptedSessionManager(appContext)
             }
             install(Postgrest)
         }

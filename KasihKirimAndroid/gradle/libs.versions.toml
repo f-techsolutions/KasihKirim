@@ -11,7 +11,6 @@ supabaseBom     = "3.5.0"
 ktor            = "3.0.3"
 coreKtx         = "1.15.0"
 activityCompose = "1.9.3"
-securityCrypto  = "1.1.0-alpha06"
 coroutines      = "1.11.0"
 junit           = "4.13.2"
 androidxJunit   = "1.2.1"
@@ -24,7 +23,6 @@ androidx-lifecycle-runtime= { module = "androidx.lifecycle:lifecycle-runtime-ktx
 androidx-lifecycle-compose= { module = "androidx.lifecycle:lifecycle-runtime-compose",version.ref = "lifecycle" }
 androidx-lifecycle-vm     = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycle" }
 androidx-navigation      = { module = "androidx.navigation:navigation-compose",       version.ref = "navigation" }
-androidx-security-crypto = { module = "androidx.security:security-crypto",            version.ref = "securityCrypto" }
 
 compose-bom       = { module = "androidx.compose:compose-bom",           version.ref = "composeBom" }
 compose-ui        = { module = "androidx.compose.ui:ui" }

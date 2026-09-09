@@ -107,7 +107,6 @@ dependencies {
     implementation(libs.androidx.lifecycle.compose)
     implementation(libs.androidx.lifecycle.vm)
     implementation(libs.androidx.navigation)
-    implementation(libs.androidx.security.crypto)
 
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)

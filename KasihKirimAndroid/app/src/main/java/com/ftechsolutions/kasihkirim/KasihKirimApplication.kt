@@ -1,6 +1,7 @@
 package com.ftechsolutions.kasihkirim
 
 import android.app.Application
+import com.ftechsolutions.kasihkirim.data.remote.SupabaseClientProvider
 import com.ftechsolutions.kasihkirim.data.repository.AddressRepositoryImpl
 import com.ftechsolutions.kasihkirim.data.repository.AuthRepositoryImpl
 import com.ftechsolutions.kasihkirim.data.repository.DeliveryRepositoryImpl
@@ -24,6 +25,11 @@ import com.ftechsolutions.kasihkirim.domain.repository.VehicleRepository
  * simplest structure that works. Introduce DI when the graph earns it.
  */
 class KasihKirimApplication : Application() {
+    override fun onCreate() {
+        super.onCreate()
+        SupabaseClientProvider.init(this)
+    }
+
     val authRepository: AuthRepository by lazy { AuthRepositoryImpl() }
     val addressRepository: AddressRepository by lazy { AddressRepositoryImpl() }
     val kirimRepository: KirimRepository by lazy { KirimRepositoryImpl() }
