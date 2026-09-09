@@ -40,9 +40,12 @@
     <string name="addresses_recipient_name">Nama Penerima</string>
     <string name="addresses_recipient_phone">Telefon Penerima</string>
     <string name="addresses_community">Kampung / Pekan</string>
+    <string name="addresses_community_hint">Taip untuk cari, kemudian ketik nama dari senarai</string>
+    <string name="addresses_community_change">Tukar</string>
+    <string name="addresses_community_not_selected">Sila pilih kampung/pekan dari senarai carian sebelum simpan.</string>
     <string name="addresses_landmark">Petunjuk Lokasi</string>
     <string name="addresses_save">Simpan Alamat</string>
-    <string name="addresses_default_badge">(Utama)</string>
+    <string name="addresses_default_badge">Utama</string>
     <string name="addresses_set_default">Jadikan Utama</string>
     <string name="addresses_delete">Padam</string>
     <string name="addresses_edit">Kemas Kini</string>

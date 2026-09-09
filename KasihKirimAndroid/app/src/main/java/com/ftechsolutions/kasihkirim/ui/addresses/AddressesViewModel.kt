@@ -85,6 +85,11 @@ class AddressesViewModel(private val repo: AddressRepository) : ViewModel() {
     fun onCommunitySelected(community: Community) =
         updateForm { it.copy(selectedCommunity = community, communityResults = emptyList(), communityQuery = community.name) }
 
+    /** Lets the user back out of a selection and search again -- the
+     *  "Tukar" (Change) action next to the locked community pill. */
+    fun onCommunityCleared() =
+        updateForm { it.copy(selectedCommunity = null, communityQuery = "", communityResults = emptyList()) }
+
     fun startEdit(address: Address) = updateForm {
         AddressFormState(
             label = address.label,
