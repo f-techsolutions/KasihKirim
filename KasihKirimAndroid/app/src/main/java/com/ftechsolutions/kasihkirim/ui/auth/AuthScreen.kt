@@ -188,6 +188,11 @@ internal fun AppError.messageRes(): Int = when (this) {
         "DELIVERY_NOT_FOUND" -> R.string.err_delivery_not_found
         "PHOTO_PATH_REQUIRED" -> R.string.err_photo_path_required
         "PROOF_REQUIRED" -> R.string.err_proof_required
+        "SELLER_APPLICATION_EXISTS" -> R.string.err_seller_application_exists
+        "COMMUNITY_NOT_FOUND" -> R.string.err_community_not_found
+        "BUSINESS_NAME_TOO_SHORT" -> R.string.err_business_name_too_short
+        "PRODUCT_NOT_FOUND" -> R.string.err_product_not_found
+        "PRODUCT_IMAGE_LIMIT" -> R.string.err_product_image_limit
         else -> R.string.err_unexpected
     }
     else -> R.string.err_unexpected

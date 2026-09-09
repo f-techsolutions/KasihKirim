@@ -9,6 +9,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -18,13 +19,20 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.ftechsolutions.kasihkirim.R
 import com.ftechsolutions.kasihkirim.domain.model.AuthUser
+import com.ftechsolutions.kasihkirim.domain.model.UserRole
 import com.ftechsolutions.kasihkirim.ui.auth.AuthViewModel
 import com.ftechsolutions.kasihkirim.ui.common.AppCard
 import com.ftechsolutions.kasihkirim.ui.common.BadgeTone
 import com.ftechsolutions.kasihkirim.ui.common.StatusBadge
 
 @Composable
-fun ProfileScreen(user: AuthUser, vm: AuthViewModel, onOpenAddresses: () -> Unit, onOpenServiceability: () -> Unit) {
+fun ProfileScreen(
+    user: AuthUser,
+    vm: AuthViewModel,
+    onOpenAddresses: () -> Unit,
+    onOpenServiceability: () -> Unit,
+    onOpenSales: () -> Unit,
+) {
     Column(
         Modifier.fillMaxSize().padding(horizontal = 20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
@@ -43,6 +51,19 @@ fun ProfileScreen(user: AuthUser, vm: AuthViewModel, onOpenAddresses: () -> Unit
                 icon = Icons.Filled.MyLocation,
                 label = stringResource(R.string.serviceability_title),
                 onClick = onOpenServiceability,
+            )
+            // tabsFor(SELLER) is the only place Destination.SALES is a tab
+            // (Destinations.kt) -- everyone else needs a way in before they
+            // hold the role at all, since applying is exactly how they'd
+            // ever get it. Same route as the tab; SalesScreen renders the
+            // right state on its own (apply form / pending / catalog).
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            ActionRow(
+                icon = Icons.Filled.Storefront,
+                label = stringResource(
+                    if (UserRole.SELLER in user.roles) R.string.profile_my_sales else R.string.profile_become_seller,
+                ),
+                onClick = onOpenSales,
             )
         }
 

@@ -18,6 +18,7 @@ import com.ftechsolutions.kasihkirim.domain.repository.DeliveryRepository
 import com.ftechsolutions.kasihkirim.domain.repository.EarningsRepository
 import com.ftechsolutions.kasihkirim.domain.repository.KirimRepository
 import com.ftechsolutions.kasihkirim.domain.repository.MuatanJualRepository
+import com.ftechsolutions.kasihkirim.domain.repository.SellerRepository
 import com.ftechsolutions.kasihkirim.domain.repository.TripRepository
 import com.ftechsolutions.kasihkirim.domain.repository.VehicleRepository
 import com.ftechsolutions.kasihkirim.ui.addresses.AddressesScreen
@@ -35,6 +36,8 @@ import com.ftechsolutions.kasihkirim.ui.muatanjual.MuatanJualViewModel
 import com.ftechsolutions.kasihkirim.ui.orders.OrdersScreen
 import com.ftechsolutions.kasihkirim.ui.orders.OrdersViewModel
 import com.ftechsolutions.kasihkirim.ui.profile.ProfileScreen
+import com.ftechsolutions.kasihkirim.ui.sales.SalesScreen
+import com.ftechsolutions.kasihkirim.ui.sales.SalesViewModel
 import com.ftechsolutions.kasihkirim.ui.send.KirimQuoteViewModel
 import com.ftechsolutions.kasihkirim.ui.send.SendScreen
 import com.ftechsolutions.kasihkirim.ui.serviceability.ServiceabilityScreen
@@ -60,6 +63,7 @@ fun AppNavHost(
     tripRepository: TripRepository,
     deliveryRepository: DeliveryRepository,
     muatanJualRepository: MuatanJualRepository,
+    sellerRepository: SellerRepository,
 ) {
     val nav: NavHostController = rememberNavController()
     val tabs = tabsFor(user.primaryRole)
@@ -98,6 +102,7 @@ fun AppNavHost(
                     authViewModel,
                     onOpenAddresses = { nav.navigate(ADDRESSES_ROUTE) },
                     onOpenServiceability = { nav.navigate(SERVICEABILITY_ROUTE) },
+                    onOpenSales = { nav.navigate(Destination.SALES.route) },
                 )
             }
             composable(ADDRESSES_ROUTE) {
@@ -150,11 +155,19 @@ fun AppNavHost(
                 val vm: MuatanJualViewModel = viewModel(factory = MuatanJualViewModel.Factory(muatanJualRepository))
                 MuatanJualScreen(vm)
             }
-            // Phase 1 renders an honest placeholder. NOT a mock: it claims
-            // nothing and calls no backend. Selling one's own lots is a
-            // separate, not-yet-scoped surface from Phase 8's browse-only
-            // Muatan Jual screen above.
-            composable(Destination.SALES.route) { PlaceholderScreen(Destination.SALES) }
+            // Jualan Phase A (0016/0017_seller_onboarding.sql): seller
+            // application + product catalog. Reachable from the SALES tab
+            // (sellers only, per tabsFor) and from Profile's "Jadi Penjual"
+            // row (everyone else, so there's actually a way in before the
+            // role is granted) -- same route either way, the screen itself
+            // renders the right state (apply / pending / catalog). Separate
+            // from Phase 8's browse-only Muatan Jual screen above, which is
+            // a different feature (carrier-as-trader, ADDENDUM-COMMERCE.md),
+            // not this one.
+            composable(Destination.SALES.route) {
+                val vm: SalesViewModel = viewModel(factory = SalesViewModel.Factory(sellerRepository, addressRepository))
+                SalesScreen(vm, onBack = { nav.popBackStack() })
+            }
         }
     }
 }
