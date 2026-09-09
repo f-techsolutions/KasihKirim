@@ -87,7 +87,7 @@ CREATE OR REPLACE FUNCTION public.rpc_submit_proof(
   p_is_mock_location BOOLEAN DEFAULT false, p_is_offline_capture BOOLEAN DEFAULT false)
 RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
 DECLARE
-  d public.deliveries; v_uid UUID := auth.uid();
+  d public.deliveries; v_uid UUID := (SELECT auth.uid());
   v_leg ref.handover_leg := p_leg::ref.handover_leg;
   v_method ref.proof_method := p_method::ref.proof_method;
   v_quality ref.proof_quality;
