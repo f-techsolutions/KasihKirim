@@ -79,11 +79,16 @@ SELECT throws_ok(
   NULL, NULL, 'a carrier cannot accept their own posted kirim (self-dealing)');
 
 -- ── FLOAT_LIMIT_EXCEEDED ────────────────────────────────────────────────────
--- seed_fixture's carrier has float_limit_sen=50000. Push existing exposure
--- to within 1000 sen of that limit, leaving no room for a new kirim whose
--- budget_cap_sen (2000) would breach it.
+-- seed_fixture's carrier has float_limit_sen=50000. procurement_advance_sen
+-- is already 3500 at this point (the earlier successful accept above), and
+-- ck_carrier_exposure (01_constraints.test.sql) itself blocks
+-- cod_held_sen+procurement_advance_sen > float_limit_sen on the UPDATE
+-- below -- so cod_held_sen can only go as high as 46500 here, not right up
+-- to 50000. 46000 clears that constraint (46000+3500=49500) while still
+-- leaving no room for a new kirim whose budget_cap_sen (2000) would push
+-- the total to 51500, over the limit, inside rpc_accept_offer itself.
 SELECT tests.clear_auth();
-UPDATE public.carriers SET cod_held_sen = 49000 WHERE id = tests.uid('_carrier');
+UPDATE public.carriers SET cod_held_sen = 46000 WHERE id = tests.uid('_carrier');
 
 DO $$
 DECLARE v_kirim UUID; v_kk UUID; v_beluran UUID; v_cat UUID; v_addr UUID;
