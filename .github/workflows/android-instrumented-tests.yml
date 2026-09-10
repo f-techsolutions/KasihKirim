@@ -106,7 +106,7 @@ jobs:
 
       - name: Upload instrumented test reports (failure only)
         if: failure()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: KasihKirim-instrumented-test-reports
           path: KasihKirimAndroid/app/build/reports/androidTests/
@@ -114,7 +114,7 @@ jobs:
           retention-days: 14
 
       - name: Upload demo screenshots
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: KasihKirim-demo-screenshots
           path: KasihKirimAndroid/demo-screenshots/

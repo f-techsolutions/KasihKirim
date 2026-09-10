@@ -143,7 +143,7 @@ jobs:
         run: rm -f release-signing.jks
 
       - name: Upload signed AAB
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: KasihKirim-release-aab
           path: KasihKirimAndroid/app/build/outputs/bundle/release/app-release.aab
