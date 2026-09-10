@@ -4,6 +4,7 @@ import android.app.Application
 import com.ftechsolutions.kasihkirim.data.remote.SupabaseClientProvider
 import com.ftechsolutions.kasihkirim.data.repository.AddressRepositoryImpl
 import com.ftechsolutions.kasihkirim.data.repository.AuthRepositoryImpl
+import com.ftechsolutions.kasihkirim.data.repository.AdminRepositoryImpl
 import com.ftechsolutions.kasihkirim.data.repository.BadgeRepositoryImpl
 import com.ftechsolutions.kasihkirim.data.repository.BuyRepositoryImpl
 import com.ftechsolutions.kasihkirim.data.repository.DeliveryRepositoryImpl
@@ -15,6 +16,7 @@ import com.ftechsolutions.kasihkirim.data.repository.TripRepositoryImpl
 import com.ftechsolutions.kasihkirim.data.repository.VehicleRepositoryImpl
 import com.ftechsolutions.kasihkirim.domain.repository.AddressRepository
 import com.ftechsolutions.kasihkirim.domain.repository.AuthRepository
+import com.ftechsolutions.kasihkirim.domain.repository.AdminRepository
 import com.ftechsolutions.kasihkirim.domain.repository.BadgeRepository
 import com.ftechsolutions.kasihkirim.domain.repository.BuyRepository
 import com.ftechsolutions.kasihkirim.domain.repository.DeliveryRepository
@@ -47,4 +49,5 @@ class KasihKirimApplication : Application() {
     val sellerRepository: SellerRepository by lazy { SellerRepositoryImpl() }
     val buyRepository: BuyRepository by lazy { BuyRepositoryImpl() }
     val badgeRepository: BadgeRepository by lazy { BadgeRepositoryImpl() }
+    val adminRepository: AdminRepository by lazy { AdminRepositoryImpl() }
 }

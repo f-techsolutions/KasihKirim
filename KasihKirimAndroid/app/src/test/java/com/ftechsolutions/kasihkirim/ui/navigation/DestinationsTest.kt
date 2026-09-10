@@ -51,12 +51,28 @@ class DestinationsTest {
     }
 
     @Test fun `roles with no dedicated tab set fall back to customer tabs deterministically, not a crash`() {
-        // AGENT and admin roles aren't customer-facing in this app; tabsFor's
-        // `else` branch is the same deterministic fallback as
-        // AuthUser.primaryRole's own CUSTOMER default -- not a crash, not an
-        // empty tab bar.
+        // AGENT isn't customer-facing in this app; tabsFor's `else` branch is
+        // the same deterministic fallback as AuthUser.primaryRole's own
+        // CUSTOMER default -- not a crash, not an empty tab bar.
         assertEquals(tabsFor(UserRole.CUSTOMER), tabsFor(UserRole.AGENT))
-        assertEquals(tabsFor(UserRole.CUSTOMER), tabsFor(UserRole.ADMIN_SUPER))
+    }
+
+    @Test fun `every admin role reaches the review queues, not the customer tabs`() {
+        val expected = listOf(Destination.HOME, Destination.ADMIN, Destination.PROFILE)
+        listOf(
+            UserRole.ADMIN_SUPPORT, UserRole.ADMIN_OPS, UserRole.ADMIN_FINANCE,
+            UserRole.ADMIN_COMPLIANCE, UserRole.ADMIN_SUPER,
+        ).forEach { role ->
+            assertEquals("$role must get the admin tab set", expected, tabsFor(role))
+            assertNotEquals(tabsFor(UserRole.CUSTOMER), tabsFor(role))
+        }
+    }
+
+    @Test fun `an admin who is also a seller still lands on the review queues`() {
+        val user = buildAuthUser("u1", "admin@example.com", appMetadataWithRoles("seller", "admin_ops"))
+
+        assertEquals(UserRole.ADMIN_OPS, user.primaryRole)
+        assertEquals(tabsFor(UserRole.ADMIN_OPS), tabsFor(user.primaryRole))
     }
 
     // End-to-end: a real carrier JWT, decoded the production way, must drive
@@ -76,4 +92,14 @@ class DestinationsTest {
         assertEquals(tabsFor(UserRole.CARRIER), tabsFor(user.primaryRole))
         assertNotEquals(tabsFor(UserRole.CUSTOMER), tabsFor(user.primaryRole))
     }
+
+    /** Builds the app_metadata claim the way custom_access_token_hook emits
+     *  it, decoded through the same production path as the JWT test above. */
+    private fun appMetadataWithRoles(vararg roles: String) = JwtClaims.appMetadata(
+        Base64.getUrlEncoder().withoutPadding()
+            .encodeToString("""{"alg":"HS256","typ":"JWT"}""".toByteArray()) + "." +
+            Base64.getUrlEncoder().withoutPadding().encodeToString(
+                """{"app_metadata":{"roles":[${roles.joinToString(",") { "\"$it\"" }}]}}""".toByteArray(),
+            ) + ".fake-signature-not-verified-client-side",
+    )
 }
