@@ -34,7 +34,7 @@ enum class Destination(val route: String, val labelRes: Int, val icon: ImageVect
 
 fun tabsFor(role: UserRole): List<Destination> = when (role) {
     UserRole.CARRIER -> listOf(
-        Destination.HOME, Destination.TRIPS, Destination.ORDERS,
+        Destination.HOME, Destination.BOARD, Destination.TRIPS, Destination.ORDERS,
         Destination.EARNINGS, Destination.PROFILE,
     )
     UserRole.SELLER -> listOf(

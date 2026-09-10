@@ -13,6 +13,7 @@ import com.ftechsolutions.kasihkirim.domain.model.NewSeller
 import com.ftechsolutions.kasihkirim.domain.model.Product
 import com.ftechsolutions.kasihkirim.domain.model.ProductStatus
 import com.ftechsolutions.kasihkirim.domain.model.Seller
+import com.ftechsolutions.kasihkirim.domain.model.SellerOrder
 import com.ftechsolutions.kasihkirim.domain.repository.AddressRepository
 import com.ftechsolutions.kasihkirim.domain.repository.SellerRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -71,11 +72,16 @@ data class ProductFormState(
     }
 }
 
+enum class SalesTab { PRODUCTS, ORDERS }
+
 data class SalesUiState(
     val isLoading: Boolean = true,
     /** null once loaded means "never applied" -- see the empty-state screen. */
     val seller: Seller? = null,
     val products: List<Product> = emptyList(),
+    val selectedTab: SalesTab = SalesTab.PRODUCTS,
+    val orders: List<SellerOrder> = emptyList(),
+    val isLoadingOrders: Boolean = false,
     val error: AppError? = null,
     val isSubmittingApplication: Boolean = false,
     val applicationForm: SellerApplicationFormState = SellerApplicationFormState(),
@@ -103,7 +109,12 @@ class SalesViewModel(
                 is AppResult.Success -> {
                     val seller = result.data
                     _state.update { it.copy(seller = seller, isLoading = seller != null) }
-                    if (seller != null) loadProducts(seller.id) else _state.update { it.copy(isLoading = false) }
+                    if (seller != null) {
+                        loadProducts(seller.id)
+                        loadOrders(seller.id)
+                    } else {
+                        _state.update { it.copy(isLoading = false) }
+                    }
                 }
                 is AppResult.Failure -> _state.update { it.copy(isLoading = false, error = result.error) }
             }
@@ -114,6 +125,16 @@ class SalesViewModel(
         when (val result = sellerRepo.listMyProducts(sellerId)) {
             is AppResult.Success -> _state.update { it.copy(isLoading = false, products = result.data) }
             is AppResult.Failure -> _state.update { it.copy(isLoading = false, error = result.error) }
+        }
+    }
+
+    fun selectTab(tab: SalesTab) = _state.update { it.copy(selectedTab = tab) }
+
+    private suspend fun loadOrders(sellerId: String) {
+        _state.update { it.copy(isLoadingOrders = true) }
+        when (val result = sellerRepo.listMyOrders(sellerId)) {
+            is AppResult.Success -> _state.update { it.copy(isLoadingOrders = false, orders = result.data) }
+            is AppResult.Failure -> _state.update { it.copy(isLoadingOrders = false, error = result.error) }
         }
     }
 

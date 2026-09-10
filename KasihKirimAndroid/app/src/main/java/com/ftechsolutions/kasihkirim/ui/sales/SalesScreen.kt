@@ -30,9 +30,11 @@ import androidx.compose.ui.unit.dp
 import com.ftechsolutions.kasihkirim.R
 import com.ftechsolutions.kasihkirim.domain.model.HandlingFlag
 import com.ftechsolutions.kasihkirim.domain.model.KirimCategory
+import com.ftechsolutions.kasihkirim.domain.model.OrderStatus
 import com.ftechsolutions.kasihkirim.domain.model.Product
 import com.ftechsolutions.kasihkirim.domain.model.ProductStatus
 import com.ftechsolutions.kasihkirim.domain.model.Seller
+import com.ftechsolutions.kasihkirim.domain.model.SellerOrder
 import com.ftechsolutions.kasihkirim.domain.model.SellerStatus
 import com.ftechsolutions.kasihkirim.ui.auth.messageRes
 import com.ftechsolutions.kasihkirim.ui.common.AppCard
@@ -65,7 +67,15 @@ fun SalesScreen(vm: SalesViewModel, onBack: () -> Unit) {
                 }
                 state.seller == null -> SellerApplicationScreen(vm)
                 !state.seller!!.status.isUsable -> SellerStatusScreen(state.seller!!)
-                else -> ProductCatalogScreen(vm)
+                else -> Column(Modifier.fillMaxSize()) {
+                    SalesTabRow(selected = state.selectedTab, onSelect = vm::selectTab)
+                    Box(Modifier.weight(1f)) {
+                        when (state.selectedTab) {
+                            SalesTab.PRODUCTS -> ProductCatalogScreen(vm)
+                            SalesTab.ORDERS -> OrdersListScreen(vm)
+                        }
+                    }
+                }
             }
         }
     }
@@ -169,6 +179,82 @@ private fun SellerStatusScreen(seller: Seller) {
             }
         }
     }
+}
+
+@Composable
+private fun SalesTabRow(selected: SalesTab, onSelect: (SalesTab) -> Unit) {
+    TabRow(selectedTabIndex = selected.ordinal) {
+        Tab(
+            selected = selected == SalesTab.PRODUCTS,
+            onClick = { onSelect(SalesTab.PRODUCTS) },
+            text = { Text(stringResource(R.string.sales_tab_products)) },
+        )
+        Tab(
+            selected = selected == SalesTab.ORDERS,
+            onClick = { onSelect(SalesTab.ORDERS) },
+            text = { Text(stringResource(R.string.sales_tab_orders)) },
+        )
+    }
+}
+
+@Composable
+private fun OrdersListScreen(vm: SalesViewModel) {
+    val state by vm.state.collectAsState()
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        item { Spacer(Modifier.height(4.dp)) }
+        if (state.orders.isEmpty() && !state.isLoadingOrders) {
+            item {
+                AppCard {
+                    Text(stringResource(R.string.sales_no_orders), style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+        }
+        items(state.orders, key = { it.id }) { order -> SellerOrderCard(order) }
+        item { Spacer(Modifier.height(24.dp)) }
+    }
+}
+
+@Composable
+private fun SellerOrderCard(order: SellerOrder) {
+    AppCard {
+        Row(verticalAlignment = Alignment.Top) {
+            Text(order.referenceCode, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            StatusBadge(order.status.labelMs, tone = order.status.tone())
+        }
+        Spacer(Modifier.height(8.dp))
+        order.items.forEach { item ->
+            Row(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    "${item.quantity}x ${item.titleSnapshot}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(item.lineTotalSen.format(), style = MaterialTheme.typography.bodyMedium)
+            }
+        }
+        HorizontalDivider(Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
+        Row(modifier = Modifier.fillMaxWidth()) {
+            Text(
+                stringResource(R.string.sales_order_total),
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1f),
+            )
+            Text(order.totalSen.format(), style = MaterialTheme.typography.titleMedium)
+        }
+    }
+}
+
+private fun OrderStatus.tone(): BadgeTone = when (this) {
+    OrderStatus.SETTLED, OrderStatus.FULFILLED -> BadgeTone.POSITIVE
+    OrderStatus.PAYMENT_FAILED, OrderStatus.EXPIRED, OrderStatus.REJECTED_BY_SELLER,
+    OrderStatus.CANCELLED, OrderStatus.REFUNDED, OrderStatus.PARTIALLY_REFUNDED,
+    -> BadgeTone.ERROR
+    OrderStatus.CREATED, OrderStatus.PENDING_PAYMENT -> BadgeTone.NEUTRAL
+    OrderStatus.PAID, OrderStatus.ACCEPTED, OrderStatus.PREPARING, OrderStatus.READY_FOR_PICKUP -> BadgeTone.WARNING
 }
 
 @Composable
