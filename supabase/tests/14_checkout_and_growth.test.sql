@@ -118,8 +118,15 @@ SELECT is((SELECT total_sen FROM public.orders WHERE id=tests.uid('_order1')),
   8000::bigint, 'total equals goods_subtotal_sen when no voucher is applied');
 SELECT is((SELECT count(*)::int FROM public.order_items WHERE order_id=tests.uid('_order1')),
   2, 'one order_item per distinct cart line');
+
+-- inventory_own's RLS (0001_schema.sql) scopes SELECT to the owning seller,
+-- with no admin clause -- aisyah (the buyer, still authenticated) cannot
+-- see siti's inventory row at all, real or not. Check it as postgres.
+SELECT tests.clear_auth();
 SELECT is((SELECT reserved FROM public.inventory WHERE product_id=tests.uid('_p_tracked')),
   2, 'stock is reserved only for the inventory-tracked product');
+SELECT tests.authenticate_as('aisyah');
+
 SELECT is((SELECT count(*)::int FROM public.cart_items ci
            JOIN public.carts c ON c.id=ci.cart_id WHERE c.user_id=tests.uid('aisyah')),
   0, 'checkout clears the cart it consumed');
@@ -139,8 +146,11 @@ INSERT INTO public.cart_items (cart_id, product_id, quantity)
 SELECT throws_ok(
   format($$SELECT public.rpc_checkout(%L)$$, tests.uid('_addr')),
   NULL, NULL, 'checkout refuses a quantity exceeding available stock');
+
+SELECT tests.clear_auth();
 SELECT is((SELECT reserved FROM public.inventory WHERE product_id=tests.uid('_p_tracked')),
   2, 'a failed checkout does not leave a partial stock reservation behind');
+SELECT tests.authenticate_as('aisyah');
 DELETE FROM public.cart_items ci USING public.carts c
   WHERE ci.cart_id=c.id AND c.user_id=tests.uid('aisyah');
 
