@@ -3,6 +3,8 @@ package com.ftechsolutions.kasihkirim.ui.profile
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -12,6 +14,8 @@ import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -19,6 +23,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.ftechsolutions.kasihkirim.R
 import com.ftechsolutions.kasihkirim.domain.model.AuthUser
+import com.ftechsolutions.kasihkirim.domain.model.Badge
 import com.ftechsolutions.kasihkirim.domain.model.UserRole
 import com.ftechsolutions.kasihkirim.ui.auth.AuthViewModel
 import com.ftechsolutions.kasihkirim.ui.common.AppCard
@@ -29,16 +34,23 @@ import com.ftechsolutions.kasihkirim.ui.common.StatusBadge
 fun ProfileScreen(
     user: AuthUser,
     vm: AuthViewModel,
+    profileVm: ProfileViewModel,
     onOpenAddresses: () -> Unit,
     onOpenServiceability: () -> Unit,
     onOpenSales: () -> Unit,
 ) {
+    val profileState by profileVm.state.collectAsState()
+
     Column(
         Modifier.fillMaxSize().padding(horizontal = 20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         Spacer(Modifier.height(12.dp))
         IdentityCard(user)
+
+        if (profileState.badges.isNotEmpty()) {
+            BadgesRow(profileState.badges)
+        }
 
         AppCard {
             ActionRow(
@@ -111,6 +123,35 @@ private fun IdentityCard(user: AuthUser) {
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     StatusBadge(user.primaryRole.wire.replaceFirstChar { it.uppercase() }, tone = BadgeTone.INFO)
                     user.accountStatus?.let { StatusBadge(it.replaceFirstChar { c -> c.uppercase() }, tone = BadgeTone.NEUTRAL) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BadgesRow(badges: List<Badge>) {
+    AppCard {
+        Text(stringResource(R.string.profile_badges_title), style = MaterialTheme.typography.titleSmall)
+        Spacer(Modifier.height(10.dp))
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            items(badges, key = { it.slug }) { badge ->
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.secondaryContainer,
+                        modifier = Modifier.size(48.dp),
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(badge.icon, style = MaterialTheme.typography.titleLarge)
+                        }
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        badge.nameMs,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
         }

@@ -97,6 +97,9 @@ private class FakeKirimRepository : KirimRepository {
                 Sen.of(1000), Sen.of(900), Sen.of(90), "2026-09-05T11:15:00Z"),
         )
     )
+
+    override suspend fun listMyInvites() = AppResult.Success(emptyList<com.ftechsolutions.kasihkirim.domain.model.CapacityInvite>())
+    override suspend fun respondToInvite(inviteId: String) = AppResult.Success(Unit)
 }
 
 private class FakeTripRepository : TripRepository {
@@ -109,6 +112,7 @@ private class FakeTripRepository : TripRepository {
     )
     override suspend fun createTrip(draft: NewTripDraft) = throw NotImplementedError("not exercised by these screens")
     override suspend fun acceptOffer(tripId: String, kirimId: String) = AppResult.Success(Unit)
+    override suspend fun sendCapacityInvite(tripId: String) = AppResult.Success(0)
 }
 
 private class FakeAddressRepository : AddressRepository {

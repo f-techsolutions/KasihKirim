@@ -27,6 +27,8 @@ class MainActivity : ComponentActivity() {
                     app.deliveryRepository,
                     app.muatanJualRepository,
                     app.sellerRepository,
+                    app.buyRepository,
+                    app.badgeRepository,
                 )
             }
         }

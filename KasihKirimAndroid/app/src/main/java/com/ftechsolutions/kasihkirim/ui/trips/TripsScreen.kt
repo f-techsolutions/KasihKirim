@@ -52,7 +52,15 @@ fun TripsScreen(vm: TripsViewModel, onOpenVehicles: () -> Unit, onOpenDeliveries
         if (state.trips.isEmpty() && !state.isLoading) {
             item { EmptyStateCard(stringResource(R.string.trips_empty)) }
         }
-        items(state.trips, key = { it.id }) { trip -> TripCard(trip, state.nodeNames) }
+        items(state.trips, key = { it.id }) { trip ->
+            TripCard(
+                trip = trip,
+                nodeNames = state.nodeNames,
+                isSendingInvite = state.sendingInviteForTripId == trip.id,
+                inviteSentCount = state.inviteSentCounts[trip.id],
+                onSendInvite = { vm.sendInvite(trip.id) },
+            )
+        }
 
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -85,7 +93,13 @@ fun TripsScreen(vm: TripsViewModel, onOpenVehicles: () -> Unit, onOpenDeliveries
 }
 
 @Composable
-private fun TripCard(trip: Trip, nodeNames: Map<String, String>) {
+private fun TripCard(
+    trip: Trip,
+    nodeNames: Map<String, String>,
+    isSendingInvite: Boolean,
+    inviteSentCount: Int?,
+    onSendInvite: () -> Unit,
+) {
     AppCard {
         Row(verticalAlignment = Alignment.Top) {
             Text(
@@ -108,6 +122,32 @@ private fun TripCard(trip: Trip, nodeNames: Map<String, String>) {
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+
+        // Ajak Kirim (0006_carrier_commerce.sql): only makes sense while the
+        // trip still has room to fill.
+        if (trip.status == TripStatus.ANNOUNCED || trip.status == TripStatus.BOARDING) {
+            Spacer(Modifier.height(10.dp))
+            OutlinedButton(
+                onClick = onSendInvite,
+                enabled = !isSendingInvite,
+                shape = MaterialTheme.shapes.small,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                if (isSendingInvite) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                } else {
+                    Text(stringResource(R.string.trips_send_invite))
+                }
+            }
+            inviteSentCount?.let {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    stringResource(R.string.trips_invite_sent_count, it),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
     }
 }
 

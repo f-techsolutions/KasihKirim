@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.ftechsolutions.kasihkirim.R
+import com.ftechsolutions.kasihkirim.domain.model.CapacityInvite
 import com.ftechsolutions.kasihkirim.domain.model.KirimSummary
 import com.ftechsolutions.kasihkirim.domain.model.KirimType
 import com.ftechsolutions.kasihkirim.domain.model.Trip
@@ -38,6 +39,19 @@ fun BoardScreen(vm: BoardViewModel, isCarrier: Boolean) {
         item {
             Spacer(Modifier.height(12.dp))
             ScreenHeader(stringResource(R.string.board_title))
+        }
+
+        if (state.invites.isNotEmpty()) {
+            item { ScreenHeader(stringResource(R.string.board_invites_title)) }
+            items(state.invites, key = { it.id }) { invite ->
+                InviteCard(
+                    invite = invite,
+                    nodeNames = state.nodeNames,
+                    hasResponded = invite.id in state.respondedInviteIds,
+                    onRespond = { vm.respondToInvite(invite.id) },
+                )
+            }
+            item { Spacer(Modifier.height(4.dp)) }
         }
 
         if (state.items.isEmpty() && !state.isLoading) {
@@ -125,6 +139,38 @@ private fun BoardCard(
                         Text(stringResource(R.string.board_accept))
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun InviteCard(
+    invite: CapacityInvite,
+    nodeNames: Map<String, String>,
+    hasResponded: Boolean,
+    onRespond: () -> Unit,
+) {
+    AppCard {
+        Text(
+            "${nodeNames[invite.originNodeId] ?: "?"} → ${nodeNames[invite.destNodeId] ?: "?"}",
+            style = MaterialTheme.typography.titleMedium,
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            invite.message ?: stringResource(R.string.board_invite_default_message),
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        Spacer(Modifier.height(10.dp))
+        if (hasResponded) {
+            Text(
+                stringResource(R.string.board_invite_responded),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        } else {
+            OutlinedButton(onClick = onRespond, shape = MaterialTheme.shapes.small, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.board_invite_respond))
             }
         }
     }

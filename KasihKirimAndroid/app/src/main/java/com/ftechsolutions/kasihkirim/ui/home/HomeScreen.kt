@@ -1,9 +1,14 @@
 package com.ftechsolutions.kasihkirim.ui.home
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Storefront
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -17,17 +22,19 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.ftechsolutions.kasihkirim.R
 import com.ftechsolutions.kasihkirim.domain.model.AuthUser
+import com.ftechsolutions.kasihkirim.ui.common.AppCard
 import com.ftechsolutions.kasihkirim.ui.common.EmptyStateCard
 import com.ftechsolutions.kasihkirim.ui.common.GradientHeroCard
 
 @Composable
-fun HomeScreen(user: AuthUser) {
+fun HomeScreen(user: AuthUser, onOpenBuy: () -> Unit) {
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Spacer(Modifier.height(12.dp))
         HeroCard(user)
+        BuyEntryCard(onClick = onOpenBuy)
         // Roles shown for transparency during Phase 1. They come from the JWT
         // claim; they do not grant anything.
         EmptyStateCard(
@@ -35,6 +42,32 @@ fun HomeScreen(user: AuthUser) {
             hint = stringResource(R.string.phase1_placeholder),
         )
         Spacer(Modifier.height(8.dp))
+    }
+}
+
+@Composable
+private fun BuyEntryCard(onClick: () -> Unit) {
+    AppCard {
+        Row(
+            modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.Filled.Storefront, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(stringResource(R.string.home_buy_title), style = MaterialTheme.typography.titleMedium)
+                Text(
+                    stringResource(R.string.home_buy_subtitle),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Icon(
+                Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 

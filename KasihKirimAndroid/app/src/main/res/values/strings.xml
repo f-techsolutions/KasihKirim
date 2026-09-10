@@ -214,4 +214,48 @@
 
     <string name="kirim_weight_hint">Minimum 100g, maksimum 500,000g (500kg)</string>
     <string name="kirim_weight_error">Berat mesti antara 100g hingga 500,000g.</string>
+
+    <string name="trips_send_invite">Hantar Jemputan Ruang</string>
+    <string name="trips_invite_sent_count">Dihantar kepada %1$d orang</string>
+
+    <string name="board_invites_title">Jemputan Ruang Kosong</string>
+    <string name="board_invite_default_message">Ada ruang kosong pada trip ini. Ada apa-apa nak dikirim?</string>
+    <string name="board_invite_respond">Berminat</string>
+    <string name="board_invite_responded">Terima kasih! Guna tab Hantar untuk mulakan kiriman.</string>
+
+    <string name="home_buy_title">Beli-Belah</string>
+    <string name="home_buy_subtitle">Beli produk terus daripada penjual tempatan</string>
+
+    <string name="buy_title">Beli-Belah</string>
+    <string name="buy_search_hint">Cari produk</string>
+    <string name="buy_empty">Tiada produk tersedia buat masa ini.</string>
+    <string name="buy_cart">Troli</string>
+    <string name="buy_cart_empty">Troli anda kosong.</string>
+    <string name="buy_cart_total">Jumlah</string>
+    <string name="buy_add_to_cart">Tambah ke troli</string>
+    <string name="buy_increase_quantity">Tambah kuantiti</string>
+    <string name="buy_decrease_quantity">Kurangkan kuantiti</string>
+    <string name="buy_multi_seller_hint">Troli anda mempunyai produk daripada lebih satu penjual -- setiap penjual akan menjadi pesanan berasingan. Kod baucar hanya boleh digunakan untuk troli satu penjual.</string>
+    <string name="buy_no_address">Sila tambah alamat penghantaran sebelum membeli.</string>
+    <string name="buy_deliver_to">Hantar ke</string>
+    <string name="buy_voucher_code">Kod Baucar (jika ada)</string>
+    <string name="buy_checkout">Bayar</string>
+    <string name="buy_checkout_success">Pesanan Berjaya!</string>
+    <string name="buy_order_total">Jumlah</string>
+    <string name="buy_order_discount">Diskaun</string>
+    <string name="buy_done">Selesai</string>
+
+    <string name="err_cart_empty">Troli anda kosong.</string>
+    <string name="err_product_not_available">Produk ini tidak lagi tersedia.</string>
+    <string name="err_insufficient_stock">Stok tidak mencukupi.</string>
+    <string name="err_voucher_requires_single_seller">Kod baucar hanya boleh digunakan untuk troli satu penjual.</string>
+    <string name="err_voucher_not_found">Kod baucar tidak sah.</string>
+    <string name="err_voucher_already_used">Kod baucar ini sudah digunakan.</string>
+    <string name="err_voucher_expired">Kod baucar sudah luput.</string>
+    <string name="err_voucher_min_order">Jumlah pesanan tidak mencukupi untuk baucar ini.</string>
+    <string name="err_voucher_limit_reached">Anda sudah mencapai had tuntutan baucar ini.</string>
+    <string name="err_campaign_not_active">Kempen baucar ini tidak aktif buat masa ini.</string>
+    <string name="err_campaign_budget_exhausted">Peruntukan kempen baucar ini sudah habis.</string>
+
+    <string name="profile_badges_title">Lencana</string>
 </resources>

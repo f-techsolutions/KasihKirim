@@ -4,7 +4,10 @@ import com.ftechsolutions.kasihkirim.core.result.AppError
 import com.ftechsolutions.kasihkirim.core.result.AppResult
 import com.ftechsolutions.kasihkirim.core.security.SafeLog
 import com.ftechsolutions.kasihkirim.data.remote.SupabaseClientProvider
+import com.ftechsolutions.kasihkirim.data.remote.dto.CapacityInviteDto
 import com.ftechsolutions.kasihkirim.data.remote.dto.KirimRequestDto
+import com.ftechsolutions.kasihkirim.data.remote.dto.NewInviteResponseDto
+import com.ftechsolutions.kasihkirim.domain.model.CapacityInvite
 import com.ftechsolutions.kasihkirim.domain.model.KirimCreated
 import com.ftechsolutions.kasihkirim.domain.model.KirimDraft
 import com.ftechsolutions.kasihkirim.domain.model.KirimQuote
@@ -101,6 +104,31 @@ class KirimRepositoryImpl : KirimRepository {
             }
             .decodeList<KirimRequestDto>()
             .map { it.toDomain() }
+    }
+
+    override suspend fun listMyInvites(): AppResult<List<CapacityInvite>> = runCatchingResult {
+        val now = java.time.Instant.now()
+        SupabaseClientProvider.client.postgrest.from("capacity_invites")
+            .select(columns = Columns.raw("id,message,expires_at,trips(origin_node_id,dest_node_id)")) {
+                order("expires_at", Order.ASCENDING)
+            }
+            .decodeList<CapacityInviteDto>()
+            // Filtered client-side (parsed, not a string compare -- Postgres'
+            // own ISO-8601 rendering and Instant.now().toString() do not
+            // share a format) rather than with a server-side gt() filter on
+            // a timestamp literal -- no proven example of that filter exists
+            // yet in this module (see BuyRepositoryImpl's own note on
+            // textSearch for why an unverified Postgrest-kt call is avoided).
+            .filter { java.time.Instant.parse(it.expiresAt).isAfter(now) }
+            .map { it.toDomain() }
+    }
+
+    override suspend fun respondToInvite(inviteId: String): AppResult<Unit> = runCatchingResult {
+        val userId = SupabaseClientProvider.client.auth.currentUserOrNull()?.id
+            ?: throw IllegalStateException("SESSION_EXPIRED")
+        SupabaseClientProvider.client.postgrest.from("invite_responses")
+            .insert(NewInviteResponseDto(inviteId = inviteId, userId = userId))
+        Unit
     }
 
     private inline fun <T> runCatchingResult(block: () -> T): AppResult<T> =

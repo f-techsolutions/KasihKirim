@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.ftechsolutions.kasihkirim.core.result.AppError
 import com.ftechsolutions.kasihkirim.core.result.AppResult
+import com.ftechsolutions.kasihkirim.domain.model.CapacityInvite
 import com.ftechsolutions.kasihkirim.domain.model.KirimSummary
 import com.ftechsolutions.kasihkirim.domain.model.Trip
 import com.ftechsolutions.kasihkirim.domain.model.TripStatus
@@ -27,6 +28,11 @@ data class BoardUiState(
     /** The Kirim currently being accepted, if any -- disables its own button
      *  only, not the whole board. */
     val acceptingKirimId: String? = null,
+    /** Ajak Kirim (0006_carrier_commerce.sql) invites addressed to the
+     *  caller -- their own community, a direct target, or (for a carrier)
+     *  one they sent. */
+    val invites: List<CapacityInvite> = emptyList(),
+    val respondedInviteIds: Set<String> = emptySet(),
     val error: AppError? = null,
 )
 
@@ -47,6 +53,7 @@ class BoardViewModel(
             _state.update { it.copy(isLoading = true, error = null) }
             val boardResult = kirimRepo.listBoard()
             val tripsResult = if (isCarrier) tripRepo.listMyTrips() else AppResult.Success(emptyList())
+            val invitesResult = kirimRepo.listMyInvites()
             val nodeNames = (addressRepo.searchCommunities("") as? AppResult.Success)?.data
                 ?.mapNotNull { c -> c.nodeId?.let { it to c.name } }
                 ?.toMap()
@@ -65,8 +72,18 @@ class BoardViewModel(
                                 t.status == TripStatus.ANNOUNCED || t.status == TripStatus.BOARDING
                             },
                             nodeNames = nodeNames,
+                            invites = (invitesResult as? AppResult.Success)?.data ?: it.invites,
                         )
                     }
+            }
+        }
+    }
+
+    fun respondToInvite(inviteId: String) {
+        viewModelScope.launch {
+            when (val result = kirimRepo.respondToInvite(inviteId)) {
+                is AppResult.Success -> _state.update { it.copy(respondedInviteIds = it.respondedInviteIds + inviteId) }
+                is AppResult.Failure -> _state.update { it.copy(error = result.error) }
             }
         }
     }

@@ -193,6 +193,17 @@ internal fun AppError.messageRes(): Int = when (this) {
         "BUSINESS_NAME_TOO_SHORT" -> R.string.err_business_name_too_short
         "PRODUCT_NOT_FOUND" -> R.string.err_product_not_found
         "PRODUCT_IMAGE_LIMIT" -> R.string.err_product_image_limit
+        "CART_EMPTY" -> R.string.err_cart_empty
+        "PRODUCT_NOT_AVAILABLE" -> R.string.err_product_not_available
+        "INSUFFICIENT_STOCK" -> R.string.err_insufficient_stock
+        "VOUCHER_REQUIRES_SINGLE_SELLER" -> R.string.err_voucher_requires_single_seller
+        "VOUCHER_NOT_FOUND" -> R.string.err_voucher_not_found
+        "VOUCHER_ALREADY_USED" -> R.string.err_voucher_already_used
+        "VOUCHER_EXPIRED" -> R.string.err_voucher_expired
+        "VOUCHER_MIN_ORDER" -> R.string.err_voucher_min_order
+        "VOUCHER_LIMIT_REACHED" -> R.string.err_voucher_limit_reached
+        "CAMPAIGN_NOT_ACTIVE" -> R.string.err_campaign_not_active
+        "CAMPAIGN_BUDGET_EXHAUSTED" -> R.string.err_campaign_budget_exhausted
         else -> R.string.err_unexpected
     }
     else -> R.string.err_unexpected

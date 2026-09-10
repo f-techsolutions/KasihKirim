@@ -49,6 +49,9 @@ private class FakeKirimRepository(var boardItems: List<KirimSummary> = listOf(BO
     override suspend fun createKirim(submission: com.ftechsolutions.kasihkirim.domain.model.KirimSubmission) = throw NotImplementedError()
     override suspend fun listBoard(): AppResult<List<KirimSummary>> = AppResult.Success(boardItems)
     override suspend fun listMyKirims() = throw NotImplementedError()
+    override suspend fun listMyInvites(): AppResult<List<com.ftechsolutions.kasihkirim.domain.model.CapacityInvite>> =
+        AppResult.Success(emptyList())
+    override suspend fun respondToInvite(inviteId: String) = throw NotImplementedError()
 }
 
 private class FakeTripRepository(
@@ -61,6 +64,7 @@ private class FakeTripRepository(
 
     override suspend fun listMyTrips(): AppResult<List<Trip>> = AppResult.Success(trips)
     override suspend fun createTrip(draft: NewTripDraft) = throw NotImplementedError()
+    override suspend fun sendCapacityInvite(tripId: String) = throw NotImplementedError()
 
     override suspend fun acceptOffer(tripId: String, kirimId: String): AppResult<Unit> {
         acceptCalls++

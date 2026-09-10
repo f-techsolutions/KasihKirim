@@ -67,6 +67,9 @@ data class TripsUiState(
     val isSubmitting: Boolean = false,
     val error: AppError? = null,
     val form: TripFormState = TripFormState(),
+    val sendingInviteForTripId: String? = null,
+    /** trip id -> how many people the last invite for it actually reached. */
+    val inviteSentCounts: Map<String, Int> = emptyMap(),
 )
 
 class TripsViewModel(
@@ -152,6 +155,21 @@ class TripsViewModel(
                     it.copy(isSubmitting = false, trips = listOf(result.data) + it.trips, form = TripFormState())
                 }
                 is AppResult.Failure -> _state.update { it.copy(isSubmitting = false, error = result.error) }
+            }
+        }
+    }
+
+    fun sendInvite(tripId: String) {
+        viewModelScope.launch {
+            _state.update { it.copy(sendingInviteForTripId = tripId, error = null) }
+            when (val result = tripRepo.sendCapacityInvite(tripId)) {
+                is AppResult.Success -> _state.update {
+                    it.copy(
+                        sendingInviteForTripId = null,
+                        inviteSentCounts = it.inviteSentCounts + (tripId to result.data),
+                    )
+                }
+                is AppResult.Failure -> _state.update { it.copy(sendingInviteForTripId = null, error = result.error) }
             }
         }
     }

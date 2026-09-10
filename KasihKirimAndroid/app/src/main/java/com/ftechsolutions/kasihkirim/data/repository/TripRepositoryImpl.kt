@@ -77,6 +77,19 @@ class TripRepositoryImpl : TripRepository {
         Unit
     }
 
+    override suspend fun sendCapacityInvite(tripId: String): AppResult<Int> = runCatchingResult {
+        val json = SupabaseClientProvider.client.postgrest
+            .rpc(
+                "rpc_send_capacity_invite",
+                buildJsonObject {
+                    put("p_trip", tripId)
+                    put("p_audience", "past_senders")
+                },
+            )
+            .decodeAs<JsonObject>()
+        (json["sent"] as? JsonPrimitive)?.content?.toIntOrNull() ?: 0
+    }
+
     /** carrier_id lives only in the JWT the hook mints, never in the SDK's
      *  cached user object -- see SupabaseClientProvider.currentJwtAppMetadata(). */
     private fun requireCarrierId(): String {
