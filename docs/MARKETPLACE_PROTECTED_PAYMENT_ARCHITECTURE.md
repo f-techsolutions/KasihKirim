@@ -556,3 +556,190 @@ Run on a fresh database (all 25 migrations from `0000`, then seed, then helpers)
 | New file against the *original* buggy function | 1 | 40 | **FAIL — 9 assertions**, as intended |
 
 No existing assertion was weakened, changed or removed.
+
+---
+
+# 23. P1 — Marketplace transaction lifecycle (0025–0029)
+
+Section 22 fixed how a marketplace order settles. It could not fix that no marketplace order
+could ever *reach* settlement: nothing created the delivery job, nothing collected the money,
+nothing declared the allocation, and nothing let a customer object. P1 closes that, backend only.
+Real payment activation stays off.
+
+## 23.1 Status of every part
+
+**IMPLEMENTED AND TESTED**
+
+| Capability | Where |
+|---|---|
+| Every product has a stock row; a product with no stock cannot be sold | `0025` |
+| Seller sets and adjusts stock; movements are logged append-only | `0025` |
+| Reservation → sale on pickup, reservation → shelf on cancel | `0025`, `0027` |
+| Checkout prices the carriage leg through the existing quote engine | `0026` |
+| Checkout opens a payment intent on the existing payments table | `0026` |
+| Order → delivery bridge (`PASARAN` kirim carrying `order_id`) | `0027` |
+| Carrier assignment declares the four-way allocation | `0027` |
+| Seller→carrier handover codes, issue and verify | `0028` |
+| COD capture at the doorstep, split into the two escrow accounts | `0027` |
+| Customer confirmation, ownership-checked | `0027` |
+| Customer-raised disputes that freeze settlement | `0028` |
+| Risk holds that freeze settlement | `0029` |
+| 48-hour auto-release sweep, resilient to ineligible rows | `0029` |
+| Ledger-derived earnings for sellers and carriers | `0029` |
+| Full refund as a linked ledger reversal | `0029` |
+
+**SANDBOX / TEST ONLY**
+
+- The prepaid authorisation path. `internal.payments` supports it and
+  `fn_apply_payment_event` already handles an order capture, but no provider is
+  connected and no webhook is wired to a real gateway.
+- `internal.fn_sweep_settlements` is written and tested, and `seed.sql`'s cron entry now
+  points at it, but scheduling only takes effect where `pg_cron` is present. Nothing in
+  these migrations enables it in production.
+
+**NOT ACTIVATED**
+
+- `ref.feature_gates.prepaid_payments_enabled` remains `false` (MJ-01).
+- `ref.app_config.payment_methods_enabled` remains `["COD"]`.
+- Marketplace discounts and vouchers remain refused (§23.8).
+- Partial refunds remain refused (§23.7).
+- No Android marketplace UI. Every RPC below is backend surface only.
+
+## 23.2 The lifecycle
+
+```
+seller sets stock
+      ↓
+customer checks out            rpc_checkout
+  ├─ price snapshotted onto order_items
+  ├─ stock reserved atomically
+  ├─ delivery leg priced        fn_quote_order_delivery
+  ├─ payment intent opened      fn_create_order_payment_intent   → order PENDING_PAYMENT
+  └─ delivery job created       fn_bridge_order_to_delivery      → PASARAN kirim, POSTED
+      ↓
+carrier accepts                rpc_accept_offer                  → delivery MATCHED
+  └─ allocation declared        fn_allocate_order_payment         (HELD, no money moves)
+      ↓
+seller hands over              rpc_issue_handover_code / rpc_verify_handover_code
+      ↓
+CONFIRM_PICKUP (proof)         → PICKED_UP    reservation becomes a sale
+DEPART / START_DELIVERY        → IN_TRANSIT / OUT_FOR_DELIVERY
+CONFIRM_DELIVERY (proof)       → DELIVERED    COD captured, escrow funded, order FULFILLED
+      ↓
+CONFIRM_RECEIPT  ──or──  48h   fn_sweep_settlements
+      ↓
+settlement                     fn_settle_delivery                → order SETTLED
+  ├─ SELLER_PAYABLE
+  ├─ CARRIER_PAYABLE
+  └─ PLATFORM_COMMISSION
+```
+
+No new delivery status was added. There is still no `ACCEPTED`.
+
+## 23.3 Order ↔ payment
+
+One order, one payment intent, on `internal.payments` with `reference_type = 'order'`. There is
+no second payment table and no second state machine. `ref.payment_status` is unchanged: the
+conceptual states map onto values that already exist — `COD_PENDING` for an opened intent,
+`CAPTURED` once money is in hand, `SETTLED` once released, `REFUNDED` once reversed. Reopening
+an intent for an order that already has one returns the existing row rather than creating a
+second claim.
+
+## 23.4 Order ↔ delivery
+
+`public.kirim_requests.order_id` and `ck_pasaran_has_order` have existed since `0001`;
+`fn_bridge_order_to_delivery` is the first thing to use them. The delivery job's weight, volume,
+category, handling flags and corridor are read back from the quote's `input_snapshot` — the same
+snapshot that was priced — so the job that gets carried can never differ from the job that was
+charged for. `deliveries` remains the single authority on delivery state; `orders.status` is a
+projection driven from it, never the reverse.
+
+The bridge runs at intent time, not at capture time, and that ordering is forced rather than
+chosen: the allocation needs a delivery (for the carrier and agent legs), and the capture needs
+the allocation (to split the goods and carriage escrow). So delivery → allocation → capture.
+
+## 23.5 Stock
+
+`public.inventory` is authoritative. A reservation is taken by a single conditional statement —
+the predicate and the write are the same `UPDATE`, so two buyers racing for the last unit cannot
+both win. `ck_inventory_not_oversold` remains the database-level backstop, never the mechanism.
+`internal.fn_adjust_inventory` is the only writer of `on_hand`, and refuses any change that would
+strand a live reservation.
+
+The pre-P1 hole: `rpc_checkout` raised `INSUFFICIENT_STOCK` only when an inventory row existed,
+so a product with no row sold without limit. `0025` guarantees the row for every product, past
+and future, and `0026` removes the escape.
+
+## 23.6 Settlement eligibility
+
+`internal.fn_settlement_blocked_reason` returns `NULL` or the reason. Global to both product
+lines: `ALREADY_SETTLED`, `ESCROW_HELD_BY_DISPUTE`, `RISK_HOLD`. Marketplace-only, deliberately:
+`PROOF_MISSING`, `PAYMENT_MISSING`, `PAYMENT_NOT_HELD`, `ALLOCATION_MISSING`,
+`ALLOCATION_SUM_MISMATCH`, `ALLOCATION_NOT_HELD`. Kirim settlement is byte-identical to what it
+was before `0024`.
+
+The sweep asks this question before attempting anything, and wraps each settlement in its own
+exception block. Under the previous cron statement — a bare `SELECT fn_settle_delivery(id) FROM
+deliveries WHERE …` — one ineligible marketplace order would have aborted the whole statement and
+silently stalled settlement for every other delivery, every ten minutes.
+
+## 23.7 Refunds
+
+`internal.fn_refund_order` reverses the capture entry for entry and links the two transactions
+through `ledger_transactions.reverses_id`. The pair sums to nothing on every account it touched.
+A refunded payment then reads `PAYMENT_NOT_HELD`, so the same money cannot also be settled out to
+the seller and carrier.
+
+Partial refunds are refused. A partial refund is not a reversal; it is a renegotiation of a
+four-way split, and which party gives up which sen is a commercial decision nobody has made.
+Refunding after settlement is refused for the same reason: the money is already credited, and
+clawing it back is a payout adjustment, not a payment reversal.
+
+`internal.fn_refund` (Kirim, `0004`) is untouched.
+
+## 23.8 Discount funding — still unresolved
+
+Unchanged from §22.8, and now enforced one step earlier. `rpc_checkout` refuses a marketplace
+checkout carrying a voucher code, `fn_bridge_order_to_delivery` refuses a discounted order, and
+`fn_allocate_order_payment` refuses it at settlement. Previously the order was accepted and only
+refused at settlement — money in, nothing out.
+
+The question remains: **who funds a marketplace discount?** Seller-funded, platform-funded,
+shared, or campaign-specific. Kirim vouchers are unaffected and keep working.
+
+## 23.9 Security model
+
+Every new function is `SECURITY DEFINER` with `SET search_path = ''`, revoked from `PUBLIC` and
+`anon`, and granted to `authenticated` only where a signed-in user legitimately calls it. The
+`internal` helpers get no grant at all: schema `internal` has no `USAGE` for `anon` or
+`authenticated` (`0000`) and is absent from `config.toml`'s exposed schema list, so it is
+unreachable through PostgREST regardless.
+
+One pre-existing hole was found and closed. `rpc_delivery_transition` checked that the caller
+*held* a role the transition permits, and stopped there. Holding the `customer` role is not the
+same as being *this* delivery's customer: any signed-in customer could `CONFIRM_RECEIPT` a
+stranger's delivery and release a stranger's escrow. The RPC now also checks that the caller is
+the party they claim to be — requester for `customer`, the assigned carrier for `carrier`, the
+order's seller for `seller`. Agent and admin roles stay unrestricted, which is what those roles
+are for.
+
+Handover codes are stored only as a SHA-256 of `delivery:leg:code`, so a digest is useless on any
+other delivery. The table has no SELECT policy and no grant, so it is readable by nobody. A wrong
+code returns a result rather than raising, because a raise would roll back the attempt counter
+and make the five-attempt lockout unreachable.
+
+## 23.10 Verification
+
+Fresh database, all migrations from `0000`, then seed, then helpers:
+
+| | Files | Assertions | Result |
+|---|---|---|---|
+| Baseline (through `0024`) | 17 | 239 | PASS |
+| New P1 coverage (`16`–`21`) | 6 | 169 | PASS |
+| **Total** | **23** | **408** | **PASS** |
+
+Four assertions in `14_checkout_and_growth.test.sql` were rewritten, none weakened. They asserted
+behaviour P1 deliberately changes: that `total_sen` equals the goods subtotal (it now includes the
+delivery fee), that a product without an inventory row is not stock-tracked (every product now is),
+and that a voucher discount is applied to a marketplace order (it is now refused). Each was
+replaced by an assertion of the new, stricter behaviour.

@@ -179,9 +179,13 @@ BEGIN
     $j$UPDATE public.price_variances SET status='TIMED_OUT', responded_at=now()
        WHERE status='PENDING' AND expires_at < now()$j$);
 
+  -- 0029: the sweep, not a bare SELECT over fn_settle_delivery. Since 0024
+  -- gave settlement real eligibility rules, an ineligible marketplace order
+  -- RAISES -- and a raise inside a set-returning SELECT aborts the whole
+  -- statement, silently stalling every other delivery in the batch. The
+  -- sweep checks eligibility first and contains a per-row failure.
   PERFORM cron.schedule('settle_delivered','*/10 * * * *',
-    $j$SELECT internal.fn_settle_delivery(id) FROM public.deliveries
-       WHERE status='DELIVERED' AND settlement_due_at < now()$j$);
+    $j$SELECT internal.fn_sweep_settlements()$j$);
 
   PERFORM cron.schedule('reconcile_ledger','0 2 * * *',
     $j$INSERT INTO internal.job_runs (job_name,ended_at,outcome,detail)
