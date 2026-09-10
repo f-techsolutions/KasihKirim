@@ -15,6 +15,7 @@
     <string name="err_invalid_email">Sila masukkan e-mel yang sah.</string>
     <string name="err_password_short">Kata laluan mesti sekurang-kurangnya 8 aksara.</string>
     <string name="err_credentials">E-mel atau kata laluan salah.</string>
+    <string name="err_email_not_confirmed">Sila sahkan e-mel anda dahulu. Semak peti masuk anda untuk pautan pengesahan.</string>
     <string name="err_network">Tiada talian. Sila cuba lagi.</string>
     <string name="err_unexpected">Ada masalah. Sila cuba lagi.</string>
     <string name="err_not_configured">Aplikasi belum dikonfigurasi. Sila hubungi sokongan.</string>
@@ -30,6 +31,7 @@
     <string name="nav_sales">Jualan</string>
 
     <string name="phase1_placeholder">Skrin ini akan dibina dalam fasa seterusnya.</string>
+    <string name="home_more_soon_title">Lagi ciri akan datang</string>
 
     <string name="back">Kembali</string>
 
@@ -39,10 +41,12 @@
     <string name="addresses_label">Label (cth. Rumah)</string>
     <string name="addresses_recipient_name">Nama Penerima</string>
     <string name="addresses_recipient_phone">Telefon Penerima</string>
+    <string name="addresses_phone_format_hint">Format: +60 diikuti nombor telefon, cth. +60111234567</string>
+    <string name="addresses_phone_format_error">Nombor tidak sah. Guna format +60111234567.</string>
     <string name="addresses_community">Kampung / Pekan</string>
     <string name="addresses_landmark">Petunjuk Lokasi</string>
     <string name="addresses_save">Simpan Alamat</string>
-    <string name="addresses_default_badge">(Utama)</string>
+    <string name="addresses_default_badge">Utama</string>
     <string name="addresses_set_default">Jadikan Utama</string>
     <string name="addresses_delete">Padam</string>
     <string name="addresses_edit">Kemas Kini</string>
@@ -75,6 +79,9 @@
     <string name="kirim_quote_goods">Bajet barang: %1$s</string>
     <string name="kirim_quote_delivery">Yuran penghantaran: %1$s</string>
     <string name="kirim_quote_total">Jumlah: %1$s</string>
+    <string name="kirim_quote_goods_label">Bajet barang</string>
+    <string name="kirim_quote_delivery_label">Yuran penghantaran</string>
+    <string name="kirim_quote_total_label">Jumlah</string>
     <string name="kirim_item_description">Perihal Barang</string>
     <string name="kirim_origin_address">Alamat Ambil</string>
     <string name="kirim_dest_address">Alamat Hantar</string>
@@ -105,6 +112,52 @@
     <string name="deliveries_empty">Tiada penghantaran lagi.</string>
     <string name="deliveries_carrier_earning">Pendapatan carrier: %1$s</string>
     <string name="err_delivery_not_found">Penghantaran tidak dijumpai.</string>
+    <string name="err_photo_path_required">Sila ambil gambar bukti dahulu.</string>
+    <string name="err_proof_required">Bukti belum berjaya dihantar. Sila cuba ambil gambar semula.</string>
+    <string name="err_seller_application_exists">Anda sudah memohon menjadi penjual.</string>
+    <string name="err_community_not_found">Kampung / pekan tidak sah.</string>
+    <string name="err_business_name_too_short">Nama perniagaan terlalu pendek.</string>
+    <string name="err_product_not_found">Produk tidak dijumpai.</string>
+    <string name="err_product_image_limit">Had 6 gambar bagi setiap produk.</string>
+
+    <string name="sales_title">Jualan Saya</string>
+    <string name="sales_apply_intro">Mohon menjadi penjual untuk mula menyenaraikan produk anda. Permohonan akan disemak oleh pentadbir.</string>
+    <string name="sales_business_name">Nama Perniagaan</string>
+    <string name="sales_ssm_reg_no">No. Pendaftaran SSM (jika ada)</string>
+    <string name="sales_community">Kampung / Pekan</string>
+    <string name="sales_apply_submit">Hantar Permohonan</string>
+    <string name="sales_status_pending_hint">Anda akan dapat menyenaraikan produk sebaik sahaja permohonan diluluskan.</string>
+    <string name="sales_no_products">Belum ada produk. Tambah produk pertama anda di bawah.</string>
+    <string name="sales_add_product">Tambah Produk</string>
+    <string name="sales_edit_product">Kemaskini Produk</string>
+    <string name="sales_edit">Ubah</string>
+    <string name="sales_submit_for_review">Hantar untuk Semakan</string>
+    <string name="sales_withdraw">Tarik Balik</string>
+    <string name="sales_pause">Jeda</string>
+    <string name="sales_resume">Aktifkan Semula</string>
+    <string name="sales_revise">Semak Semula</string>
+    <string name="sales_add_photo">Tambah Gambar</string>
+    <string name="sales_remove_photo">Buang Gambar</string>
+    <string name="sales_product_title">Nama Produk</string>
+    <string name="sales_product_description">Keterangan</string>
+    <string name="sales_category_reselect_hint">Sila pilih kategori semula.</string>
+    <string name="sales_product_price">Harga (RM)</string>
+    <string name="sales_product_unit">Unit (cth: kg, biji, ikat)</string>
+    <string name="sales_product_weight">Berat (gram)</string>
+    <string name="sales_product_min_order_qty">Kuantiti Minimum Tempahan</string>
+    <string name="sales_update_product">Kemaskini</string>
+    <string name="sales_save_product">Simpan</string>
+    <string name="sales_cancel">Batal</string>
+    <string name="profile_become_seller">Jadi Penjual</string>
+    <string name="profile_my_sales">Jualan Saya</string>
+    <string name="deliveries_confirm_pickup">Sahkan Ambil</string>
+    <string name="deliveries_confirm_delivery">Sahkan Hantar</string>
+    <string name="deliveries_confirm_return">Sahkan Pulang</string>
+    <string name="deliveries_proof_retake">Ambil Semula</string>
+    <string name="deliveries_proof_submit">Hantar Bukti</string>
+    <string name="deliveries_proof_cancel">Batal</string>
+    <string name="deliveries_proof_title">Gambar Bukti</string>
+    <string name="deliveries_proof_capture_failed">Gagal mengambil gambar. Sila cuba lagi.</string>
 
     <string name="earnings_title">Pendapatan Saya</string>
     <string name="earnings_available">Boleh dikeluarkan</string>
@@ -154,4 +207,55 @@
     <string name="err_capacity_exceeded">Trip ini tidak lagi mempunyai ruang yang cukup.</string>
     <string name="err_trip_not_found">Trip tidak dijumpai.</string>
     <string name="err_trip_not_boarding">Trip ini tidak lagi menerima kirim.</string>
+
+    <string name="picker_search_hint">Taip untuk cari, kemudian ketik nama dari senarai</string>
+    <string name="picker_change">Tukar</string>
+    <string name="picker_not_selected">Sila pilih dari senarai carian.</string>
+
+    <string name="kirim_weight_hint">Minimum 100g, maksimum 500,000g (500kg)</string>
+    <string name="kirim_weight_error">Berat mesti antara 100g hingga 500,000g.</string>
+
+    <string name="trips_send_invite">Hantar Jemputan Ruang</string>
+    <string name="trips_invite_sent_count">Dihantar kepada %1$d orang</string>
+
+    <string name="board_invites_title">Jemputan Ruang Kosong</string>
+    <string name="board_invite_default_message">Ada ruang kosong pada trip ini. Ada apa-apa nak dikirim?</string>
+    <string name="board_invite_respond">Berminat</string>
+    <string name="board_invite_responded">Terima kasih! Guna tab Hantar untuk mulakan kiriman.</string>
+
+    <string name="home_buy_title">Beli-Belah</string>
+    <string name="home_buy_subtitle">Beli produk terus daripada penjual tempatan</string>
+
+    <string name="buy_title">Beli-Belah</string>
+    <string name="buy_search_hint">Cari produk</string>
+    <string name="buy_empty">Tiada produk tersedia buat masa ini.</string>
+    <string name="buy_cart">Troli</string>
+    <string name="buy_cart_empty">Troli anda kosong.</string>
+    <string name="buy_cart_total">Jumlah</string>
+    <string name="buy_add_to_cart">Tambah ke troli</string>
+    <string name="buy_increase_quantity">Tambah kuantiti</string>
+    <string name="buy_decrease_quantity">Kurangkan kuantiti</string>
+    <string name="buy_multi_seller_hint">Troli anda mempunyai produk daripada lebih satu penjual -- setiap penjual akan menjadi pesanan berasingan. Kod baucar hanya boleh digunakan untuk troli satu penjual.</string>
+    <string name="buy_no_address">Sila tambah alamat penghantaran sebelum membeli.</string>
+    <string name="buy_deliver_to">Hantar ke</string>
+    <string name="buy_voucher_code">Kod Baucar (jika ada)</string>
+    <string name="buy_checkout">Bayar</string>
+    <string name="buy_checkout_success">Pesanan Berjaya!</string>
+    <string name="buy_order_total">Jumlah</string>
+    <string name="buy_order_discount">Diskaun</string>
+    <string name="buy_done">Selesai</string>
+
+    <string name="err_cart_empty">Troli anda kosong.</string>
+    <string name="err_product_not_available">Produk ini tidak lagi tersedia.</string>
+    <string name="err_insufficient_stock">Stok tidak mencukupi.</string>
+    <string name="err_voucher_requires_single_seller">Kod baucar hanya boleh digunakan untuk troli satu penjual.</string>
+    <string name="err_voucher_not_found">Kod baucar tidak sah.</string>
+    <string name="err_voucher_already_used">Kod baucar ini sudah digunakan.</string>
+    <string name="err_voucher_expired">Kod baucar sudah luput.</string>
+    <string name="err_voucher_min_order">Jumlah pesanan tidak mencukupi untuk baucar ini.</string>
+    <string name="err_voucher_limit_reached">Anda sudah mencapai had tuntutan baucar ini.</string>
+    <string name="err_campaign_not_active">Kempen baucar ini tidak aktif buat masa ini.</string>
+    <string name="err_campaign_budget_exhausted">Peruntukan kempen baucar ini sudah habis.</string>
+
+    <string name="profile_badges_title">Lencana</string>
 </resources>

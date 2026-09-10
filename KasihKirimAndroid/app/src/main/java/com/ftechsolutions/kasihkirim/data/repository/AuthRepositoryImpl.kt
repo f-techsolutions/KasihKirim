@@ -97,14 +97,26 @@ class AuthRepositoryImpl : AuthRepository {
 /**
  * Roles come from the JWT app_metadata claim written by
  * public.custom_access_token_hook -- never from a client-side table read, and
- * never from user input (§4).
+ * never from user input (§4). Deliberately reads the decoded access token
+ * (SupabaseClientProvider.currentJwtAppMetadata()), not this UserInfo's own
+ * appMetadata field: that field mirrors auth.users.raw_app_meta_data, which
+ * the hook never writes to -- its enrichment only ever lands in the JWT.
  */
-internal fun UserInfo.toAuthUser(): AuthUser {
-    val meta: JsonObject? = appMetadata
-    val roles = (meta?.get("roles") as? JsonArray)
+internal fun UserInfo.toAuthUser(): AuthUser =
+    buildAuthUser(id, email, SupabaseClientProvider.currentJwtAppMetadata())
+
+/**
+ * The actual claim -> AuthUser mapping, split out from [toAuthUser] so it's
+ * unit-testable against a hand-built app_metadata JsonObject without needing
+ * to construct a real UserInfo or touch SupabaseClientProvider's singleton --
+ * see AuthRoleResolutionTest, which exists specifically to protect this
+ * mapping from regressing to reading the wrong metadata source again.
+ */
+internal fun buildAuthUser(id: String, email: String?, appMetadata: JsonObject?): AuthUser {
+    val roles = (appMetadata?.get("roles") as? JsonArray)
         ?.mapNotNull { (it as? JsonPrimitive)?.content }
         .orEmpty()
-    fun str(key: String) = (meta?.get(key) as? JsonPrimitive)?.content?.takeIf { it != "null" }
+    fun str(key: String) = (appMetadata?.get(key) as? JsonPrimitive)?.content?.takeIf { it != "null" }
     return AuthUser(
         id = id,
         email = email,
@@ -117,6 +129,10 @@ internal fun UserInfo.toAuthUser(): AuthUser {
 
 internal fun Throwable.toAppError(): AppError = when {
     this is IOException -> AppError.Network
+    // GoTrue's own literal message for a login attempt on an unconfirmed
+    // account -- checked before the broader "credentials" match below so it
+    // isn't swallowed into a generic wrong-password error.
+    message?.contains("Email not confirmed", true) == true -> AppError.EmailNotConfirmed
     message?.contains("Invalid login", true) == true -> AppError.InvalidCredentials
     message?.contains("credentials", true) == true -> AppError.InvalidCredentials
     message?.contains("timeout", true) == true -> AppError.Timeout

@@ -85,6 +85,12 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
+      # demo/ScreenshotDemoTest renders each screen against fake repositories
+      # (never real Supabase -- there's no seeded account to sign in with
+      # here) and dumps a PNG per screen under the debug app's
+      # externalFilesDir. adb pull runs inside this same script, before the
+      # emulator action tears the device down, since that's the only point
+      # in the job the device still exists.
       - name: Run Compose UI tests on an emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -94,7 +100,9 @@ jobs:
           profile: pixel_6
           disable-animations: true
           working-directory: KasihKirimAndroid
-          script: ./gradlew :app:connectedDebugAndroidTest --no-daemon
+          script: |
+            ./gradlew :app:connectedDebugAndroidTest --no-daemon
+            adb pull /sdcard/Android/data/com.ftechsolutions.kasihkirim.debug/files/demo-screenshots ./demo-screenshots
 
       - name: Upload instrumented test reports (failure only)
         if: failure()
@@ -102,5 +110,13 @@ jobs:
         with:
           name: KasihKirim-instrumented-test-reports
           path: KasihKirimAndroid/app/build/reports/androidTests/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload demo screenshots
+        uses: actions/upload-artifact@v6
+        with:
+          name: KasihKirim-demo-screenshots
+          path: KasihKirimAndroid/demo-screenshots/
           if-no-files-found: warn
           retention-days: 14

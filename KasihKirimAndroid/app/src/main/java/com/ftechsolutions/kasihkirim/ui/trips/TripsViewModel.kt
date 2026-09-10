@@ -67,6 +67,9 @@ data class TripsUiState(
     val isSubmitting: Boolean = false,
     val error: AppError? = null,
     val form: TripFormState = TripFormState(),
+    val sendingInviteForTripId: String? = null,
+    /** trip id -> how many people the last invite for it actually reached. */
+    val inviteSentCounts: Map<String, Int> = emptyMap(),
 )
 
 class TripsViewModel(
@@ -125,6 +128,12 @@ class TripsViewModel(
     fun onDestSelected(community: Community) =
         updateForm { it.copy(selectedDest = community, destResults = emptyList(), destQuery = community.name) }
 
+    fun onOriginCleared() =
+        updateForm { it.copy(selectedOrigin = null, originQuery = "", originResults = emptyList()) }
+
+    fun onDestCleared() =
+        updateForm { it.copy(selectedDest = null, destQuery = "", destResults = emptyList()) }
+
     fun onDepartDateChange(millis: Long?) = updateForm { it.copy(departDateMillis = millis) }
     fun onDepartTimeChange(hour: Int, minute: Int) = updateForm { it.copy(departHour = hour, departMinute = minute) }
 
@@ -146,6 +155,21 @@ class TripsViewModel(
                     it.copy(isSubmitting = false, trips = listOf(result.data) + it.trips, form = TripFormState())
                 }
                 is AppResult.Failure -> _state.update { it.copy(isSubmitting = false, error = result.error) }
+            }
+        }
+    }
+
+    fun sendInvite(tripId: String) {
+        viewModelScope.launch {
+            _state.update { it.copy(sendingInviteForTripId = tripId, error = null) }
+            when (val result = tripRepo.sendCapacityInvite(tripId)) {
+                is AppResult.Success -> _state.update {
+                    it.copy(
+                        sendingInviteForTripId = null,
+                        inviteSentCounts = it.inviteSentCounts + (tripId to result.data),
+                    )
+                }
+                is AppResult.Failure -> _state.update { it.copy(sendingInviteForTripId = null, error = result.error) }
             }
         }
     }

@@ -14,10 +14,13 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.ftechsolutions.kasihkirim.domain.model.AuthUser
 import com.ftechsolutions.kasihkirim.domain.repository.AddressRepository
+import com.ftechsolutions.kasihkirim.domain.repository.BadgeRepository
+import com.ftechsolutions.kasihkirim.domain.repository.BuyRepository
 import com.ftechsolutions.kasihkirim.domain.repository.DeliveryRepository
 import com.ftechsolutions.kasihkirim.domain.repository.EarningsRepository
 import com.ftechsolutions.kasihkirim.domain.repository.KirimRepository
 import com.ftechsolutions.kasihkirim.domain.repository.MuatanJualRepository
+import com.ftechsolutions.kasihkirim.domain.repository.SellerRepository
 import com.ftechsolutions.kasihkirim.domain.repository.TripRepository
 import com.ftechsolutions.kasihkirim.domain.repository.VehicleRepository
 import com.ftechsolutions.kasihkirim.ui.addresses.AddressesScreen
@@ -25,6 +28,8 @@ import com.ftechsolutions.kasihkirim.ui.addresses.AddressesViewModel
 import com.ftechsolutions.kasihkirim.ui.auth.AuthViewModel
 import com.ftechsolutions.kasihkirim.ui.board.BoardScreen
 import com.ftechsolutions.kasihkirim.ui.board.BoardViewModel
+import com.ftechsolutions.kasihkirim.ui.buy.BuyScreen
+import com.ftechsolutions.kasihkirim.ui.buy.BuyViewModel
 import com.ftechsolutions.kasihkirim.ui.deliveries.DeliveriesScreen
 import com.ftechsolutions.kasihkirim.ui.deliveries.DeliveriesViewModel
 import com.ftechsolutions.kasihkirim.ui.earnings.EarningsScreen
@@ -35,6 +40,9 @@ import com.ftechsolutions.kasihkirim.ui.muatanjual.MuatanJualViewModel
 import com.ftechsolutions.kasihkirim.ui.orders.OrdersScreen
 import com.ftechsolutions.kasihkirim.ui.orders.OrdersViewModel
 import com.ftechsolutions.kasihkirim.ui.profile.ProfileScreen
+import com.ftechsolutions.kasihkirim.ui.profile.ProfileViewModel
+import com.ftechsolutions.kasihkirim.ui.sales.SalesScreen
+import com.ftechsolutions.kasihkirim.ui.sales.SalesViewModel
 import com.ftechsolutions.kasihkirim.ui.send.KirimQuoteViewModel
 import com.ftechsolutions.kasihkirim.ui.send.SendScreen
 import com.ftechsolutions.kasihkirim.ui.serviceability.ServiceabilityScreen
@@ -48,6 +56,7 @@ private const val ADDRESSES_ROUTE = "addresses"
 private const val SERVICEABILITY_ROUTE = "serviceability"
 private const val VEHICLES_ROUTE = "vehicles"
 private const val DELIVERIES_ROUTE = "deliveries"
+private const val BUY_ROUTE = "buy"
 
 @Composable
 fun AppNavHost(
@@ -60,6 +69,9 @@ fun AppNavHost(
     tripRepository: TripRepository,
     deliveryRepository: DeliveryRepository,
     muatanJualRepository: MuatanJualRepository,
+    sellerRepository: SellerRepository,
+    buyRepository: BuyRepository,
+    badgeRepository: BadgeRepository,
 ) {
     val nav: NavHostController = rememberNavController()
     val tabs = tabsFor(user.primaryRole)
@@ -79,7 +91,7 @@ fun AppNavHost(
                                 restoreState = true
                             }
                         },
-                        icon = {},
+                        icon = { Icon(d.icon, contentDescription = null) },
                         label = { Text(stringResource(d.labelRes)) },
                     )
                 }
@@ -91,14 +103,28 @@ fun AppNavHost(
             startDestination = tabs.first().route,
             modifier = Modifier.padding(padding),
         ) {
-            composable(Destination.HOME.route) { HomeScreen(user) }
+            composable(Destination.HOME.route) {
+                HomeScreen(user, onOpenBuy = { nav.navigate(BUY_ROUTE) })
+            }
             composable(Destination.PROFILE.route) {
+                val profileVm: ProfileViewModel = viewModel(factory = ProfileViewModel.Factory(badgeRepository))
                 ProfileScreen(
                     user,
                     authViewModel,
+                    profileVm,
                     onOpenAddresses = { nav.navigate(ADDRESSES_ROUTE) },
                     onOpenServiceability = { nav.navigate(SERVICEABILITY_ROUTE) },
+                    onOpenSales = { nav.navigate(Destination.SALES.route) },
                 )
+            }
+            // Jualan Phase B (0020_jualan_checkout_and_growth.sql): browse
+            // active products across all sellers, cart, checkout. Reached
+            // from Home rather than a bottom tab -- the tab row is already
+            // full per role (Destinations.kt), same reasoning as
+            // ADDRESSES_ROUTE/VEHICLES_ROUTE living off Profile/Trips.
+            composable(BUY_ROUTE) {
+                val vm: BuyViewModel = viewModel(factory = BuyViewModel.Factory(buyRepository, addressRepository))
+                BuyScreen(vm, onBack = { nav.popBackStack() })
             }
             composable(ADDRESSES_ROUTE) {
                 val vm: AddressesViewModel = viewModel(factory = AddressesViewModel.Factory(addressRepository))
@@ -150,11 +176,19 @@ fun AppNavHost(
                 val vm: MuatanJualViewModel = viewModel(factory = MuatanJualViewModel.Factory(muatanJualRepository))
                 MuatanJualScreen(vm)
             }
-            // Phase 1 renders an honest placeholder. NOT a mock: it claims
-            // nothing and calls no backend. Selling one's own lots is a
-            // separate, not-yet-scoped surface from Phase 8's browse-only
-            // Muatan Jual screen above.
-            composable(Destination.SALES.route) { PlaceholderScreen(Destination.SALES) }
+            // Jualan Phase A (0016/0017_seller_onboarding.sql): seller
+            // application + product catalog. Reachable from the SALES tab
+            // (sellers only, per tabsFor) and from Profile's "Jadi Penjual"
+            // row (everyone else, so there's actually a way in before the
+            // role is granted) -- same route either way, the screen itself
+            // renders the right state (apply / pending / catalog). Separate
+            // from Phase 8's browse-only Muatan Jual screen above, which is
+            // a different feature (carrier-as-trader, ADDENDUM-COMMERCE.md),
+            // not this one.
+            composable(Destination.SALES.route) {
+                val vm: SalesViewModel = viewModel(factory = SalesViewModel.Factory(sellerRepository, addressRepository))
+                SalesScreen(vm, onBack = { nav.popBackStack() })
+            }
         }
     }
 }

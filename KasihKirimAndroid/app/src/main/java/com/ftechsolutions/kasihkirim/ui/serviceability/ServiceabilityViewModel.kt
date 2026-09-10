@@ -66,6 +66,12 @@ class ServiceabilityViewModel(private val repo: AddressRepository) : ViewModel()
     fun onDestSelected(community: Community) =
         updateForm { it.copy(selectedDest = community, destResults = emptyList(), destQuery = community.name) }
 
+    fun onOriginCleared() =
+        updateForm { it.copy(selectedOrigin = null, originQuery = "", originResults = emptyList()) }
+
+    fun onDestCleared() =
+        updateForm { it.copy(selectedDest = null, destQuery = "", destResults = emptyList()) }
+
     fun check() {
         val form = _state.value.form
         val originId = form.selectedOrigin?.nodeId ?: return

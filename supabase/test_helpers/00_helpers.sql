@@ -35,6 +35,26 @@ BEGIN
     p_phone, now(), '', '{"provider":"phone","providers":["phone"]}'::jsonb, '{}'::jsonb,
     '', '', '', '',
     now(), now());
+  -- 0015_profile_on_auth_signup.sql's tg_auth_users_create_profile trigger
+  -- now fires on the auth.users insert above and creates a placeholder
+  -- profiles row (status 'pending', phone NULL) before this statement runs.
+  --
+  -- An UPSERT (ON CONFLICT DO UPDATE) is the wrong fix here, even though it
+  -- looks right: internal.tg_protect_profile_columns is a BEFORE UPDATE
+  -- trigger (0003_functions_rls.sql) that forces status/phone/rating_*/
+  -- nric_hash back to OLD for anyone who isn't authz.is_admin() -- which is
+  -- everyone here, since this runs with no JWT/request context at all. An
+  -- upsert's UPDATE branch goes straight through that trigger and gets
+  -- silently neutered: confirmed live -- status and phone stayed at the
+  -- trigger's placeholder values while unprotected columns (display_name)
+  -- went through fine, exactly the split PROTECTED/unprotected column list
+  -- predicts, and exactly what broke 02_rls.test.sql's "public projection"
+  -- count and this file's own status assertion in CI.
+  --
+  -- DELETE + a fresh INSERT never touches UPDATE, so the protection trigger
+  -- never fires, and this ends up with the exact row this function has
+  -- always promised (status 'active', not the placeholder 'pending').
+  DELETE FROM public.profiles WHERE id = v_id;
   INSERT INTO public.profiles (id, phone, display_name, status)
   VALUES (v_id, p_phone, p_handle, 'active');
   FOREACH r IN ARRAY p_roles LOOP
