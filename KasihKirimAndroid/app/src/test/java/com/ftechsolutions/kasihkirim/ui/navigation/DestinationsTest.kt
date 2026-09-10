@@ -25,9 +25,12 @@ class DestinationsTest {
         )
     }
 
-    @Test fun `carrier tabs are Utama Trip Pesanan Duit Profil`() {
+    @Test fun `carrier tabs are Utama Papan Trip Pesanan Duit Profil`() {
         assertEquals(
-            listOf(Destination.HOME, Destination.TRIPS, Destination.ORDERS, Destination.EARNINGS, Destination.PROFILE),
+            listOf(
+                Destination.HOME, Destination.BOARD, Destination.TRIPS,
+                Destination.ORDERS, Destination.EARNINGS, Destination.PROFILE,
+            ),
             tabsFor(UserRole.CARRIER),
         )
     }

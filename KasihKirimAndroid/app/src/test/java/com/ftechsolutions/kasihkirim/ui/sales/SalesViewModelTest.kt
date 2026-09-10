@@ -12,6 +12,9 @@ import com.ftechsolutions.kasihkirim.domain.model.ProductImage
 import com.ftechsolutions.kasihkirim.domain.model.ProductStatus
 import com.ftechsolutions.kasihkirim.domain.model.Sen
 import com.ftechsolutions.kasihkirim.domain.model.Seller
+import com.ftechsolutions.kasihkirim.domain.model.SellerOrder
+import com.ftechsolutions.kasihkirim.domain.model.SellerOrderItem
+import com.ftechsolutions.kasihkirim.domain.model.OrderStatus
 import com.ftechsolutions.kasihkirim.domain.model.SellerStatus
 import com.ftechsolutions.kasihkirim.domain.model.Serviceability
 import com.ftechsolutions.kasihkirim.domain.repository.AddressRepository
@@ -47,6 +50,7 @@ private class FakeAddressRepository(var communities: List<Community> = listOf(KE
 private class FakeSellerRepository(
     var seller: Seller? = null,
     var products: List<Product> = emptyList(),
+    var orders: List<SellerOrder> = emptyList(),
     var applyResult: AppResult<Seller>? = null,
     var createProductResult: AppResult<Product>? = null,
 ) : SellerRepository {
@@ -82,6 +86,8 @@ private class FakeSellerRepository(
         AppResult.Success(ProductImage(id = "img1", storagePath = "u/$productId/img1.jpg", sortOrder = sortOrder))
 
     override suspend fun deleteProductImage(imageId: String, storagePath: String): AppResult<Unit> = AppResult.Success(Unit)
+
+    override suspend fun listMyOrders(sellerId: String): AppResult<List<SellerOrder>> = AppResult.Success(orders)
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -158,6 +164,27 @@ class SalesViewModelTest {
         assertEquals(1, vm.state.value.products.size)
         assertEquals("Ikan Bilis", vm.state.value.products.first().title)
         assertNull(vm.state.value.productForm)
+    }
+
+    @Test fun `an approved seller's orders are loaded alongside products, tab defaults to Products`() = runTest(dispatcher) {
+        val order = SellerOrder(
+            id = "o1", referenceCode = "ORD-2609-000001", status = OrderStatus.CREATED,
+            goodsSubtotalSen = Sen(3000), deliveryFeeSen = Sen(0), discountSen = Sen(0), totalSen = Sen(3000),
+            createdAt = "2026-09-10T00:00:00Z",
+            items = listOf(SellerOrderItem(titleSnapshot = "Ikan Bilis", priceSen = Sen(1500), quantity = 2, lineTotalSen = Sen(3000))),
+        )
+        val vm = SalesViewModel(
+            FakeSellerRepository(seller = APPROVED_SELLER, products = listOf(DRAFT_PRODUCT), orders = listOf(order)),
+            FakeAddressRepository(),
+        )
+        advanceUntilIdle()
+
+        assertEquals(SalesTab.PRODUCTS, vm.state.value.selectedTab)
+        assertEquals(1, vm.state.value.orders.size)
+        assertEquals("ORD-2609-000001", vm.state.value.orders.first().referenceCode)
+
+        vm.selectTab(SalesTab.ORDERS)
+        assertEquals(SalesTab.ORDERS, vm.state.value.selectedTab)
     }
 
     @Test fun `setProductStatus calls the repository and reloads the catalog`() = runTest(dispatcher) {

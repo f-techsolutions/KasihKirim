@@ -7,13 +7,14 @@ import com.ftechsolutions.kasihkirim.domain.model.Product
 import com.ftechsolutions.kasihkirim.domain.model.ProductImage
 import com.ftechsolutions.kasihkirim.domain.model.ProductStatus
 import com.ftechsolutions.kasihkirim.domain.model.Seller
+import com.ftechsolutions.kasihkirim.domain.model.SellerOrder
 
 /**
- * Jualan (Sales) Phase A -- seller onboarding and product catalog only.
- * Checkout/orders/payout are a separate, later phase (see
- * docs/CARRIER_DEVICE_VALIDATION.md's "Jualan scope" decision): the
- * public.orders/order_items/inventory tables exist but have no write RPCs
- * yet, so nothing here touches them.
+ * Jualan (Sales) Phase A -- seller onboarding and product catalog.
+ * listMyOrders (Phase B, 0020_jualan_checkout_and_growth.sql) is read-only:
+ * a buyer's rpc_checkout is the only writer of public.orders/order_items,
+ * and no seller fulfillment RPC exists yet -- there is nothing for a seller
+ * to change on an order here, only to see it.
  */
 interface SellerRepository {
     /** null means the caller has never applied. Reads the sellers table
@@ -50,4 +51,7 @@ interface SellerRepository {
     suspend fun uploadProductImage(productId: String, sortOrder: Int, photoBytes: ByteArray): AppResult<ProductImage>
 
     suspend fun deleteProductImage(imageId: String, storagePath: String): AppResult<Unit>
+
+    /** Orders placed against this seller's products, newest first. */
+    suspend fun listMyOrders(sellerId: String): AppResult<List<SellerOrder>>
 }

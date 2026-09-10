@@ -121,6 +121,10 @@
     <string name="err_product_image_limit">Had 6 gambar bagi setiap produk.</string>
 
     <string name="sales_title">Jualan Saya</string>
+    <string name="sales_tab_products">Produk</string>
+    <string name="sales_tab_orders">Pesanan</string>
+    <string name="sales_no_orders">Belum ada pesanan lagi.</string>
+    <string name="sales_order_total">Jumlah</string>
     <string name="sales_apply_intro">Mohon menjadi penjual untuk mula menyenaraikan produk anda. Permohonan akan disemak oleh pentadbir.</string>
     <string name="sales_business_name">Nama Perniagaan</string>
     <string name="sales_ssm_reg_no">No. Pendaftaran SSM (jika ada)</string>

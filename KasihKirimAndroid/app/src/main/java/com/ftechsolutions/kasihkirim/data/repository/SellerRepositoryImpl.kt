@@ -9,12 +9,14 @@ import com.ftechsolutions.kasihkirim.data.remote.dto.ProductDto
 import com.ftechsolutions.kasihkirim.data.remote.dto.ProductImageDto
 import com.ftechsolutions.kasihkirim.data.remote.dto.ProductStatusUpdateDto
 import com.ftechsolutions.kasihkirim.data.remote.dto.SellerDto
+import com.ftechsolutions.kasihkirim.data.remote.dto.SellerOrderDto
 import com.ftechsolutions.kasihkirim.domain.model.NewProduct
 import com.ftechsolutions.kasihkirim.domain.model.NewSeller
 import com.ftechsolutions.kasihkirim.domain.model.Product
 import com.ftechsolutions.kasihkirim.domain.model.ProductImage
 import com.ftechsolutions.kasihkirim.domain.model.ProductStatus
 import com.ftechsolutions.kasihkirim.domain.model.Seller
+import com.ftechsolutions.kasihkirim.domain.model.SellerOrder
 import com.ftechsolutions.kasihkirim.domain.model.Sen
 import com.ftechsolutions.kasihkirim.domain.model.SellerStatus
 import com.ftechsolutions.kasihkirim.domain.repository.SellerRepository
@@ -37,6 +39,10 @@ private const val PRODUCT_COLUMNS =
         "min_order_qty,rejection_reason,product_images(id,storage_path,sort_order)"
 
 private const val PRODUCT_IMAGES_BUCKET = "product-images"
+
+private const val SELLER_ORDER_COLUMNS =
+    "id,reference_code,status,goods_subtotal_sen,delivery_fee_sen,discount_sen,total_sen,created_at," +
+        "order_items(title_snapshot,price_sen,quantity,line_total_sen)"
 
 class SellerRepositoryImpl : SellerRepository {
 
@@ -137,6 +143,16 @@ class SellerRepositoryImpl : SellerRepository {
         SupabaseClientProvider.client.postgrest.from("product_images")
             .delete { filter { eq("id", imageId) } }
         Unit
+    }
+
+    override suspend fun listMyOrders(sellerId: String): AppResult<List<SellerOrder>> = runCatchingResult {
+        SupabaseClientProvider.client.postgrest.from("orders")
+            .select(columns = Columns.raw(SELLER_ORDER_COLUMNS)) {
+                filter { eq("seller_id", sellerId) }
+                order("created_at", Order.DESCENDING)
+            }
+            .decodeList<SellerOrderDto>()
+            .map { it.toDomain() }
     }
 
     private inline fun <T> runCatchingResult(block: () -> T): AppResult<T> =
