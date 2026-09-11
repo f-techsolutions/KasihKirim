@@ -25,6 +25,7 @@ import com.ftechsolutions.kasihkirim.domain.model.Serviceability
 import com.ftechsolutions.kasihkirim.domain.repository.AddressRepository
 import com.ftechsolutions.kasihkirim.domain.repository.EarningsRepository
 import com.ftechsolutions.kasihkirim.domain.repository.SellerRepository
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.*
@@ -66,6 +67,8 @@ private class FakeSellerRepository(
     var orderStatusResult: AppResult<SellerOrderStatus>? = null,
     var openDisputeResult: AppResult<Unit>? = null,
     var archiveResult: AppResult<Unit>? = null,
+    var deleteImageResult: AppResult<Unit>? = null,
+    var deleteImageGate: CompletableDeferred<Unit>? = null,
 ) : SellerRepository {
     var setStatusCalls = 0
     var lastStatus: ProductStatus? = null
@@ -74,6 +77,7 @@ private class FakeSellerRepository(
     var lastAdjustDelta: Int? = null
     var lastArchivedId: String? = null
     var lastDisputeDeliveryId: String? = null
+    var deleteImageCalls = 0
 
     override suspend fun getMySellerApplication(): AppResult<Seller?> = AppResult.Success(seller)
 
@@ -103,7 +107,11 @@ private class FakeSellerRepository(
     override suspend fun uploadProductImage(productId: String, sortOrder: Int, photoBytes: ByteArray): AppResult<ProductImage> =
         AppResult.Success(ProductImage(id = "img1", storagePath = "u/$productId/img1.jpg", sortOrder = sortOrder))
 
-    override suspend fun deleteProductImage(imageId: String, storagePath: String): AppResult<Unit> = AppResult.Success(Unit)
+    override suspend fun deleteProductImage(imageId: String, storagePath: String): AppResult<Unit> {
+        deleteImageCalls++
+        deleteImageGate?.await()
+        return deleteImageResult ?: AppResult.Success(Unit)
+    }
 
     override suspend fun listMyOrders(sellerId: String): AppResult<List<SellerOrder>> = AppResult.Success(orders)
 
@@ -520,5 +528,67 @@ class SalesViewModelTest {
         assertEquals(1, vm.state.value.products.size)
         assertEquals(AppError.Server("PRODUCT_HAS_OPEN_ORDERS"), vm.state.value.error)
         assertFalse(vm.state.value.isArchivingProduct)
+    }
+
+    @Test fun `dismissDisputeConfirm closes the confirmation step without filing anything`() = runTest(dispatcher) {
+        val order = SellerOrder(
+            id = "o1", referenceCode = "ORD-1", status = OrderStatus.FULFILLED,
+            goodsSubtotalSen = Sen(3000), deliveryFeeSen = Sen(0), discountSen = Sen(0), commissionSen = Sen(300),
+            totalSen = Sen(3000), createdAt = "2026-09-10T00:00:00Z", items = emptyList(),
+        )
+        val repo = FakeSellerRepository(seller = APPROVED_SELLER, orders = listOf(order))
+        val vm = SalesViewModel(repo, FakeAddressRepository(), FakeEarningsRepository())
+        advanceUntilIdle()
+
+        vm.selectOrder(order); advanceUntilIdle()
+        vm.openDisputeConfirm()
+        assertTrue(vm.state.value.showDisputeConfirm)
+
+        vm.dismissDisputeConfirm()
+
+        assertFalse(vm.state.value.showDisputeConfirm)
+        assertNull(repo.lastDisputeDeliveryId)
+        assertFalse(vm.state.value.disputeSubmitted)
+    }
+
+    @Test fun `deleteProductImage ignores a second call while the first is still in flight`() = runTest(dispatcher) {
+        val productWithImage = DRAFT_PRODUCT.copy(
+            images = listOf(ProductImage(id = "img1", storagePath = "u/p1/img1.jpg", sortOrder = 0)),
+        )
+        val gate = CompletableDeferred<Unit>()
+        val repo = FakeSellerRepository(seller = APPROVED_SELLER, products = listOf(productWithImage), deleteImageGate = gate)
+        val vm = SalesViewModel(repo, FakeAddressRepository(), FakeEarningsRepository())
+        advanceUntilIdle()
+
+        vm.deleteProductImage("p1", "img1", "u/p1/img1.jpg")
+        runCurrent()
+        assertEquals("img1", vm.state.value.deletingImageId)
+
+        vm.deleteProductImage("p1", "img1", "u/p1/img1.jpg")
+        runCurrent()
+        assertEquals("only the first call should reach the repository", 1, repo.deleteImageCalls)
+
+        gate.complete(Unit)
+        advanceUntilIdle()
+        assertNull(vm.state.value.deletingImageId)
+        assertTrue(vm.state.value.products.first().images.isEmpty())
+    }
+
+    @Test fun `a failed deleteProductImage clears the busy flag, surfaces the error, and keeps the image`() = runTest(dispatcher) {
+        val productWithImage = DRAFT_PRODUCT.copy(
+            images = listOf(ProductImage(id = "img1", storagePath = "u/p1/img1.jpg", sortOrder = 0)),
+        )
+        val repo = FakeSellerRepository(
+            seller = APPROVED_SELLER, products = listOf(productWithImage),
+            deleteImageResult = AppResult.Failure(AppError.Network),
+        )
+        val vm = SalesViewModel(repo, FakeAddressRepository(), FakeEarningsRepository())
+        advanceUntilIdle()
+
+        vm.deleteProductImage("p1", "img1", "u/p1/img1.jpg"); advanceUntilIdle()
+
+        assertNull(vm.state.value.deletingImageId)
+        assertEquals(AppError.Network, vm.state.value.error)
+        assertEquals(1, vm.state.value.products.first().images.size)
     }
 }

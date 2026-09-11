@@ -317,7 +317,9 @@ private fun OrdersListScreen(vm: SalesViewModel) {
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         item { Spacer(Modifier.height(4.dp)) }
-        if (state.orders.isEmpty() && !state.isLoadingOrders) {
+        if (state.isLoadingOrders && state.orders.isEmpty()) {
+            item { Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
+        } else if (state.orders.isEmpty()) {
             item {
                 AppCard {
                     Text(stringResource(R.string.sales_no_orders), style = MaterialTheme.typography.bodyMedium)
@@ -437,6 +439,12 @@ private fun OrderDetailSheet(vm: SalesViewModel) {
                         shape = MaterialTheme.shapes.medium,
                         modifier = Modifier.fillMaxWidth().heightIn(min = 46.dp),
                     ) { Text(stringResource(R.string.sales_order_dispute_confirm)) }
+                    Spacer(Modifier.height(6.dp))
+                    TextButton(
+                        onClick = vm::dismissDisputeConfirm,
+                        enabled = !state.isFilingDispute,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text(stringResource(R.string.sales_cancel)) }
                 }
             } else if (state.disputeSubmitted) {
                 Text(stringResource(R.string.sales_order_dispute_submitted), color = MaterialTheme.colorScheme.primary)
@@ -478,7 +486,9 @@ private fun ProductCatalogScreen(vm: SalesViewModel) {
     ) {
         item { Spacer(Modifier.height(4.dp)) }
 
-        if (state.products.isEmpty() && state.productForm == null) {
+        if (state.isLoading) {
+            item { Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
+        } else if (state.products.isEmpty() && state.productForm == null) {
             item {
                 AppCard {
                     Text(stringResource(R.string.sales_no_products), style = MaterialTheme.typography.bodyMedium)
@@ -490,6 +500,7 @@ private fun ProductCatalogScreen(vm: SalesViewModel) {
                 product = product,
                 isTransitioning = state.transitioningProductId == product.id,
                 isUploadingImage = state.uploadingImageForProductId == product.id,
+                deletingImageId = state.deletingImageId,
                 onEdit = { vm.openEditProductForm(product) },
                 onSubmitForReview = { vm.setProductStatus(product.id, ProductStatus.PENDING_REVIEW) },
                 onWithdraw = { vm.setProductStatus(product.id, ProductStatus.DRAFT) },
@@ -659,6 +670,7 @@ private fun ProductCard(
     product: Product,
     isTransitioning: Boolean,
     isUploadingImage: Boolean,
+    deletingImageId: String?,
     onEdit: () -> Unit,
     onSubmitForReview: () -> Unit,
     onWithdraw: () -> Unit,
@@ -728,14 +740,21 @@ private fun ProductCard(
                             Icon(Icons.Filled.Photo, contentDescription = null)
                         }
                     }
+                    val isDeletingThisImage = deletingImageId == image.id
                     Surface(
                         shape = CircleShape,
                         color = MaterialTheme.colorScheme.surface,
                         modifier = Modifier
                             .size(18.dp)
-                            .clickable { onDeleteImage(image.id, image.storagePath) },
+                            .clickable(enabled = deletingImageId == null) { onDeleteImage(image.id, image.storagePath) },
                     ) {
-                        Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.sales_remove_photo), modifier = Modifier.padding(2.dp))
+                        if (isDeletingThisImage) {
+                            Box(Modifier.padding(2.dp), contentAlignment = Alignment.Center) {
+                                CircularProgressIndicator(modifier = Modifier.size(10.dp), strokeWidth = 1.dp)
+                            }
+                        } else {
+                            Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.sales_remove_photo), modifier = Modifier.padding(2.dp))
+                        }
                     }
                 }
             }

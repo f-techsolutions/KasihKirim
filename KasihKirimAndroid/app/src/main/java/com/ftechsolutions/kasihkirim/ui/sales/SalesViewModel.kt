@@ -118,6 +118,7 @@ data class SalesUiState(
     val productForm: ProductFormState? = null,
     val transitioningProductId: String? = null,
     val uploadingImageForProductId: String? = null,
+    val deletingImageId: String? = null,
     // ── Dashboard (0035) ──────────────────────────────────────────────────
     val dashboard: SellerDashboard? = null,
     val isLoadingDashboard: Boolean = false,
@@ -346,16 +347,19 @@ class SalesViewModel(
     }
 
     fun deleteProductImage(productId: String, imageId: String, storagePath: String) {
+        if (_state.value.deletingImageId != null) return
         viewModelScope.launch {
+            _state.update { it.copy(deletingImageId = imageId, error = null) }
             when (val result = sellerRepo.deleteProductImage(imageId, storagePath)) {
                 is AppResult.Success -> _state.update {
                     it.copy(
+                        deletingImageId = null,
                         products = it.products.map { p ->
                             if (p.id == productId) p.copy(images = p.images.filterNot { img -> img.id == imageId }) else p
                         },
                     )
                 }
-                is AppResult.Failure -> _state.update { it.copy(error = result.error) }
+                is AppResult.Failure -> _state.update { it.copy(deletingImageId = null, error = result.error) }
             }
         }
     }
