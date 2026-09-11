@@ -31,7 +31,7 @@ private val COD_ORDER = BuyOrder(
 
 private val ONLINE_ORDER = COD_ORDER.copy(id = "o2", referenceCode = "ORD-2", paymentMethod = "FPX")
 
-private class FakeBuyRepository(
+private class FakeBuyOrdersRepository(
     var orders: List<BuyOrder> = listOf(COD_ORDER),
     var deliveryStatusResult: AppResult<DeliveryStatusInfo?>? = null,
     var paymentStatusResult: AppResult<PaymentStatusInfo>? = null,
@@ -89,7 +89,7 @@ class BuyOrdersViewModelTest {
     @After fun tearDown() = Dispatchers.resetMain()
 
     @Test fun `orders load on init`() = runTest(dispatcher) {
-        val vm = BuyOrdersViewModel(FakeBuyRepository())
+        val vm = BuyOrdersViewModel(FakeBuyOrdersRepository())
         advanceUntilIdle()
 
         assertEquals(1, vm.state.value.orders.size)
@@ -97,7 +97,7 @@ class BuyOrdersViewModelTest {
     }
 
     @Test fun `a failed order load surfaces the error`() = runTest(dispatcher) {
-        val repo = object : BuyRepository by FakeBuyRepository() {
+        val repo = object : BuyRepository by FakeBuyOrdersRepository() {
             override suspend fun listMyOrders() = AppResult.Failure(AppError.Network)
         }
         val vm = BuyOrdersViewModel(repo)
@@ -108,7 +108,7 @@ class BuyOrdersViewModelTest {
     }
 
     @Test fun `selectOrder loads delivery status but not payment status for a COD order`() = runTest(dispatcher) {
-        val repo = FakeBuyRepository()
+        val repo = FakeBuyOrdersRepository()
         val vm = BuyOrdersViewModel(repo)
         advanceUntilIdle()
 
@@ -122,7 +122,7 @@ class BuyOrdersViewModelTest {
     }
 
     @Test fun `selectOrder loads both payment and delivery status for a non-COD order`() = runTest(dispatcher) {
-        val repo = FakeBuyRepository(orders = listOf(ONLINE_ORDER))
+        val repo = FakeBuyOrdersRepository(orders = listOf(ONLINE_ORDER))
         val vm = BuyOrdersViewModel(repo)
         advanceUntilIdle()
 
@@ -133,7 +133,7 @@ class BuyOrdersViewModelTest {
     }
 
     @Test fun `a null delivery status means the order has no kirim yet, not an error`() = runTest(dispatcher) {
-        val repo = FakeBuyRepository(deliveryStatusResult = AppResult.Success(null))
+        val repo = FakeBuyOrdersRepository(deliveryStatusResult = AppResult.Success(null))
         val vm = BuyOrdersViewModel(repo)
         advanceUntilIdle()
 
@@ -145,7 +145,7 @@ class BuyOrdersViewModelTest {
     }
 
     @Test fun `dismissOrderDetail clears the selected order and its delivery status`() = runTest(dispatcher) {
-        val vm = BuyOrdersViewModel(FakeBuyRepository())
+        val vm = BuyOrdersViewModel(FakeBuyOrdersRepository())
         advanceUntilIdle()
 
         vm.selectOrder(COD_ORDER); advanceUntilIdle()
@@ -156,7 +156,7 @@ class BuyOrdersViewModelTest {
     }
 
     @Test fun `submitDispute sends the selected order's id and category`() = runTest(dispatcher) {
-        val repo = FakeBuyRepository()
+        val repo = FakeBuyOrdersRepository()
         val vm = BuyOrdersViewModel(repo)
         advanceUntilIdle()
 
@@ -174,7 +174,7 @@ class BuyOrdersViewModelTest {
     }
 
     @Test fun `a failed dispute surfaces the error and keeps the form open`() = runTest(dispatcher) {
-        val repo = FakeBuyRepository(disputeResult = AppResult.Failure(AppError.Server("DELIVERY_NOT_FOUND")))
+        val repo = FakeBuyOrdersRepository(disputeResult = AppResult.Failure(AppError.Server("DELIVERY_NOT_FOUND")))
         val vm = BuyOrdersViewModel(repo)
         advanceUntilIdle()
 
@@ -187,7 +187,7 @@ class BuyOrdersViewModelTest {
     }
 
     @Test fun `payNow opens the hosted payment page`() = runTest(dispatcher) {
-        val vm = BuyOrdersViewModel(FakeBuyRepository(orders = listOf(ONLINE_ORDER)))
+        val vm = BuyOrdersViewModel(FakeBuyOrdersRepository(orders = listOf(ONLINE_ORDER)))
         advanceUntilIdle()
 
         vm.payNow("o2"); advanceUntilIdle()
