@@ -228,9 +228,12 @@ SELECT throws_ok(
   format($$SELECT public.rpc_delivery_transition(%L,'OPEN_DISPUTE')$$, tests.uid('_delivery2')),
   NULL, NULL, 'TEST 5f: a seller cannot act on another seller''s order');
 
--- The bare transition moves the delivery but files nothing: rpc_open_dispute
--- is what creates the row fn_settlement_blocked_reason actually checks. It
--- accepts a delivery already at DISPUTED, so the buyer can still file.
+-- 0032: the bare transition above now leaves its own disputes row (raised by
+-- the seller, with a coerced category/description) rather than filing
+-- nothing, so settlement is already blocked at this point too. The buyer can
+-- still file afterwards -- rpc_open_dispute accepts a delivery already at
+-- DISPUTED -- and 0032's dedup hands them the existing row rather than
+-- raising DISPUTE_ALREADY_OPEN, since that row was not raised_by them.
 SELECT tests.authenticate_as('aisyah');
 DO $$ DECLARE r JSONB; BEGIN
   r := public.rpc_open_dispute(tests.uid('_delivery'),'damaged',

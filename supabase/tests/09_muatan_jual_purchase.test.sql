@@ -6,7 +6,7 @@
 -- what -- see 0013's own header comment for the full diagnosis.
 -- ============================================================================
 BEGIN;
-SELECT plan(13);
+SELECT plan(16);
 SELECT tests.clear_auth();      -- deterministic role: start as postgres
 SELECT tests.seed_fixture();
 SELECT tests.clear_auth();
@@ -34,6 +34,25 @@ BEGIN
   INSERT INTO tests.handles (handle,user_id) VALUES ('_mjseller',v_seller),('_mjlot',v_lot)
   ON CONFLICT (handle) DO UPDATE SET user_id=EXCLUDED.user_id;
 END $$;
+
+-- ── 0033: an unauthenticated caller is refused explicitly ──────────────────
+-- rpc_buy_from_lot read auth.uid() but never checked it for NULL; PUBLIC
+-- EXECUTE was also never revoked on this function (0006/0013 both missed
+-- it), so an anon PostgREST call reached this far. Final P1 audit closes
+-- both. Tests run as postgres, which bypasses grants entirely, so the grant
+-- itself is checked directly via has_function_privilege rather than by
+-- attempting the call as anon.
+SELECT ok(NOT has_function_privilege('anon',
+            'public.rpc_buy_from_lot(uuid,numeric,text)', 'EXECUTE'),
+  '0033a: anon no longer has EXECUTE on rpc_buy_from_lot');
+SELECT ok(NOT has_function_privilege('anon',
+            'public.rpc_send_capacity_invite(uuid,text,uuid,uuid,text)', 'EXECUTE'),
+  '0033b: anon no longer has EXECUTE on rpc_send_capacity_invite either');
+
+SELECT tests.clear_auth();
+SELECT throws_ok(
+  format($$SELECT public.rpc_buy_from_lot(%L, 2)$$, tests.uid('_mjlot')),
+  NULL, NULL, 'an unauthenticated caller is refused before the gate is even checked');
 
 -- ── The gate blocks a purchase while the marketplace is closed ─────────────
 SELECT tests.authenticate_as('aisyah');
