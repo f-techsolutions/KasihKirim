@@ -58,6 +58,10 @@ private class FakeBuyRepository(
     var listings: List<BuyListing> = listOf(LISTING),
     var cart: List<CartLine> = emptyList(),
     var checkoutResult: AppResult<CheckoutResult>? = null,
+    /** When set, addToCart suspends here until the test completes it -- lets
+     *  a test observe the in-flight addingToCartProductId state deterministically,
+     *  the same way a real network call would still be pending on a second tap. */
+    var addToCartGate: CompletableDeferred<Unit>? = null,
 ) : BuyRepository {
     var addToCartCalls = 0
     var checkoutCalls = 0
@@ -65,10 +69,6 @@ private class FakeBuyRepository(
     var lastCheckoutMethod: String? = null
     var paymentIntentUrl: AppResult<String> = AppResult.Success("https://www.billplz-sandbox.com/bills/test")
     var paymentStatus: AppResult<PaymentStatusInfo>? = null
-    /** When set, addToCart suspends here until the test completes it -- lets
-     *  a test observe the in-flight addingToCartProductId state deterministically,
-     *  the same way a real network call would still be pending on a second tap. */
-    var addToCartGate: CompletableDeferred<Unit>? = null
 
     override suspend fun browseProducts(query: String): AppResult<List<BuyListing>> = AppResult.Success(listings)
     override suspend fun getCart(): AppResult<List<CartLine>> = AppResult.Success(cart)
