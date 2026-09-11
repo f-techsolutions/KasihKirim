@@ -51,6 +51,15 @@ ALTER TABLE internal.payments
 -- Reproduced from 0027 with one branch added. COD is byte-identical to
 -- before, including bridging to delivery immediately -- that is what makes
 -- COD safe to hand a carrier without waiting on anything.
+--
+-- Same overload trap as rpc_checkout below: 0027's fn_create_order_payment_intent
+-- takes one argument, so adding p_method here would create a second, separate
+-- function rather than replacing it, leaving a 1-argument call ambiguous
+-- between the two (confirmed by CI: "is not unique" -- not a hypothetical).
+-- Every real caller is this migration's own rpc_checkout, so dropping the old
+-- overload changes nothing for anyone outside this file.
+DROP FUNCTION IF EXISTS internal.fn_create_order_payment_intent(UUID);
+
 CREATE OR REPLACE FUNCTION internal.fn_create_order_payment_intent(
   p_order UUID, p_method TEXT DEFAULT 'COD')
 RETURNS internal.payments
@@ -110,7 +119,7 @@ BEGIN
     RETURNING * INTO pay;
 
     UPDATE public.orders
-       SET status = 'PENDING_PAYMENT', payment_method = p_method, updated_at = now()
+       SET status = 'PENDING_PAYMENT', payment_method = v_enum, updated_at = now()
      WHERE id = p_order;
   END IF;
 
