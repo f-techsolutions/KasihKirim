@@ -107,6 +107,17 @@ private fun BoardCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+        // A PASARAN listing's real cash-handling commitment: rpc_accept_offer
+        // charges the whole order (goods + carriage) as COD the instant this
+        // carrier accepts, not just the delivery_fee_sen shown above.
+        kirim.codTotalSen?.let {
+            Spacer(Modifier.height(2.dp))
+            Text(
+                stringResource(R.string.board_cod_total, it.format()),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
 
         if (isCarrier) {
             if (eligibleTrips.isEmpty()) {

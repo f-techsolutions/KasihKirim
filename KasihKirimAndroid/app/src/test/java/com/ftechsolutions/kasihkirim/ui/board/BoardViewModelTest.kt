@@ -8,6 +8,7 @@ import com.ftechsolutions.kasihkirim.domain.model.KirimSummary
 import com.ftechsolutions.kasihkirim.domain.model.KirimType
 import com.ftechsolutions.kasihkirim.domain.model.NewAddress
 import com.ftechsolutions.kasihkirim.domain.model.NewTripDraft
+import com.ftechsolutions.kasihkirim.domain.model.Sen
 import com.ftechsolutions.kasihkirim.domain.model.Serviceability
 import com.ftechsolutions.kasihkirim.domain.model.Trip
 import com.ftechsolutions.kasihkirim.domain.model.TripStatus
@@ -125,5 +126,21 @@ class BoardViewModelTest {
 
         assertNull(vm.state.value.acceptingKirimId)
         assertEquals(AppError.Server("CAPACITY_EXCEEDED"), vm.state.value.error)
+    }
+
+    @Test fun `a marketplace listing's true COD total is carried through to state unchanged`() = runTest(dispatcher) {
+        val pasaranItem = BOARD_ITEM.copy(
+            id = "k2", kirimType = KirimType.PASARAN, deliveryFeeSen = Sen(500), codTotalSen = Sen(4000),
+        )
+        val vm = BoardViewModel(
+            FakeKirimRepository(boardItems = listOf(BOARD_ITEM, pasaranItem)),
+            FakeTripRepository(), FakeAddressRepository(), isCarrier = true,
+        )
+        advanceUntilIdle()
+
+        val loaded = vm.state.value.items.first { it.id == "k2" }
+        assertEquals(KirimType.PASARAN, loaded.kirimType)
+        assertEquals(Sen(4000), loaded.codTotalSen)
+        assertNull("a BELI/HANTAR item never carries a COD total", vm.state.value.items.first { it.id == "k1" }.codTotalSen)
     }
 }
