@@ -207,6 +207,7 @@ private fun String.labelMs(): String = when (this) {
     "CANCEL" -> "Batal"
     "PROCUREMENT_FAILED" -> "Belian Gagal"
     "REPORT_FAILURE" -> "Lapor Gagal"
+    "RETURN" -> "Pulangkan Barang"
     "DEPART" -> "Berlepas"
     "ARRIVE_HUB" -> "Sampai Hab"
     "LEAVE_HUB" -> "Tinggalkan Hab"

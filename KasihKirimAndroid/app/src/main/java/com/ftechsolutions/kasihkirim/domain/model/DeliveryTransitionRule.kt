@@ -66,6 +66,13 @@ val NON_PROOF_DELIVERY_TRANSITIONS = listOf(
         setOf(UserRole.CUSTOMER, UserRole.CARRIER), ALL_TYPES),
     DeliveryTransitionRule(KirimStatus.FAILED_DELIVERY, "RETRY", KirimStatus.OUT_FOR_DELIVERY,
         setOf(UserRole.CARRIER), ALL_TYPES),
+    // Found in review: seed.sql grants this (FAILED_DELIVERY -> RETURNING),
+    // but no button ever offered it, leaving the already-defined
+    // CONFIRM_RETURN proof step below permanently unreachable -- a carrier
+    // who genuinely cannot redeliver had no in-app way out of FAILED_DELIVERY
+    // beyond RETRY.
+    DeliveryTransitionRule(KirimStatus.FAILED_DELIVERY, "RETURN", KirimStatus.RETURNING,
+        setOf(UserRole.CARRIER), ALL_TYPES),
     DeliveryTransitionRule(KirimStatus.DELIVERED, "CONFIRM_RECEIPT", KirimStatus.COMPLETED,
         setOf(UserRole.CUSTOMER, UserRole.AGENT), ALL_TYPES),
 )

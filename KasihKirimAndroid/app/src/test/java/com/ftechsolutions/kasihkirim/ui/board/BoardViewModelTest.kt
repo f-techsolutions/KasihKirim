@@ -2,6 +2,7 @@ package com.ftechsolutions.kasihkirim.ui.board
 
 import com.ftechsolutions.kasihkirim.core.result.AppError
 import com.ftechsolutions.kasihkirim.core.result.AppResult
+import com.ftechsolutions.kasihkirim.domain.model.CapacityInvite
 import com.ftechsolutions.kasihkirim.domain.model.Community
 import com.ftechsolutions.kasihkirim.domain.model.KirimStatus
 import com.ftechsolutions.kasihkirim.domain.model.KirimSummary
@@ -15,6 +16,7 @@ import com.ftechsolutions.kasihkirim.domain.model.TripStatus
 import com.ftechsolutions.kasihkirim.domain.repository.AddressRepository
 import com.ftechsolutions.kasihkirim.domain.repository.KirimRepository
 import com.ftechsolutions.kasihkirim.domain.repository.TripRepository
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.*
@@ -45,14 +47,29 @@ private class FakeAddressRepository(var communities: List<Community> = listOf(BE
         AppResult.Success(communities.filter { query.isBlank() || it.name.contains(query, ignoreCase = true) })
 }
 
-private class FakeKirimRepository(var boardItems: List<KirimSummary> = listOf(BOARD_ITEM)) : KirimRepository {
+private val INVITE = CapacityInvite(id = "inv1", message = "Ada ruang kosong", originNodeId = "n1", destNodeId = "n2", expiresAt = "2099-01-01T00:00:00Z")
+
+private class FakeKirimRepository(
+    var boardItems: List<KirimSummary> = listOf(BOARD_ITEM),
+    var invites: List<CapacityInvite> = emptyList(),
+    var respondResult: AppResult<Unit>? = null,
+    var respondGate: CompletableDeferred<Unit>? = null,
+) : KirimRepository {
+    var respondCalls = 0
+    var lastRespondedInviteId: String? = null
+
     override suspend fun quoteKirim(draft: com.ftechsolutions.kasihkirim.domain.model.KirimDraft) = throw NotImplementedError()
     override suspend fun createKirim(submission: com.ftechsolutions.kasihkirim.domain.model.KirimSubmission) = throw NotImplementedError()
     override suspend fun listBoard(): AppResult<List<KirimSummary>> = AppResult.Success(boardItems)
     override suspend fun listMyKirims() = throw NotImplementedError()
-    override suspend fun listMyInvites(): AppResult<List<com.ftechsolutions.kasihkirim.domain.model.CapacityInvite>> =
-        AppResult.Success(emptyList())
-    override suspend fun respondToInvite(inviteId: String) = throw NotImplementedError()
+    override suspend fun listMyInvites(): AppResult<List<CapacityInvite>> = AppResult.Success(invites)
+
+    override suspend fun respondToInvite(inviteId: String): AppResult<Unit> {
+        respondCalls++
+        lastRespondedInviteId = inviteId
+        respondGate?.await()
+        return respondResult ?: AppResult.Success(Unit)
+    }
 }
 
 private class FakeTripRepository(
@@ -142,5 +159,54 @@ class BoardViewModelTest {
         assertEquals(KirimType.PASARAN, loaded.kirimType)
         assertEquals(Sen(4000), loaded.codTotalSen)
         assertNull("a BELI/HANTAR item never carries a COD total", vm.state.value.items.first { it.id == "k1" }.codTotalSen)
+    }
+
+    @Test fun `respondToInvite ignores a second tap while the first is still in flight`() = runTest(dispatcher) {
+        val gate = CompletableDeferred<Unit>()
+        val kirimRepo = FakeKirimRepository(invites = listOf(INVITE), respondGate = gate)
+        val vm = BoardViewModel(kirimRepo, FakeTripRepository(), FakeAddressRepository(), isCarrier = true)
+        advanceUntilIdle()
+
+        vm.respondToInvite("inv1")
+        runCurrent()
+        assertEquals("inv1", vm.state.value.respondingInviteId)
+
+        vm.respondToInvite("inv1")
+        runCurrent()
+        assertEquals("only the first tap should reach the repository", 1, kirimRepo.respondCalls)
+
+        gate.complete(Unit)
+        advanceUntilIdle()
+        assertNull(vm.state.value.respondingInviteId)
+        assertTrue("inv1" in vm.state.value.respondedInviteIds)
+    }
+
+    @Test fun `a failed respondToInvite clears the busy flag and surfaces the error`() = runTest(dispatcher) {
+        val kirimRepo = FakeKirimRepository(
+            invites = listOf(INVITE),
+            respondResult = AppResult.Failure(AppError.Network),
+        )
+        val vm = BoardViewModel(kirimRepo, FakeTripRepository(), FakeAddressRepository(), isCarrier = true)
+        advanceUntilIdle()
+
+        vm.respondToInvite("inv1"); advanceUntilIdle()
+
+        assertNull(vm.state.value.respondingInviteId)
+        assertEquals(AppError.Network, vm.state.value.error)
+        assertFalse("inv1" in vm.state.value.respondedInviteIds)
+    }
+
+    @Test fun `respondToInvite clears a stale error left over from an earlier failure`() = runTest(dispatcher) {
+        val tripRepo = FakeTripRepository(acceptResult = AppResult.Failure(AppError.Server("CAPACITY_EXCEEDED")))
+        val kirimRepo = FakeKirimRepository(invites = listOf(INVITE))
+        val vm = BoardViewModel(kirimRepo, tripRepo, FakeAddressRepository(), isCarrier = true)
+        advanceUntilIdle()
+
+        vm.acceptOffer("k1", "t1"); advanceUntilIdle()
+        assertNotNull(vm.state.value.error)
+
+        vm.respondToInvite("inv1"); advanceUntilIdle()
+
+        assertNull("a successful, unrelated invite response should not leave a stale error on screen", vm.state.value.error)
     }
 }

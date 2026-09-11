@@ -33,6 +33,7 @@ data class BoardUiState(
      *  one they sent. */
     val invites: List<CapacityInvite> = emptyList(),
     val respondedInviteIds: Set<String> = emptySet(),
+    val respondingInviteId: String? = null,
     val error: AppError? = null,
 )
 
@@ -80,10 +81,14 @@ class BoardViewModel(
     }
 
     fun respondToInvite(inviteId: String) {
+        if (_state.value.respondingInviteId != null) return
         viewModelScope.launch {
+            _state.update { it.copy(respondingInviteId = inviteId, error = null) }
             when (val result = kirimRepo.respondToInvite(inviteId)) {
-                is AppResult.Success -> _state.update { it.copy(respondedInviteIds = it.respondedInviteIds + inviteId) }
-                is AppResult.Failure -> _state.update { it.copy(error = result.error) }
+                is AppResult.Success -> _state.update {
+                    it.copy(respondingInviteId = null, respondedInviteIds = it.respondedInviteIds + inviteId)
+                }
+                is AppResult.Failure -> _state.update { it.copy(respondingInviteId = null, error = result.error) }
             }
         }
     }

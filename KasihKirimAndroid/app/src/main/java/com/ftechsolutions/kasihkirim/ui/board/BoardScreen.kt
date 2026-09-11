@@ -48,6 +48,7 @@ fun BoardScreen(vm: BoardViewModel, isCarrier: Boolean) {
                     invite = invite,
                     nodeNames = state.nodeNames,
                     hasResponded = invite.id in state.respondedInviteIds,
+                    isResponding = state.respondingInviteId == invite.id,
                     onRespond = { vm.respondToInvite(invite.id) },
                 )
             }
@@ -160,6 +161,7 @@ private fun InviteCard(
     invite: CapacityInvite,
     nodeNames: Map<String, String>,
     hasResponded: Boolean,
+    isResponding: Boolean,
     onRespond: () -> Unit,
 ) {
     AppCard {
@@ -180,8 +182,17 @@ private fun InviteCard(
                 color = MaterialTheme.colorScheme.primary,
             )
         } else {
-            OutlinedButton(onClick = onRespond, shape = MaterialTheme.shapes.small, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.board_invite_respond))
+            OutlinedButton(
+                onClick = onRespond,
+                enabled = !isResponding,
+                shape = MaterialTheme.shapes.small,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                if (isResponding) {
+                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                } else {
+                    Text(stringResource(R.string.board_invite_respond))
+                }
             }
         }
     }
