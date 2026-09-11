@@ -1,7 +1,9 @@
 package com.ftechsolutions.kasihkirim.data.remote.dto
 
 import com.ftechsolutions.kasihkirim.domain.model.BuyListing
+import com.ftechsolutions.kasihkirim.domain.model.BuyOrder
 import com.ftechsolutions.kasihkirim.domain.model.CartLine
+import com.ftechsolutions.kasihkirim.domain.model.OrderStatus
 import com.ftechsolutions.kasihkirim.domain.model.Sen
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -91,3 +93,36 @@ data class NewCartItemDto(
 
 @Serializable
 data class CartItemQuantityDto(val quantity: Int)
+
+/** public.orders, the buyer's own read (orders_select's RLS, 0003) -- no
+ *  embed, unlike SellerOrderDto: order tracking here only needs the header
+ *  row, not the line items. */
+@Serializable
+data class BuyOrderDto(
+    val id: String,
+    @SerialName("reference_code") val referenceCode: String,
+    val status: String,
+    @SerialName("seller_id") val sellerId: String,
+    @SerialName("total_sen") val totalSen: Long,
+    @SerialName("payment_method") val paymentMethod: String?,
+    @SerialName("created_at") val createdAt: String,
+) {
+    fun toDomain() = BuyOrder(
+        id = id,
+        referenceCode = referenceCode,
+        status = OrderStatus.fromWire(status) ?: OrderStatus.CREATED,
+        sellerId = sellerId,
+        totalSen = Sen(totalSen),
+        paymentMethod = paymentMethod,
+        createdAt = createdAt,
+    )
+}
+
+/** id-only projections for the order -> kirim_requests -> deliveries walk
+ *  BuyRepositoryImpl.fileDispute needs to turn an order id into the
+ *  delivery id rpc_open_dispute actually takes. */
+@Serializable
+data class KirimIdDto(val id: String)
+
+@Serializable
+data class DeliveryIdDto(val id: String)

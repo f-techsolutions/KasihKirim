@@ -120,7 +120,9 @@ dependencies {
     implementation(libs.supabase.auth)
     implementation(libs.supabase.postgrest)
     implementation(libs.supabase.storage)
+    implementation(libs.supabase.functions)
     implementation(libs.ktor.okhttp)
+    implementation(libs.androidx.browser)
 
     testImplementation(libs.junit)
     testImplementation(libs.coroutines.test)

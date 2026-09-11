@@ -15,6 +15,7 @@ coroutines      = "1.11.0"
 junit           = "4.13.2"
 androidxJunit   = "1.2.1"
 espresso        = "3.7.0"
+androidxBrowser = "1.8.0"
 
 [libraries]
 androidx-core-ktx        = { module = "androidx.core:core-ktx",                       version.ref = "coreKtx" }
@@ -38,7 +39,15 @@ supabase-bom      = { module = "io.github.jan-tennert.supabase:bom",            
 supabase-auth     = { module = "io.github.jan-tennert.supabase:auth-kt" }
 supabase-postgrest= { module = "io.github.jan-tennert.supabase:postgrest-kt" }
 supabase-storage  = { module = "io.github.jan-tennert.supabase:storage-kt" }
+# P2-A: invokes payment-intent (Edge Function), the only non-Postgrest/Auth/
+# Storage server surface this app calls. Same BOM as the other supabase-kt
+# modules above, so its version always matches theirs.
+supabase-functions= { module = "io.github.jan-tennert.supabase:functions-kt" }
 ktor-okhttp       = { module = "io.ktor:ktor-client-okhttp",                    version.ref = "ktor" }
+# Custom Tabs for the Billplz hosted payment page (P2-A) -- a WebView would
+# have to reimplement TLS/cert-pinning trust and cookie handling that the
+# device's own browser already does correctly.
+androidx-browser  = { module = "androidx.browser:browser",                     version.ref = "androidxBrowser" }
 
 coroutines-test   = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
 junit             = { module = "junit:junit",                                   version.ref = "junit" }

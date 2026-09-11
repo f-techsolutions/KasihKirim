@@ -8,6 +8,7 @@ import io.github.jan.supabase.auth.Auth
 import io.github.jan.supabase.auth.FlowType
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.createSupabaseClient
+import io.github.jan.supabase.functions.Functions
 import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.storage.Storage
 import kotlinx.serialization.json.Json
@@ -64,6 +65,11 @@ object SupabaseClientProvider {
             // Proof-of-delivery photo upload only (the `pod` bucket) -- no
             // other feature in this app touches Storage.
             install(Storage)
+            // payment-intent only (P2-A, sandbox Billplz bill creation).
+            // Attaches the current session's access token the same way
+            // Postgrest does, so a call is authenticated as the signed-in
+            // buyer, never with a service-role credential.
+            install(Functions)
         }
     }
 

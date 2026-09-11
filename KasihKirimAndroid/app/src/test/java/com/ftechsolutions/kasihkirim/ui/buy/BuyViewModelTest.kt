@@ -3,12 +3,14 @@ package com.ftechsolutions.kasihkirim.ui.buy
 import com.ftechsolutions.kasihkirim.core.result.AppError
 import com.ftechsolutions.kasihkirim.core.result.AppResult
 import com.ftechsolutions.kasihkirim.domain.model.Address
+import com.ftechsolutions.kasihkirim.domain.model.BuyOrder
 import com.ftechsolutions.kasihkirim.domain.model.CartLine
 import com.ftechsolutions.kasihkirim.domain.model.CheckoutOrderSummary
 import com.ftechsolutions.kasihkirim.domain.model.CheckoutResult
 import com.ftechsolutions.kasihkirim.domain.model.Community
 import com.ftechsolutions.kasihkirim.domain.model.NewAddress
 import com.ftechsolutions.kasihkirim.domain.model.BuyListing
+import com.ftechsolutions.kasihkirim.domain.model.PaymentStatusInfo
 import com.ftechsolutions.kasihkirim.domain.model.Sen
 import com.ftechsolutions.kasihkirim.domain.model.Serviceability
 import com.ftechsolutions.kasihkirim.domain.repository.AddressRepository
@@ -56,6 +58,9 @@ private class FakeBuyRepository(
     var addToCartCalls = 0
     var checkoutCalls = 0
     var lastCheckoutVoucher: String? = null
+    var lastCheckoutMethod: String? = null
+    var paymentIntentUrl: AppResult<String> = AppResult.Success("https://www.billplz-sandbox.com/bills/test")
+    var paymentStatus: AppResult<PaymentStatusInfo>? = null
 
     override suspend fun browseProducts(query: String): AppResult<List<BuyListing>> = AppResult.Success(listings)
     override suspend fun getCart(): AppResult<List<CartLine>> = AppResult.Success(cart)
@@ -76,9 +81,14 @@ private class FakeBuyRepository(
         return AppResult.Success(Unit)
     }
 
-    override suspend fun checkout(destAddressId: String, voucherCode: String?): AppResult<CheckoutResult> {
+    override suspend fun checkout(
+        destAddressId: String,
+        voucherCode: String?,
+        paymentMethod: String,
+    ): AppResult<CheckoutResult> {
         checkoutCalls++
         lastCheckoutVoucher = voucherCode
+        lastCheckoutMethod = paymentMethod
         return checkoutResult ?: AppResult.Success(
             CheckoutResult(
                 orderGroupId = "g1",
@@ -86,6 +96,7 @@ private class FakeBuyRepository(
                     CheckoutOrderSummary(
                         orderId = "o1", referenceCode = "ORD-1", sellerId = "s1",
                         goodsSubtotalSen = Sen(3000), discountSen = Sen.ZERO, totalSen = Sen(3000),
+                        paymentId = "pay1", paymentStatus = "COD_PENDING", paymentMethod = paymentMethod,
                     ),
                 ),
             ),
@@ -93,6 +104,21 @@ private class FakeBuyRepository(
     }
 
     override suspend fun claimVoucher(campaignId: String) = throw NotImplementedError()
+
+    override suspend fun createPaymentIntent(orderId: String): AppResult<String> = paymentIntentUrl
+
+    override suspend fun getPaymentStatus(orderId: String): AppResult<PaymentStatusInfo> =
+        paymentStatus ?: AppResult.Success(
+            PaymentStatusInfo(
+                paymentId = "pay1", status = "PENDING", method = "FPX",
+                amountSen = Sen(3000), checkoutUrl = null, orderStatus = "PENDING_PAYMENT",
+            ),
+        )
+
+    override suspend fun listMyOrders(): AppResult<List<BuyOrder>> = throw NotImplementedError()
+
+    override suspend fun fileDispute(orderId: String, category: String, description: String) =
+        throw NotImplementedError()
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -162,5 +188,61 @@ class BuyViewModelTest {
         assertEquals(AppError.Server("INSUFFICIENT_STOCK"), vm.state.value.error)
         assertNull(vm.state.value.checkoutResult)
         assertEquals(1, vm.state.value.cart.size)
+    }
+
+    @Test fun `checkout forces COD when the cart spans multiple sellers even if online was selected`() = runTest(dispatcher) {
+        val secondSellerLine = CART_LINE.copy(cartItemId = "ci2", sellerId = "s2", quantity = 1)
+        val repo = FakeBuyRepository(cart = listOf(CART_LINE, secondSellerLine))
+        val vm = BuyViewModel(repo, FakeAddressRepository())
+        advanceUntilIdle()
+
+        vm.onPaymentMethodSelected("FPX")
+        vm.checkout(); advanceUntilIdle()
+
+        assertEquals("COD", repo.lastCheckoutMethod)
+    }
+
+    @Test fun `checkout passes the selected online method for a single-seller cart`() = runTest(dispatcher) {
+        val repo = FakeBuyRepository(cart = listOf(CART_LINE))
+        val vm = BuyViewModel(repo, FakeAddressRepository())
+        advanceUntilIdle()
+
+        vm.onPaymentMethodSelected("FPX")
+        vm.checkout(); advanceUntilIdle()
+
+        assertEquals("FPX", repo.lastCheckoutMethod)
+        assertEquals("FPX", vm.state.value.checkoutResult?.orders?.single()?.paymentMethod)
+    }
+
+    @Test fun `payNow opens the hosted page and stops polling once the payment reaches a terminal status`() = runTest(dispatcher) {
+        val repo = FakeBuyRepository(cart = listOf(CART_LINE)).apply {
+            paymentStatus = AppResult.Success(
+                PaymentStatusInfo(
+                    paymentId = "pay1", status = "SUCCEEDED", method = "FPX",
+                    amountSen = Sen(3000), checkoutUrl = "https://www.billplz-sandbox.com/bills/test",
+                    orderStatus = "PAID",
+                ),
+            )
+        }
+        val vm = BuyViewModel(repo, FakeAddressRepository())
+        advanceUntilIdle()
+
+        vm.payNow("o1"); advanceUntilIdle()
+
+        assertEquals("https://www.billplz-sandbox.com/bills/test", vm.state.value.pendingPaymentUrl)
+        assertEquals("SUCCEEDED", vm.state.value.paymentStatus?.status)
+        assertFalse(vm.state.value.isPollingPayment)
+    }
+
+    @Test fun `onPaymentUrlLaunched consumes the one-shot Custom Tab event`() = runTest(dispatcher) {
+        val repo = FakeBuyRepository(cart = listOf(CART_LINE))
+        val vm = BuyViewModel(repo, FakeAddressRepository())
+        advanceUntilIdle()
+
+        vm.payNow("o1"); advanceUntilIdle()
+        assertNotNull(vm.state.value.pendingPaymentUrl)
+
+        vm.onPaymentUrlLaunched()
+        assertNull(vm.state.value.pendingPaymentUrl)
     }
 }
