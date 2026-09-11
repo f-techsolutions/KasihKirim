@@ -128,18 +128,20 @@ SELECT throws_ok(
     VALUES ('seller', gen_random_uuid(), 500000, gen_random_uuid())$$,
   NULL, NULL, 'TEST K7: nor request a payout for themselves');
 
--- K8/K11 assert the EFFECT, not an exception. On a real Supabase database
--- `authenticated` holds UPDATE on these two tables through the platform's
--- default privileges, so the write is stopped by RLS having no UPDATE policy
--- -- which denies every row rather than raising. Asserting `throws_ok` here
--- passed locally (where the grant is absent) and failed in CI, measuring the
--- environment instead of the control.
-SELECT ok(NOT EXISTS (SELECT 1 FROM pg_policies
-                       WHERE tablename='sellers' AND cmd IN ('UPDATE','ALL')),
-  'TEST K8a: public.sellers has no UPDATE policy, so every row write is denied');
-UPDATE public.sellers SET commission_bps = 0;
-SELECT is((SELECT commission_bps FROM public.sellers WHERE id=tests.uid('_s')),
-  1000, 'TEST K8b: a signed-in user cannot set the commission rate');
+-- K8/K11: 0010's own header is explicit that this project grants nothing to
+-- `authenticated` by default -- "a table receives exactly the privileges for
+-- which an authenticated policy already exists, and nothing more" -- and
+-- public.sellers/public.inventory carry SELECT only (0010 lines 46, 67). So
+-- the write is refused at the GRANT check, before RLS is even evaluated, and
+-- it raises rather than silently affecting zero rows. Assert both: the grant
+-- is genuinely absent (the control), and the attempt raises (the effect).
+SELECT is((SELECT count(*)::int FROM information_schema.role_table_grants
+            WHERE table_schema='public' AND table_name='sellers'
+              AND grantee='authenticated' AND privilege_type='UPDATE'),
+  0, 'TEST K8a: authenticated has no UPDATE grant on public.sellers');
+SELECT throws_ok(
+  $$UPDATE public.sellers SET commission_bps = 0$$,
+  NULL, NULL, 'TEST K8b: a signed-in user cannot set the commission rate');
 
 -- deliveries.status: BR-904 makes fn_delivery_transition its only writer
 SELECT is((SELECT count(*)::int FROM information_schema.role_table_grants
@@ -151,16 +153,13 @@ SELECT throws_ok(
   format($$UPDATE public.deliveries SET status='DELIVERED' WHERE id=%L$$, tests.uid('_delivery')),
   NULL, NULL, 'TEST K10: a delivery cannot be marked delivered by direct table update');
 
-SELECT ok(NOT EXISTS (SELECT 1 FROM pg_policies
-                       WHERE tablename='inventory' AND cmd IN ('UPDATE','ALL')),
-  'TEST K11a: public.inventory has no UPDATE policy either');
-UPDATE public.inventory SET on_hand = 100000;
--- Read it back unprivileged: inventory_own scopes SELECT to the owning
--- seller, so the attacker cannot even see the row they tried to rewrite.
-SELECT tests.clear_auth();
-SELECT is((SELECT on_hand FROM public.inventory WHERE product_id=tests.uid('_p')),
-  10, 'TEST K11b: stock cannot be granted by writing to inventory');
-SELECT tests.authenticate_as('p21_other');
+SELECT is((SELECT count(*)::int FROM information_schema.role_table_grants
+            WHERE table_schema='public' AND table_name='inventory'
+              AND grantee='authenticated' AND privilege_type='UPDATE'),
+  0, 'TEST K11a: authenticated has no UPDATE grant on public.inventory either');
+SELECT throws_ok(
+  $$UPDATE public.inventory SET on_hand = 100000$$,
+  NULL, NULL, 'TEST K11b: nor can stock be granted by writing to inventory');
 
 SELECT throws_ok(
   format($$INSERT INTO public.disputes
