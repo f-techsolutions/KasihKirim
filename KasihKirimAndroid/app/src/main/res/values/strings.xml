@@ -112,6 +112,7 @@
     <string name="deliveries_title">Penghantaran Saya</string>
     <string name="deliveries_empty">Tiada penghantaran lagi.</string>
     <string name="deliveries_carrier_earning">Pendapatan carrier: %1$s</string>
+    <string name="deliveries_cod_amount">COD untuk dikutip: %1$s</string>
     <string name="err_delivery_not_found">Penghantaran tidak dijumpai.</string>
     <string name="err_photo_path_required">Sila ambil gambar bukti dahulu.</string>
     <string name="err_proof_required">Bukti belum berjaya dihantar. Sila cuba ambil gambar semula.</string>
