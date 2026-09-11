@@ -14,6 +14,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.ftechsolutions.kasihkirim.domain.model.AuthUser
 import com.ftechsolutions.kasihkirim.domain.repository.AddressRepository
+import com.ftechsolutions.kasihkirim.domain.repository.AdminRepository
 import com.ftechsolutions.kasihkirim.domain.repository.BadgeRepository
 import com.ftechsolutions.kasihkirim.domain.repository.BuyRepository
 import com.ftechsolutions.kasihkirim.domain.repository.DeliveryRepository
@@ -25,6 +26,8 @@ import com.ftechsolutions.kasihkirim.domain.repository.TripRepository
 import com.ftechsolutions.kasihkirim.domain.repository.VehicleRepository
 import com.ftechsolutions.kasihkirim.ui.addresses.AddressesScreen
 import com.ftechsolutions.kasihkirim.ui.addresses.AddressesViewModel
+import com.ftechsolutions.kasihkirim.ui.admin.AdminScreen
+import com.ftechsolutions.kasihkirim.ui.admin.AdminViewModel
 import com.ftechsolutions.kasihkirim.ui.auth.AuthViewModel
 import com.ftechsolutions.kasihkirim.ui.board.BoardScreen
 import com.ftechsolutions.kasihkirim.ui.board.BoardViewModel
@@ -72,6 +75,7 @@ fun AppNavHost(
     sellerRepository: SellerRepository,
     buyRepository: BuyRepository,
     badgeRepository: BadgeRepository,
+    adminRepository: AdminRepository,
 ) {
     val nav: NavHostController = rememberNavController()
     val tabs = tabsFor(user.primaryRole)
@@ -171,6 +175,14 @@ fun AppNavHost(
             composable(Destination.ORDERS.route) {
                 val vm: OrdersViewModel = viewModel(factory = OrdersViewModel.Factory(kirimRepository, addressRepository))
                 OrdersScreen(vm, onOpenDeliveries = { nav.navigate(DELIVERIES_ROUTE) })
+            }
+            // Review queues (0023_admin_review_surface.sql). The tab is only
+            // in an admin's tab set, but the route is registered for everyone
+            // -- hiding it is convenience, and every read and write behind it
+            // is gated by RLS and each RPC's own is_admin() check.
+            composable(Destination.ADMIN.route) {
+                val vm: AdminViewModel = viewModel(factory = AdminViewModel.Factory(adminRepository))
+                AdminScreen(vm)
             }
             composable(Destination.MUATAN_JUAL.route) {
                 val vm: MuatanJualViewModel = viewModel(factory = MuatanJualViewModel.Factory(muatanJualRepository))

@@ -50,7 +50,13 @@ BEGIN
   INSERT INTO public.products (seller_id, title, category_id, price_sen, weight_grams)
   VALUES (v_seller1, 'Ikan Belum Lulus', v_cat, 700, 400) RETURNING id INTO v_p_draft;
 
-  INSERT INTO public.inventory (product_id, on_hand, reserved) VALUES (v_p_tracked, 5, 0);
+  -- 0025 creates an inventory row for every product on insert, so these set
+  -- the opening quantity rather than introducing the row. v_p_untracked was
+  -- named for the pre-0025 world where a product could have no inventory row
+  -- at all and therefore sold without limit; it is stocked here, and the
+  -- zero-stock case it used to represent is asserted explicitly below.
+  UPDATE public.inventory SET on_hand = 5,  reserved = 0 WHERE product_id = v_p_tracked;
+  UPDATE public.inventory SET on_hand = 10, reserved = 0 WHERE product_id = v_p_untracked;
 
   INSERT INTO public.voucher_campaigns
     (code_prefix, name, discount_type, discount_value, min_order_sen,
@@ -114,8 +120,11 @@ SELECT is((SELECT goods_subtotal_sen FROM public.orders WHERE id=tests.uid('_ord
   8000::bigint, 'checkout prices both lines from the live product row (2x1000 + 3x2000)');
 SELECT is((SELECT commission_sen FROM public.orders WHERE id=tests.uid('_order1')),
   800::bigint, 'commission uses the default_seller_commission_bps config (10% of 8000)');
+-- 0026 prices the carriage leg at checkout; before it, delivery_fee_sen was
+-- written as 0 and the customer was never charged for delivery at all.
 SELECT is((SELECT total_sen FROM public.orders WHERE id=tests.uid('_order1')),
-  8000::bigint, 'total equals goods_subtotal_sen when no voucher is applied');
+  (SELECT 8000 + delivery_fee_sen FROM public.orders WHERE id=tests.uid('_order1')),
+  'total is goods_subtotal_sen plus the server-priced delivery fee');
 SELECT is((SELECT count(*)::int FROM public.order_items WHERE order_id=tests.uid('_order1')),
   2, 'one order_item per distinct cart line');
 
@@ -124,7 +133,7 @@ SELECT is((SELECT count(*)::int FROM public.order_items WHERE order_id=tests.uid
 -- see siti's inventory row at all, real or not. Check it as postgres.
 SELECT tests.clear_auth();
 SELECT is((SELECT reserved FROM public.inventory WHERE product_id=tests.uid('_p_tracked')),
-  2, 'stock is reserved only for the inventory-tracked product');
+  2, 'checkout reserves exactly the quantity ordered');
 SELECT tests.authenticate_as('aisyah');
 
 SELECT is((SELECT count(*)::int FROM public.cart_items ci
@@ -184,30 +193,30 @@ SELECT throws_ok(
   NULL, NULL, 'claiming from an expired campaign is refused');
 
 -- ── checkout with the claimed voucher (single-seller cart) ─────────────────
+-- Until the discount funding policy is decided (0026 header, P1-M), a
+-- marketplace checkout carrying a discount is refused at the door. It used to
+-- be accepted here and then trapped: fn_allocate_order_payment (0024) raises
+-- ALLOCATION_DISCOUNT_UNSUPPORTED, so a discounted order could take the
+-- customer's money and never release it to anyone.
 INSERT INTO public.cart_items (cart_id, product_id, quantity)
   SELECT c.id, tests.uid('_p_untracked'), 1 FROM public.carts c WHERE c.user_id=tests.uid('aisyah');
 
-DO $$
-DECLARE v_result JSONB; v_order UUID; v_code TEXT := current_setting('tests.claimed_voucher_code', true);
-BEGIN
-  v_result := public.rpc_checkout(tests.uid('_addr'), v_code);
-  v_order := (v_result->'orders'->0->>'order_id')::uuid;
-  INSERT INTO tests.handles (handle, user_id) VALUES ('_order2', v_order)
-  ON CONFLICT (handle) DO UPDATE SET user_id=EXCLUDED.user_id;
-END $$;
-
-SELECT is((SELECT discount_sen FROM public.orders WHERE id=tests.uid('_order2')),
-  500::bigint, 'the voucher''s fixed discount is applied to the order');
-SELECT is((SELECT total_sen FROM public.orders WHERE id=tests.uid('_order2')),
-  1500::bigint, 'total_sen reflects goods_subtotal_sen minus the voucher discount (2000 - 500)');
-
--- ── voucher cannot be redeemed twice ────────────────────────────────────────
-INSERT INTO public.cart_items (cart_id, product_id, quantity)
-  SELECT c.id, tests.uid('_p_untracked'), 1 FROM public.carts c WHERE c.user_id=tests.uid('aisyah');
 SELECT throws_ok(
   format($$SELECT public.rpc_checkout(%L, %L)$$,
     tests.uid('_addr'), current_setting('tests.claimed_voucher_code', true)),
-  NULL, NULL, 'reusing an already-redeemed voucher code is refused');
+  NULL, NULL, 'a marketplace checkout carrying a voucher is refused while the funding policy is undefined');
+
+SELECT is((SELECT count(*)::int FROM public.orders WHERE buyer_id=tests.uid('aisyah') AND discount_sen <> 0),
+  0, 'no discounted order is ever persisted');
+
+-- ── the refused checkout consumed nothing ──────────────────────────────────
+-- The voucher is still claimable, the cart is still the buyer's, and no
+-- redemption was recorded: the refusal is clean, not a partial checkout.
+SELECT is((SELECT count(*)::int FROM public.voucher_issuances
+            WHERE user_id=tests.uid('aisyah') AND redeemed_at IS NOT NULL),
+  0, 'a refused marketplace checkout leaves the claimed voucher unredeemed');
+DELETE FROM public.cart_items ci USING public.carts c
+  WHERE ci.cart_id=c.id AND c.user_id=tests.uid('aisyah');
 
 -- ── badge auto-award (0022_deck_badge_awards.sql -- the real, deck-seeded
 --    catalog from supabase/seed.sql, not the three this session first

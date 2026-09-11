@@ -1,6 +1,7 @@
 package com.ftechsolutions.kasihkirim.ui.navigation
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LocalShipping
@@ -30,14 +31,21 @@ enum class Destination(val route: String, val labelRes: Int, val icon: ImageVect
     EARNINGS("earnings", R.string.nav_earnings, Icons.Filled.Payments),
     MUATAN_JUAL("muatan-jual", R.string.nav_muatan_jual, Icons.Filled.Storefront),
     SALES("sales", R.string.nav_sales, Icons.Filled.PointOfSale),
+    ADMIN("admin", R.string.nav_admin, Icons.Filled.AdminPanelSettings),
 }
 
-fun tabsFor(role: UserRole): List<Destination> = when (role) {
-    UserRole.CARRIER -> listOf(
+/** Keyed off UserRole.isAdmin rather than the five admin_* values one by one,
+ *  so a role added server-side (ref.user_role) reaches the review queues
+ *  without a client change -- the queues themselves are RLS-gated anyway. */
+fun tabsFor(role: UserRole): List<Destination> = when {
+    role.isAdmin -> listOf(
+        Destination.HOME, Destination.ADMIN, Destination.PROFILE,
+    )
+    role == UserRole.CARRIER -> listOf(
         Destination.HOME, Destination.BOARD, Destination.TRIPS, Destination.ORDERS,
         Destination.EARNINGS, Destination.PROFILE,
     )
-    UserRole.SELLER -> listOf(
+    role == UserRole.SELLER -> listOf(
         Destination.HOME, Destination.MUATAN_JUAL, Destination.ORDERS,
         Destination.SALES, Destination.PROFILE,
     )
