@@ -141,6 +141,11 @@ INSERT INTO ref.delivery_transition_rules
   ('DELIVERED','CONFIRM_RECEIPT','COMPLETED','{customer,agent}','{BELI,HANTAR,PASARAN}',false,NULL),
   ('DELIVERED','AUTO_SETTLE','COMPLETED','{admin_ops}','{BELI,HANTAR,PASARAN}',false,NULL),
   ('DELIVERED','OPEN_DISPUTE','DISPUTED','{customer,seller,carrier}','{BELI,HANTAR,PASARAN}',false,NULL),
+  -- 0031: DISPUTED used to be a one-way door. Nothing led out of it, so a
+  -- resolved dispute left the money frozen on a delivery that had physically
+  -- completed -- the sweep only looks at DELIVERED.
+  ('DISPUTED','RESOLVE_DISPUTE','DELIVERED','{admin_ops,admin_support,admin_super}','{BELI,HANTAR,PASARAN}',false,NULL),
+  ('DISPUTED','CANCEL','CANCELLED','{admin_ops,admin_super}','{BELI,HANTAR,PASARAN}',false,NULL),
   ('MATCHED','CANCEL','CANCELLED','{customer,carrier,admin_ops}','{BELI,HANTAR,PASARAN}',false,NULL),
   ('AWAITING_PICKUP','CANCEL','CANCELLED','{customer,carrier,admin_ops}','{BELI,HANTAR,PASARAN}',false,NULL)
 ON CONFLICT (from_status,event) DO NOTHING;
