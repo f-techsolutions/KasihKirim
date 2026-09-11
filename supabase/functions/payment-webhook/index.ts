@@ -1,6 +1,7 @@
 import { cors } from '../_shared/http.ts';
 import { adminClient } from '../_shared/clients.ts';
 import { verifyXSignature, normalizeBillplzEvent } from '../_shared/billplz.ts';
+import { logRejectedWebhook, tryExtractId, safeParse } from '../_shared/webhook_audit.ts';
 
 /**
  * No JWT. Authenticated per-provider (see below).
@@ -22,6 +23,7 @@ Deno.serve(async (req) => {
 
   const provider = new URL(req.url).searchParams.get('provider') ?? 'unknown';
   const raw = await req.text();   // raw FIRST -- re-serialising breaks any signature scheme
+  const admin = adminClient();
 
   let eventId: string;
   let normalizedPayload: Record<string, unknown>;
@@ -31,7 +33,14 @@ Deno.serve(async (req) => {
     if (!secret) return new Response('billplz not configured', { status: 401 });
 
     const { valid, fields } = await verifyXSignature(raw, secret);
-    if (!valid) return new Response('invalid signature', { status: 401 });
+    if (!valid) {
+      // Recorded with signature_valid=false so a forged/corrupted callback
+      // leaves an audit trail instead of vanishing at a bare 401 -- fields
+      // is populated regardless of validity (parsing happens before the
+      // HMAC check), so the bill id is still available when present.
+      await logRejectedWebhook(admin, provider, fields.id, fields);
+      return new Response('invalid signature', { status: 401 });
+    }
 
     const event = normalizeBillplzEvent(fields);
     if (!event.id) return new Response('missing bill id', { status: 400 });
@@ -40,14 +49,13 @@ Deno.serve(async (req) => {
   } else {
     const sig = req.headers.get('x-signature') ?? '';
     if (!(await validGenericSignature(raw, sig))) {
+      await logRejectedWebhook(admin, provider, tryExtractId(raw), safeParse(raw));
       return new Response('invalid signature', { status: 401 });
     }
     const event = JSON.parse(raw);
     eventId = event.id;
     normalizedPayload = event;
   }
-
-  const admin = adminClient();
 
   // Insert-first. Returns false when already seen -- idempotency is a
   // UNIQUE constraint, not application logic.
