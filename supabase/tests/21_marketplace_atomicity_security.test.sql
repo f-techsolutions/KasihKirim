@@ -157,8 +157,10 @@ SELECT throws_ok(
 DO $$ BEGIN
   UPDATE public.inventory SET on_hand = 100000;
 EXCEPTION WHEN OTHERS THEN NULL; END $$;
--- Read it back unprivileged: inventory_own scopes SELECT to the owning
--- seller, so the attacker cannot even see the row they tried to rewrite.
+-- inventory_own scopes SELECT to the owning seller, so p21_other (who owns
+-- neither the product nor its inventory row) cannot read it back at all --
+-- reading as postgres instead, to check the true value rather than an
+-- RLS-filtered absence of one.
 SELECT tests.clear_auth();
 SELECT is((SELECT on_hand FROM public.inventory WHERE product_id=tests.uid('_p')),
   10, 'TEST K11: stock cannot be granted by writing to inventory, by grant or by RLS');
