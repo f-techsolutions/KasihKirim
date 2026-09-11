@@ -432,9 +432,9 @@ Notification ladder: push immediately → SMS after 5 minutes unacknowledged →
 
 | # | Method | Endpoint | Type | Notes |
 |---|---|---|---|---|
-| 70 | POST | `/functions/v1/payment-intent` | E 🔒 | Returns the hosted-checkout URL or DuitNow QR payload |
-| 71 | GET | `/functions/v1/payment-status?payment_id=` | E | Poll fallback when the webhook is slow |
-| 72 | **POST** | `/functions/v1/webhooks/payment/{provider}` | E | **No auth — HMAC signature only.** Idempotent by `ux_webhook_idem` |
+| 70 | POST | `/functions/v1/payment-intent` | E 🔒 | Billplz sandbox only today (P2-A). `{order_id}` → hosted-checkout URL. Idempotent: retrying an order that already has a bill returns the same URL |
+| 71 | POST | `/rpc/rpc_get_payment_status` | R 🔒 | Poll fallback when the webhook is slow. Buyer-only, ownership-checked |
+| 72 | **POST** | `/functions/v1/payment-webhook?provider={provider}` | E | **No auth — signature verified per provider inside the function.** Idempotent by the `internal.webhook_events` unique constraint |
 | 73 | GET | `/rpc/my_earnings` | R | Available vs pending |
 | 74 | POST | `/rpc/request_payout` | R 🔒 | `422` if below minimum or bank account unverified |
 | 75 | GET | `/payouts?payee_id=eq.{me}` | P | |
