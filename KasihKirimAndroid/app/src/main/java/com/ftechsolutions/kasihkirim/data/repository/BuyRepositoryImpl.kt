@@ -11,6 +11,7 @@ import com.ftechsolutions.kasihkirim.data.remote.dto.CartItemExistenceDto
 import com.ftechsolutions.kasihkirim.data.remote.dto.CartItemQuantityDto
 import com.ftechsolutions.kasihkirim.data.remote.dto.CartRowDto
 import com.ftechsolutions.kasihkirim.data.remote.dto.DeliveryIdDto
+import com.ftechsolutions.kasihkirim.data.remote.dto.DeliveryStatusRowDto
 import com.ftechsolutions.kasihkirim.data.remote.dto.KirimIdDto
 import com.ftechsolutions.kasihkirim.data.remote.dto.NewCartItemDto
 import com.ftechsolutions.kasihkirim.data.remote.dto.NewCartRowDto
@@ -19,6 +20,8 @@ import com.ftechsolutions.kasihkirim.domain.model.CartLine
 import com.ftechsolutions.kasihkirim.domain.model.CheckoutOrderSummary
 import com.ftechsolutions.kasihkirim.domain.model.CheckoutResult
 import com.ftechsolutions.kasihkirim.domain.model.BuyListing
+import com.ftechsolutions.kasihkirim.domain.model.DeliveryStatusInfo
+import com.ftechsolutions.kasihkirim.domain.model.KirimStatus
 import com.ftechsolutions.kasihkirim.domain.model.PaymentStatusInfo
 import com.ftechsolutions.kasihkirim.domain.model.Sen
 import com.ftechsolutions.kasihkirim.domain.repository.BuyRepository
@@ -47,7 +50,8 @@ private const val CART_ITEM_COLUMNS =
     "id,product_id,quantity,products(title,price_sen,unit,seller_id)"
 
 private const val BUY_ORDER_COLUMNS =
-    "id,reference_code,status,seller_id,total_sen,payment_method,created_at"
+    "id,reference_code,status,seller_id,goods_subtotal_sen,delivery_fee_sen,total_sen," +
+        "payment_method,created_at,order_items(title_snapshot,price_sen,quantity,line_total_sen)"
 
 class BuyRepositoryImpl : BuyRepository {
 
@@ -134,6 +138,7 @@ class BuyRepositoryImpl : BuyRepository {
                     referenceCode = o.getValue("reference_code").jsonPrimitive.content,
                     sellerId = o.getValue("seller_id").jsonPrimitive.content,
                     goodsSubtotalSen = Sen(o.getValue("goods_subtotal_sen").jsonPrimitive.content.toLong()),
+                    deliveryFeeSen = Sen(o.getValue("delivery_fee_sen").jsonPrimitive.content.toLong()),
                     discountSen = Sen(o.getValue("discount_sen").jsonPrimitive.content.toLong()),
                     totalSen = Sen(o.getValue("total_sen").jsonPrimitive.content.toLong()),
                     paymentId = o.getValue("payment_id").jsonPrimitive.content,
@@ -200,6 +205,31 @@ class BuyRepositoryImpl : BuyRepository {
             }
             .decodeList<BuyOrderDto>()
             .map { it.toDomain() }
+    }
+
+    /** Delivery tracking for a buyer's own order -- found missing in review:
+     *  the buyer had a status badge and (for non-COD) a payment poll, but no
+     *  visibility into pickup/transit/delivery progress at all. Unlike the
+     *  seller side (rpc_seller_order_status, 0035), no new RPC is needed:
+     *  kirim_select/deliveries_select already grant the buyer, as the
+     *  kirim's own requester_id, a direct read on both tables. Null return
+     *  means the order has no kirim yet (e.g. a prepaid order still awaiting
+     *  payment, never bridged) -- a normal state, not a missing one. */
+    override suspend fun getDeliveryStatus(orderId: String): AppResult<DeliveryStatusInfo?> = runCatchingResult {
+        val kirim = SupabaseClientProvider.client.postgrest.from("kirim_requests")
+            .select(columns = Columns.raw("id,status")) { filter { eq("order_id", orderId) } }
+            .decodeList<KirimIdDto>()
+            .firstOrNull() ?: return@runCatchingResult null
+
+        val delivery = SupabaseClientProvider.client.postgrest.from("deliveries")
+            .select(columns = Columns.raw("status,carrier_id")) { filter { eq("kirim_id", kirim.id) } }
+            .decodeList<DeliveryStatusRowDto>()
+            .firstOrNull()
+
+        delivery?.toDomain() ?: DeliveryStatusInfo(
+            kirimStatus = KirimStatus.fromWire(kirim.status ?: "") ?: KirimStatus.POSTED,
+            carrierAssigned = false,
+        )
     }
 
     override suspend fun fileDispute(orderId: String, category: String, description: String): AppResult<Unit> =

@@ -3,6 +3,8 @@ package com.ftechsolutions.kasihkirim.data.remote.dto
 import com.ftechsolutions.kasihkirim.domain.model.BuyListing
 import com.ftechsolutions.kasihkirim.domain.model.BuyOrder
 import com.ftechsolutions.kasihkirim.domain.model.CartLine
+import com.ftechsolutions.kasihkirim.domain.model.DeliveryStatusInfo
+import com.ftechsolutions.kasihkirim.domain.model.KirimStatus
 import com.ftechsolutions.kasihkirim.domain.model.OrderStatus
 import com.ftechsolutions.kasihkirim.domain.model.Sen
 import kotlinx.serialization.SerialName
@@ -103,26 +105,45 @@ data class BuyOrderDto(
     @SerialName("reference_code") val referenceCode: String,
     val status: String,
     @SerialName("seller_id") val sellerId: String,
+    @SerialName("goods_subtotal_sen") val goodsSubtotalSen: Long,
+    @SerialName("delivery_fee_sen") val deliveryFeeSen: Long,
     @SerialName("total_sen") val totalSen: Long,
     @SerialName("payment_method") val paymentMethod: String?,
     @SerialName("created_at") val createdAt: String,
+    @SerialName("order_items") val items: List<SellerOrderItemDto> = emptyList(),
 ) {
     fun toDomain() = BuyOrder(
         id = id,
         referenceCode = referenceCode,
         status = OrderStatus.fromWire(status) ?: OrderStatus.CREATED,
         sellerId = sellerId,
+        goodsSubtotalSen = Sen(goodsSubtotalSen),
+        deliveryFeeSen = Sen(deliveryFeeSen),
         totalSen = Sen(totalSen),
         paymentMethod = paymentMethod,
         createdAt = createdAt,
+        items = items.map { it.toDomain() },
     )
 }
 
 /** id-only projections for the order -> kirim_requests -> deliveries walk
- *  BuyRepositoryImpl.fileDispute needs to turn an order id into the
- *  delivery id rpc_open_dispute actually takes. */
+ *  BuyRepositoryImpl.fileDispute/getDeliveryStatus need to turn an order id
+ *  into the delivery id rpc_open_dispute takes, and into the delivery
+ *  progress a buyer can already read directly (kirim_select/deliveries_select
+ *  both grant the requester_id=auth.uid() a plain read -- no RPC needed). */
 @Serializable
-data class KirimIdDto(val id: String)
+data class KirimIdDto(val id: String, val status: String? = null)
 
 @Serializable
 data class DeliveryIdDto(val id: String)
+
+/** deliveries.status/carrier_id, own-requester read (deliveries_select, 0003/0009).
+ *  status wins over the kirim's own once a delivery exists -- see
+ *  BuyRepositoryImpl.getDeliveryStatus's own comment. */
+@Serializable
+data class DeliveryStatusRowDto(val status: String, @SerialName("carrier_id") val carrierId: String?) {
+    fun toDomain() = DeliveryStatusInfo(
+        kirimStatus = KirimStatus.fromWire(status) ?: KirimStatus.DRAFT,
+        carrierAssigned = carrierId != null,
+    )
+}

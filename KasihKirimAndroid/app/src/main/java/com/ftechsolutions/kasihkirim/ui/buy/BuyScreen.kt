@@ -85,11 +85,17 @@ fun BuyScreen(vm: BuyViewModel, onBack: () -> Unit, onOpenOrders: () -> Unit) {
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
-                if (state.listings.isEmpty() && !state.isLoading) {
+                if (state.isLoading && state.listings.isEmpty()) {
+                    item { Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
+                } else if (state.listings.isEmpty()) {
                     item { EmptyStateCard(stringResource(R.string.buy_empty)) }
                 }
                 items(state.listings, key = { it.id }) { listing ->
-                    ListingCard(listing, onAdd = { vm.addToCart(listing.id) })
+                    ListingCard(
+                        listing = listing,
+                        isAdding = state.addingToCartProductId == listing.id,
+                        onAdd = { vm.addToCart(listing.id) },
+                    )
                 }
                 state.error?.let { item { Text(stringResource(it.messageRes()), color = MaterialTheme.colorScheme.error) } }
                 item { Spacer(Modifier.height(24.dp)) }
@@ -103,7 +109,7 @@ fun BuyScreen(vm: BuyViewModel, onBack: () -> Unit, onOpenOrders: () -> Unit) {
 }
 
 @Composable
-private fun ListingCard(listing: BuyListing, onAdd: () -> Unit) {
+private fun ListingCard(listing: BuyListing, isAdding: Boolean, onAdd: () -> Unit) {
     AppCard {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
@@ -126,8 +132,12 @@ private fun ListingCard(listing: BuyListing, onAdd: () -> Unit) {
                 Spacer(Modifier.height(4.dp))
                 Text("${listing.priceSen.format()} / ${listing.unit}", style = MaterialTheme.typography.bodyMedium)
             }
-            FilledIconButton(onClick = onAdd) {
-                Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.buy_add_to_cart))
+            FilledIconButton(onClick = onAdd, enabled = !isAdding) {
+                if (isAdding) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                } else {
+                    Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.buy_add_to_cart))
+                }
             }
         }
     }
@@ -222,7 +232,7 @@ private fun CartSheet(vm: BuyViewModel) {
                 }
 
                 Button(
-                    onClick = vm::checkout,
+                    onClick = vm::requestCheckout,
                     enabled = !state.isCheckingOut && state.selectedAddressId != null,
                     shape = MaterialTheme.shapes.medium,
                     modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp),
@@ -237,6 +247,23 @@ private fun CartSheet(vm: BuyViewModel) {
 
             state.error?.let { Text(stringResource(it.messageRes()), color = MaterialTheme.colorScheme.error) }
         }
+    }
+
+    // Found missing in review: this was the one real-money commitment in the
+    // whole buyer flow with no confirmation step at all (COD needs no
+    // further gate once placed either).
+    if (state.showCheckoutConfirm) {
+        AlertDialog(
+            onDismissRequest = vm::dismissCheckoutConfirm,
+            title = { Text(stringResource(R.string.buy_checkout_confirm_title)) },
+            text = { Text(stringResource(R.string.buy_checkout_confirm_body)) },
+            confirmButton = {
+                TextButton(onClick = vm::checkout) { Text(stringResource(R.string.buy_checkout_confirm_ok)) }
+            },
+            dismissButton = {
+                TextButton(onClick = vm::dismissCheckoutConfirm) { Text(stringResource(R.string.buy_cancel)) }
+            },
+        )
     }
 }
 
@@ -278,13 +305,19 @@ private fun CheckoutSuccessContent(vm: BuyViewModel) {
             AppCard {
                 Text(order.referenceCode, style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.height(4.dp))
-                Text("${stringResource(R.string.buy_order_total)}: ${order.totalSen.format()}")
+                Text("${stringResource(R.string.buy_order_goods_subtotal)}: ${order.goodsSubtotalSen.format()}")
+                Text("${stringResource(R.string.buy_order_delivery_fee)}: ${order.deliveryFeeSen.format()}")
                 if (order.discountSen.value > 0) {
                     Text(
                         "${stringResource(R.string.buy_order_discount)}: -${order.discountSen.format()}",
                         color = MaterialTheme.colorScheme.primary,
                     )
                 }
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "${stringResource(R.string.buy_order_total)}: ${order.totalSen.format()}",
+                    style = MaterialTheme.typography.titleSmall,
+                )
             }
         }
 

@@ -20,7 +20,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.ftechsolutions.kasihkirim.R
 import com.ftechsolutions.kasihkirim.domain.model.BuyOrder
+import com.ftechsolutions.kasihkirim.domain.model.DeliveryStatusInfo
 import com.ftechsolutions.kasihkirim.domain.model.DisputeCategory
+import com.ftechsolutions.kasihkirim.domain.model.KirimStatus
 import com.ftechsolutions.kasihkirim.domain.model.OrderStatus
 import com.ftechsolutions.kasihkirim.ui.auth.messageRes
 import com.ftechsolutions.kasihkirim.ui.common.AppCard
@@ -48,7 +50,9 @@ fun BuyOrdersScreen(vm: BuyOrdersViewModel, onBack: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             item { Spacer(Modifier.height(4.dp)) }
-            if (state.orders.isEmpty() && !state.isLoading) {
+            if (state.isLoading && state.orders.isEmpty()) {
+                item { Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
+            } else if (state.orders.isEmpty()) {
                 item { EmptyStateCard(stringResource(R.string.buy_orders_empty)) }
             }
             items(state.orders, key = { it.id }) { order ->
@@ -99,9 +103,33 @@ private fun BuyOrderDetailSheet(vm: BuyOrdersViewModel) {
                 Text(order.totalSen.format(), style = MaterialTheme.typography.titleMedium)
             }
 
+            AppCard {
+                order.items.forEach { item ->
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            "${item.quantity}x ${item.titleSnapshot}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Text(item.lineTotalSen.format(), style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+                HorizontalDivider(Modifier.padding(vertical = 6.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(stringResource(R.string.buy_order_goods_subtotal), style = MaterialTheme.typography.bodySmall)
+                    Text(order.goodsSubtotalSen.format(), style = MaterialTheme.typography.bodySmall)
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(stringResource(R.string.buy_order_delivery_fee), style = MaterialTheme.typography.bodySmall)
+                    Text(order.deliveryFeeSen.format(), style = MaterialTheme.typography.bodySmall)
+                }
+            }
+
             if (order.paymentMethod != null && order.paymentMethod != "COD") {
                 PaymentStatusRow(vm, order)
             }
+
+            DeliveryStatusSection(state.deliveryStatus, state.isLoadingDeliveryStatus)
 
             if (state.showDisputeForm) {
                 DisputeForm(vm)
@@ -124,6 +152,47 @@ private fun BuyOrderDetailSheet(vm: BuyOrdersViewModel) {
             ) { Text(stringResource(R.string.buy_close)) }
         }
     }
+}
+
+/** Found missing in review: the buyer had a status badge and (for non-COD) a
+ *  payment poll, but no visibility into pickup/transit/delivery progress at
+ *  all. null means the order has no kirim yet -- e.g. a prepaid order still
+ *  awaiting payment, never bridged -- a normal state, not an error, so this
+ *  renders a plain hint rather than an error card. */
+@Composable
+private fun DeliveryStatusSection(status: DeliveryStatusInfo?, isLoading: Boolean) {
+    AppCard {
+        Text(stringResource(R.string.buy_delivery_status_title), style = MaterialTheme.typography.titleSmall)
+        Spacer(Modifier.height(6.dp))
+        when {
+            isLoading && status == null -> Box(Modifier.fillMaxWidth().padding(8.dp), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+            }
+            status == null -> Text(
+                stringResource(R.string.buy_delivery_not_bridged),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            else -> {
+                StatusBadge(status.kirimStatus.labelMs, tone = status.kirimStatus.tone())
+                Spacer(Modifier.height(6.dp))
+                StatusBadge(
+                    stringResource(
+                        if (status.carrierAssigned) R.string.buy_delivery_carrier_assigned
+                        else R.string.buy_delivery_carrier_not_assigned,
+                    ),
+                    tone = if (status.carrierAssigned) BadgeTone.POSITIVE else BadgeTone.NEUTRAL,
+                )
+            }
+        }
+    }
+}
+
+private fun KirimStatus.tone(): BadgeTone = when {
+    this == KirimStatus.DELIVERED || this == KirimStatus.COMPLETED -> BadgeTone.POSITIVE
+    isFailure || this == KirimStatus.CANCELLED || this == KirimStatus.EXPIRED -> BadgeTone.ERROR
+    this == KirimStatus.DRAFT || this == KirimStatus.POSTED -> BadgeTone.NEUTRAL
+    else -> BadgeTone.WARNING
 }
 
 @Composable

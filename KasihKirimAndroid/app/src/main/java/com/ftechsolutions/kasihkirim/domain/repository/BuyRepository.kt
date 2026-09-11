@@ -5,6 +5,7 @@ import com.ftechsolutions.kasihkirim.domain.model.BuyOrder
 import com.ftechsolutions.kasihkirim.domain.model.CartLine
 import com.ftechsolutions.kasihkirim.domain.model.CheckoutResult
 import com.ftechsolutions.kasihkirim.domain.model.BuyListing
+import com.ftechsolutions.kasihkirim.domain.model.DeliveryStatusInfo
 import com.ftechsolutions.kasihkirim.domain.model.PaymentStatusInfo
 
 /**
@@ -58,6 +59,14 @@ interface BuyRepository {
     /** The caller's own marketplace orders (orders_select's RLS, 0003), every
      *  status, own rows only -- the buyer-side order-tracking list. */
     suspend fun listMyOrders(): AppResult<List<BuyOrder>>
+
+    /** Delivery/pickup/transit progress for the buyer's own order --
+     *  kirim_select/deliveries_select already grant the buyer, as the
+     *  kirim's own requester_id, a direct RLS read on both tables, so unlike
+     *  the seller side (rpc_seller_order_status, 0035) no new RPC is needed.
+     *  Null means the order has no kirim yet (e.g. a prepaid order still
+     *  awaiting payment, never bridged) -- a normal state, not an error. */
+    suspend fun getDeliveryStatus(orderId: String): AppResult<DeliveryStatusInfo?>
 
     /** Buyer-initiated dispute filing. rpc_open_dispute (0028/0032) takes a
      *  delivery id, not an order id, so this resolves order -> kirim_requests

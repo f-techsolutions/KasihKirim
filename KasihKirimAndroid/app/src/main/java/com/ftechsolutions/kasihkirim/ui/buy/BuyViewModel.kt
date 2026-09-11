@@ -39,6 +39,10 @@ data class BuyUiState(
      *  other than COD is sandbox-only (Billplz, P2-A) and forced back to
      *  COD server-side unless a project has deliberately enabled it. */
     val paymentMethod: String = "COD",
+    /** The product currently being added, if any -- disables only that
+     *  listing's own button, not the whole browse list. */
+    val addingToCartProductId: String? = null,
+    val showCheckoutConfirm: Boolean = false,
     val isCheckingOut: Boolean = false,
     val checkoutResult: CheckoutResult? = null,
     /** A hosted Billplz page to open in a Custom Tab -- a one-shot event,
@@ -105,16 +109,21 @@ class BuyViewModel(
                             ?: result.data.firstOrNull()?.id,
                     )
                 }
-                is AppResult.Failure -> Unit
+                is AppResult.Failure -> _state.update { it.copy(error = result.error) }
             }
         }
     }
 
     fun addToCart(productId: String) {
+        if (_state.value.addingToCartProductId != null) return
         viewModelScope.launch {
+            _state.update { it.copy(addingToCartProductId = productId, error = null) }
             when (val result = buyRepo.addToCart(productId, quantity = 1)) {
-                is AppResult.Success -> loadCart()
-                is AppResult.Failure -> _state.update { it.copy(error = result.error) }
+                is AppResult.Success -> {
+                    _state.update { it.copy(addingToCartProductId = null) }
+                    loadCart()
+                }
+                is AppResult.Failure -> _state.update { it.copy(addingToCartProductId = null, error = result.error) }
             }
         }
     }
@@ -150,12 +159,23 @@ class BuyViewModel(
      *  exactly one order. */
     fun onPaymentMethodSelected(method: String) = _state.update { it.copy(paymentMethod = method) }
 
+    /** Opens a confirmation step rather than firing rpc_checkout on the same
+     *  tap -- found in review: this was the one real-money commitment in the
+     *  whole buyer flow (COD needs no further gate at all) with no
+     *  confirmation step anywhere in the cart sheet. */
+    fun requestCheckout() {
+        if (_state.value.selectedAddressId == null) return
+        _state.update { it.copy(showCheckoutConfirm = true) }
+    }
+
+    fun dismissCheckoutConfirm() = _state.update { it.copy(showCheckoutConfirm = false) }
+
     fun checkout() {
         val addressId = _state.value.selectedAddressId ?: return
         val code = _state.value.voucherCode.trim().takeIf { it.isNotEmpty() }
         val method = if (_state.value.cartSpansMultipleSellers) "COD" else _state.value.paymentMethod
         viewModelScope.launch {
-            _state.update { it.copy(isCheckingOut = true, error = null) }
+            _state.update { it.copy(showCheckoutConfirm = false, isCheckingOut = true, error = null) }
             when (val result = buyRepo.checkout(addressId, code, method)) {
                 is AppResult.Success -> _state.update {
                     it.copy(

@@ -15,6 +15,7 @@ import com.ftechsolutions.kasihkirim.domain.model.Sen
 import com.ftechsolutions.kasihkirim.domain.model.Serviceability
 import com.ftechsolutions.kasihkirim.domain.repository.AddressRepository
 import com.ftechsolutions.kasihkirim.domain.repository.BuyRepository
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.*
@@ -40,8 +41,11 @@ private val CART_LINE = CartLine(
     unit = "kg", sellerId = "s1", quantity = 2,
 )
 
-private class FakeAddressRepository(var addresses: List<Address> = listOf(ADDRESS)) : AddressRepository {
-    override suspend fun listAddresses(): AppResult<List<Address>> = AppResult.Success(addresses)
+private class FakeAddressRepository(
+    var addresses: List<Address> = listOf(ADDRESS),
+    var listResult: AppResult<List<Address>>? = null,
+) : AddressRepository {
+    override suspend fun listAddresses(): AppResult<List<Address>> = listResult ?: AppResult.Success(addresses)
     override suspend fun createAddress(draft: NewAddress) = throw NotImplementedError()
     override suspend fun updateAddress(id: String, draft: NewAddress) = throw NotImplementedError()
     override suspend fun setDefaultAddress(id: String) = throw NotImplementedError()
@@ -61,12 +65,17 @@ private class FakeBuyRepository(
     var lastCheckoutMethod: String? = null
     var paymentIntentUrl: AppResult<String> = AppResult.Success("https://www.billplz-sandbox.com/bills/test")
     var paymentStatus: AppResult<PaymentStatusInfo>? = null
+    /** When set, addToCart suspends here until the test completes it -- lets
+     *  a test observe the in-flight addingToCartProductId state deterministically,
+     *  the same way a real network call would still be pending on a second tap. */
+    var addToCartGate: CompletableDeferred<Unit>? = null
 
     override suspend fun browseProducts(query: String): AppResult<List<BuyListing>> = AppResult.Success(listings)
     override suspend fun getCart(): AppResult<List<CartLine>> = AppResult.Success(cart)
 
     override suspend fun addToCart(productId: String, quantity: Int): AppResult<Unit> {
         addToCartCalls++
+        addToCartGate?.await()
         cart = listOf(CART_LINE)
         return AppResult.Success(Unit)
     }
@@ -95,7 +104,7 @@ private class FakeBuyRepository(
                 orders = listOf(
                     CheckoutOrderSummary(
                         orderId = "o1", referenceCode = "ORD-1", sellerId = "s1",
-                        goodsSubtotalSen = Sen(3000), discountSen = Sen.ZERO, totalSen = Sen(3000),
+                        goodsSubtotalSen = Sen(3000), deliveryFeeSen = Sen(500), discountSen = Sen.ZERO, totalSen = Sen(3500),
                         paymentId = "pay1", paymentStatus = "COD_PENDING", paymentMethod = paymentMethod,
                     ),
                 ),
@@ -116,6 +125,8 @@ private class FakeBuyRepository(
         )
 
     override suspend fun listMyOrders(): AppResult<List<BuyOrder>> = throw NotImplementedError()
+
+    override suspend fun getDeliveryStatus(orderId: String) = throw NotImplementedError()
 
     override suspend fun fileDispute(orderId: String, category: String, description: String) =
         throw NotImplementedError()
@@ -244,5 +255,86 @@ class BuyViewModelTest {
 
         vm.onPaymentUrlLaunched()
         assertNull(vm.state.value.pendingPaymentUrl)
+    }
+
+    @Test fun `addToCart ignores a second call for the same product while the first is still in flight`() = runTest(dispatcher) {
+        val gate = CompletableDeferred<Unit>()
+        val repo = FakeBuyRepository(addToCartGate = gate)
+        val vm = BuyViewModel(repo, FakeAddressRepository())
+        advanceUntilIdle()
+
+        vm.addToCart("p1")
+        runCurrent()
+        assertEquals("p1", vm.state.value.addingToCartProductId)
+
+        vm.addToCart("p1")
+        runCurrent()
+        assertEquals("only the first tap's call should reach the repository", 1, repo.addToCartCalls)
+
+        gate.complete(Unit)
+        advanceUntilIdle()
+        assertNull(vm.state.value.addingToCartProductId)
+        assertEquals(1, repo.addToCartCalls)
+    }
+
+    @Test fun `a failed addToCart clears the in-flight flag and surfaces the error`() = runTest(dispatcher) {
+        val repo = object : BuyRepository by FakeBuyRepository() {
+            override suspend fun addToCart(productId: String, quantity: Int): AppResult<Unit> =
+                AppResult.Failure(AppError.Server("PRODUCT_NOT_FOUND"))
+        }
+        val vm = BuyViewModel(repo, FakeAddressRepository())
+        advanceUntilIdle()
+
+        vm.addToCart("p1"); advanceUntilIdle()
+
+        assertNull(vm.state.value.addingToCartProductId)
+        assertEquals(AppError.Server("PRODUCT_NOT_FOUND"), vm.state.value.error)
+    }
+
+    @Test fun `requestCheckout opens a confirmation step rather than checking out immediately`() = runTest(dispatcher) {
+        val repo = FakeBuyRepository(cart = listOf(CART_LINE))
+        val vm = BuyViewModel(repo, FakeAddressRepository())
+        advanceUntilIdle()
+
+        vm.requestCheckout()
+
+        assertTrue(vm.state.value.showCheckoutConfirm)
+        assertEquals("requestCheckout must not itself place the order", 0, repo.checkoutCalls)
+
+        vm.dismissCheckoutConfirm()
+        assertFalse(vm.state.value.showCheckoutConfirm)
+        assertEquals(0, repo.checkoutCalls)
+    }
+
+    @Test fun `requestCheckout does nothing without a selected address`() = runTest(dispatcher) {
+        val vm = BuyViewModel(FakeBuyRepository(), FakeAddressRepository(addresses = emptyList()))
+        advanceUntilIdle()
+
+        vm.requestCheckout()
+
+        assertFalse(vm.state.value.showCheckoutConfirm)
+    }
+
+    @Test fun `checkout clears the confirmation step once it actually runs`() = runTest(dispatcher) {
+        val repo = FakeBuyRepository(cart = listOf(CART_LINE))
+        val vm = BuyViewModel(repo, FakeAddressRepository())
+        advanceUntilIdle()
+
+        vm.requestCheckout()
+        vm.checkout(); advanceUntilIdle()
+
+        assertFalse(vm.state.value.showCheckoutConfirm)
+        assertEquals(1, repo.checkoutCalls)
+    }
+
+    @Test fun `a failed address load surfaces the error instead of failing silently`() = runTest(dispatcher) {
+        val vm = BuyViewModel(
+            FakeBuyRepository(),
+            FakeAddressRepository(listResult = AppResult.Failure(AppError.Network)),
+        )
+        advanceUntilIdle()
+
+        assertEquals(AppError.Network, vm.state.value.error)
+        assertTrue(vm.state.value.addresses.isEmpty())
     }
 }

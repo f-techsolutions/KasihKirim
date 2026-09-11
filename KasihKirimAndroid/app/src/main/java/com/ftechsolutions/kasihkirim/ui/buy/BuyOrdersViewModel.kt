@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.ftechsolutions.kasihkirim.core.result.AppError
 import com.ftechsolutions.kasihkirim.core.result.AppResult
 import com.ftechsolutions.kasihkirim.domain.model.BuyOrder
+import com.ftechsolutions.kasihkirim.domain.model.DeliveryStatusInfo
 import com.ftechsolutions.kasihkirim.domain.model.DisputeCategory
 import com.ftechsolutions.kasihkirim.domain.model.PaymentStatusInfo
 import com.ftechsolutions.kasihkirim.domain.repository.BuyRepository
@@ -21,6 +22,8 @@ data class BuyOrdersUiState(
     val selectedOrder: BuyOrder? = null,
     val isLoadingDetail: Boolean = false,
     val paymentStatus: PaymentStatusInfo? = null,
+    val deliveryStatus: DeliveryStatusInfo? = null,
+    val isLoadingDeliveryStatus: Boolean = false,
     /** A hosted Billplz page to open in a Custom Tab -- one-shot, consumed
      *  by BuyOrdersScreen's LaunchedEffect the same way BuyScreen's own
      *  checkout flow consumes it (see BuyViewModel.onPaymentUrlLaunched). */
@@ -60,16 +63,27 @@ class BuyOrdersViewModel(private val buyRepo: BuyRepository) : ViewModel() {
     fun selectOrder(order: BuyOrder) {
         _state.update {
             it.copy(
-                selectedOrder = order, paymentStatus = null, showDisputeForm = false,
+                selectedOrder = order, paymentStatus = null, deliveryStatus = null, showDisputeForm = false,
                 disputeSubmitted = false, disputeDescription = "", disputeCategory = DisputeCategory.OTHER,
             )
         }
         if (order.paymentMethod != null && order.paymentMethod != "COD") {
             refreshPaymentStatus(order.id)
         }
+        loadDeliveryStatus(order.id)
     }
 
-    fun dismissOrderDetail() = _state.update { it.copy(selectedOrder = null) }
+    fun dismissOrderDetail() = _state.update { it.copy(selectedOrder = null, deliveryStatus = null) }
+
+    fun loadDeliveryStatus(orderId: String) {
+        viewModelScope.launch {
+            _state.update { it.copy(isLoadingDeliveryStatus = true) }
+            when (val result = buyRepo.getDeliveryStatus(orderId)) {
+                is AppResult.Success -> _state.update { it.copy(isLoadingDeliveryStatus = false, deliveryStatus = result.data) }
+                is AppResult.Failure -> _state.update { it.copy(isLoadingDeliveryStatus = false, error = result.error) }
+            }
+        }
+    }
 
     fun refreshPaymentStatus(orderId: String) {
         viewModelScope.launch {

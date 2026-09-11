@@ -317,9 +317,15 @@
     <string name="buy_deliver_to">Hantar ke</string>
     <string name="buy_voucher_code">Kod Baucar (jika ada)</string>
     <string name="buy_checkout">Bayar</string>
+    <string name="buy_checkout_confirm_title">Sahkan Pesanan?</string>
+    <string name="buy_checkout_confirm_body">Anda akan membuat pesanan ini. Untuk Bayar Semasa Terima, ini adalah komitmen untuk membayar semasa penghantaran.</string>
+    <string name="buy_checkout_confirm_ok">Ya, Buat Pesanan</string>
+    <string name="buy_cancel">Batal</string>
     <string name="buy_checkout_success">Pesanan Berjaya!</string>
     <string name="buy_order_total">Jumlah</string>
     <string name="buy_order_discount">Diskaun</string>
+    <string name="buy_order_goods_subtotal">Subjumlah Barangan</string>
+    <string name="buy_order_delivery_fee">Yuran Penghantaran</string>
     <string name="buy_done">Selesai</string>
 
     <string name="buy_payment_method">Kaedah Bayaran</string>
@@ -336,6 +342,10 @@
     <string name="buy_orders_empty">Anda belum membuat sebarang pesanan.</string>
     <string name="buy_order_detail">Butiran Pesanan</string>
     <string name="buy_order_report_problem">Laporkan Masalah</string>
+    <string name="buy_delivery_status_title">Status Penghantaran</string>
+    <string name="buy_delivery_carrier_assigned">Penghantar telah ditugaskan</string>
+    <string name="buy_delivery_carrier_not_assigned">Belum ada penghantar</string>
+    <string name="buy_delivery_not_bridged">Belum dipadankan dengan penghantaran lagi.</string>
     <string name="buy_dispute_title">Laporkan Masalah Pesanan</string>
     <string name="buy_dispute_category">Kategori</string>
     <string name="buy_dispute_description">Terangkan masalah anda</string>

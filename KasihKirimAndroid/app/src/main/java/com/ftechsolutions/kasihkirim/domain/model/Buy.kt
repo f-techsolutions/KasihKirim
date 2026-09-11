@@ -36,12 +36,18 @@ data class CartLine(
  *  paymentMethod/paymentStatus are the payment intent rpc_checkout already
  *  opens for the order (0034_marketplace_prepaid_billplz.sql): "COD" needs
  *  nothing further, anything else still needs a bill created via
- *  BuyRepository.createPaymentIntent before it can be paid. */
+ *  BuyRepository.createPaymentIntent before it can be paid.
+ *
+ *  deliveryFeeSen was previously dropped even though rpc_checkout's own
+ *  response already carries it (found in review) -- totalSen =
+ *  goodsSubtotalSen + deliveryFeeSen - discountSen silently absorbed it with
+ *  no way for the buyer to see why the total was higher than their cart. */
 data class CheckoutOrderSummary(
     val orderId: String,
     val referenceCode: String,
     val sellerId: String,
     val goodsSubtotalSen: Sen,
+    val deliveryFeeSen: Sen,
     val discountSen: Sen,
     val totalSen: Sen,
     val paymentId: String,
@@ -68,15 +74,39 @@ data class PaymentStatusInfo(
 
 /** public.orders, the buyer's own read (orders_select's RLS, 0003) -- the
  *  marketplace order-tracking list. Shares OrderStatus with SellerOrder.kt:
- *  the same order, seen from the other side of the sale. */
+ *  the same order, seen from the other side of the sale.
+ *
+ *  goodsSubtotalSen/deliveryFeeSen/items were previously missing (found in
+ *  review): the buyer's own order history showed a reference code, a status
+ *  badge and a bare total, with no way to see what was actually bought or
+ *  how the total split between goods and delivery -- order_items_select
+ *  already grants the buyer this same read (0003), so this is server truth,
+ *  not a client computation. items reuses SellerOrderItem (SellerOrder.kt):
+ *  the same public.order_items row, read from the other side of the sale. */
 data class BuyOrder(
     val id: String,
     val referenceCode: String,
     val status: OrderStatus,
     val sellerId: String,
+    val goodsSubtotalSen: Sen,
+    val deliveryFeeSen: Sen,
     val totalSen: Sen,
     val paymentMethod: String?,
     val createdAt: String,
+    val items: List<SellerOrderItem> = emptyList(),
+)
+
+/** rpc_seller_order_status's carrier-side fields have no buyer analogue --
+ *  kirim_select/deliveries_select already grant the buyer (as the kirim's
+ *  own requester_id) a direct read on both tables, so unlike the seller
+ *  side (0035_seller_dashboard_and_order_visibility.sql) no new RPC is
+ *  needed here, just a plain, RLS-scoped read (BuyRepository.getDeliveryStatus).
+ *  Null kirimStatus/carrierAssigned has no meaning -- a null
+ *  DeliveryStatusInfo (not this type) is what "not bridged to a delivery job
+ *  yet" looks like (e.g. a prepaid order still awaiting payment). */
+data class DeliveryStatusInfo(
+    val kirimStatus: KirimStatus,
+    val carrierAssigned: Boolean,
 )
 
 /** The fixed category set public.rpc_open_dispute (0028/0032) accepts --
