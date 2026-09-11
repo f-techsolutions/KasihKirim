@@ -177,6 +177,52 @@
     <string name="sales_update_product">Kemaskini</string>
     <string name="sales_save_product">Simpan</string>
     <string name="sales_cancel">Batal</string>
+
+    <string name="sales_tab_dashboard">Papan Pemuka</string>
+    <string name="sales_dashboard_product_count">Jumlah Produk</string>
+    <string name="sales_dashboard_active_listings">Penyenaraian Aktif</string>
+    <string name="sales_dashboard_pending_orders">Pesanan Belum Selesai</string>
+    <string name="sales_dashboard_completed_orders">Pesanan Selesai</string>
+    <string name="sales_dashboard_low_stock">Amaran Stok Rendah</string>
+    <string name="sales_dashboard_low_stock_none">Tiada produk berstok rendah.</string>
+    <string name="sales_dashboard_earnings_title">Pendapatan</string>
+    <string name="sales_dashboard_earnings_available">Boleh Dikeluarkan</string>
+    <string name="sales_dashboard_earnings_pending">Belum Selesai</string>
+    <string name="sales_dashboard_earnings_total">Jumlah Diperoleh</string>
+
+    <string name="sales_stock_title">Stok</string>
+    <string name="sales_stock_on_hand">Stok Semasa</string>
+    <string name="sales_stock_reserved">Ditempah</string>
+    <string name="sales_stock_available">Tersedia</string>
+    <string name="sales_stock_safety">Stok Keselamatan</string>
+    <string name="sales_stock_low_warning">Stok rendah -- pertimbangkan untuk menambah stok.</string>
+    <string name="sales_stock_set">Tetapkan Stok</string>
+    <string name="sales_stock_adjust">Laraskan Stok</string>
+    <string name="sales_stock_adjust_hint">Gunakan nombor positif untuk tambah, negatif untuk kurangkan</string>
+    <string name="sales_stock_history">Sejarah Pergerakan Stok</string>
+    <string name="sales_stock_history_empty">Tiada pergerakan stok direkodkan.</string>
+    <string name="sales_stock_save">Simpan Stok</string>
+    <string name="sales_archive_product">Arkibkan</string>
+    <string name="sales_archive_confirm_title">Arkibkan Produk?</string>
+    <string name="sales_archive_confirm_body">Produk yang diarkibkan tidak akan kelihatan lagi dalam katalog anda. Tindakan ini tidak boleh dibuat asal.</string>
+    <string name="sales_archive_confirm_ok">Arkibkan</string>
+
+    <string name="sales_order_detail">Butiran Pesanan</string>
+    <string name="sales_order_goods_subtotal">Subjumlah Barangan</string>
+    <string name="sales_order_commission">Komisen KasihKirim</string>
+    <string name="sales_order_delivery_fee">Yuran Penghantaran (bukan milik anda)</string>
+    <string name="sales_order_net_payable">Bersih Kepada Anda</string>
+    <string name="sales_order_payment_status">Status Bayaran</string>
+    <string name="sales_order_delivery_status">Status Penghantaran</string>
+    <string name="sales_order_no_delivery_yet">Belum dipadankan dengan penghantar.</string>
+    <string name="sales_order_carrier_assigned">Penghantar telah ditugaskan</string>
+    <string name="sales_order_carrier_not_assigned">Belum ada penghantar</string>
+    <string name="sales_order_report_problem">Laporkan Masalah</string>
+    <string name="sales_order_dispute_hint">Ini akan menandakan pesanan sebagai dipertikaikan untuk semakan pentadbir.</string>
+    <string name="sales_order_dispute_confirm">Ya, Tandakan Dipertikaikan</string>
+    <string name="sales_order_dispute_submitted">Pesanan telah ditandakan sebagai dipertikaikan.</string>
+    <string name="sales_close">Tutup</string>
+
     <string name="profile_become_seller">Jadi Penjual</string>
     <string name="profile_my_sales">Jualan Saya</string>
     <string name="deliveries_confirm_pickup">Sahkan Ambil</string>
@@ -317,6 +363,10 @@
     <string name="err_description_too_short">Sila terangkan masalah dengan lebih terperinci (sekurang-kurangnya 10 aksara).</string>
     <string name="err_dispute_already_open">Aduan untuk pesanan ini sudah dibuka.</string>
     <string name="err_state_actor_not_permitted">Awak tiada kebenaran untuk tindakan ini.</string>
+    <string name="err_inventory_not_found">Rekod stok untuk produk ini tidak dijumpai.</string>
+    <string name="err_stock_negative">Kuantiti stok tidak boleh negatif.</string>
+    <string name="err_stock_below_reserved">Stok tidak boleh dikurangkan bawah jumlah yang sudah ditempah.</string>
+    <string name="err_stock_delta_zero">Sila masukkan perubahan stok yang bukan sifar.</string>
 
     <string name="profile_badges_title">Lencana</string>
 </resources>

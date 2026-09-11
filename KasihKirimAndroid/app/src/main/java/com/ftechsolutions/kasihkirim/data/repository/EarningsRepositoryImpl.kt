@@ -40,6 +40,8 @@ private fun JsonObject.toEarnings() = Earnings(
     pendingSen = Sen(getValue("pending_sen").jsonPrimitive.long),
     codHeldSen = this["cod_held_sen"]?.jsonPrimitive?.long?.let(::Sen),
     floatLimitSen = this["float_limit_sen"]?.jsonPrimitive?.long?.let(::Sen),
+    sellerAvailableSen = this["seller_available_sen"]?.jsonPrimitive?.long?.let(::Sen),
+    sellerPendingSen = this["seller_pending_sen"]?.jsonPrimitive?.long?.let(::Sen),
 )
 
 private fun Throwable.toEarningsAppError(): AppError = when {

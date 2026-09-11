@@ -215,6 +215,10 @@ internal fun AppError.messageRes(): Int = when (this) {
         "DESCRIPTION_TOO_SHORT" -> R.string.err_description_too_short
         "DISPUTE_ALREADY_OPEN" -> R.string.err_dispute_already_open
         "STATE_ACTOR_NOT_PERMITTED" -> R.string.err_state_actor_not_permitted
+        "INVENTORY_NOT_FOUND" -> R.string.err_inventory_not_found
+        "STOCK_NEGATIVE" -> R.string.err_stock_negative
+        "STOCK_BELOW_RESERVED" -> R.string.err_stock_below_reserved
+        "STOCK_DELTA_ZERO" -> R.string.err_stock_delta_zero
         else -> R.string.err_unexpected
     }
     else -> R.string.err_unexpected

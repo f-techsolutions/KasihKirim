@@ -205,7 +205,9 @@ fun AppNavHost(
             // a different feature (carrier-as-trader, ADDENDUM-COMMERCE.md),
             // not this one.
             composable(Destination.SALES.route) {
-                val vm: SalesViewModel = viewModel(factory = SalesViewModel.Factory(sellerRepository, addressRepository))
+                val vm: SalesViewModel = viewModel(
+                    factory = SalesViewModel.Factory(sellerRepository, addressRepository, earningsRepository),
+                )
                 SalesScreen(vm, onBack = { nav.popBackStack() })
             }
         }

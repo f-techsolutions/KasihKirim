@@ -50,6 +50,32 @@ data class Product(
     val minOrderQty: Int,
     val rejectionReason: String?,
     val images: List<ProductImage> = emptyList(),
+    /** null only if the row somehow predates tg_products_inventory_row
+     *  (0025) -- every product created since has one from the moment it
+     *  exists, on_hand/reserved/safety_stock all starting at 0. */
+    val inventory: Inventory? = null,
+)
+
+/** public.inventory, the single server-authoritative source for stock
+ *  (0025_seller_product_stock.sql). Never computed client-side: `available`
+ *  is read straight off rpc_set_stock/rpc_adjust_stock's own response, the
+ *  same number the server just used to decide whether the change was legal. */
+data class Inventory(
+    val onHand: Int,
+    val reserved: Int,
+    val safetyStock: Int,
+    val available: Int,
+) {
+    val isLowStock: Boolean get() = onHand <= safetyStock
+}
+
+/** public.inventory_movements -- an append-only audit row (0025), read-only
+ *  from this client; the only writer is internal.fn_adjust_inventory. */
+data class InventoryMovement(
+    val id: String,
+    val delta: Int,
+    val reason: String,
+    val createdAt: String,
 )
 
 data class ProductImage(
