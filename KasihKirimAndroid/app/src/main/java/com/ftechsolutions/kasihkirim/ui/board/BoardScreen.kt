@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -32,6 +33,12 @@ import com.ftechsolutions.kasihkirim.ui.common.StatusBadge
 fun BoardScreen(vm: BoardViewModel, isCarrier: Boolean) {
     val state by vm.state.collectAsState()
 
+    // The bottom nav's saveState/restoreState keeps this ViewModel alive
+    // across tab switches, but disposes/recreates this Composable, so
+    // init{}'s one-shot load() never refires on re-entry (same bug already
+    // found and fixed on EarningsScreen).
+    LaunchedEffect(Unit) { vm.load() }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
@@ -55,7 +62,7 @@ fun BoardScreen(vm: BoardViewModel, isCarrier: Boolean) {
             item { Spacer(Modifier.height(4.dp)) }
         }
 
-        if (state.items.isEmpty() && !state.isLoading) {
+        if (state.items.isEmpty() && !state.isLoading && state.error == null) {
             item { EmptyStateCard(stringResource(R.string.board_empty)) }
         }
         items(state.items, key = { it.id }) { kirim ->

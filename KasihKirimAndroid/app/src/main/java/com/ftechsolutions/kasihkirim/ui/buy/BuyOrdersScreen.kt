@@ -52,7 +52,7 @@ fun BuyOrdersScreen(vm: BuyOrdersViewModel, onBack: () -> Unit) {
             item { Spacer(Modifier.height(4.dp)) }
             if (state.isLoading && state.orders.isEmpty()) {
                 item { Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
-            } else if (state.orders.isEmpty()) {
+            } else if (state.orders.isEmpty() && state.error == null) {
                 item { EmptyStateCard(stringResource(R.string.buy_orders_empty)) }
             }
             items(state.orders, key = { it.id }) { order ->

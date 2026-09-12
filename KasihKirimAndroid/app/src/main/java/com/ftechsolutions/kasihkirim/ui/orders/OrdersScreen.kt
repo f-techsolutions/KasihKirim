@@ -7,6 +7,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -26,6 +27,10 @@ import com.ftechsolutions.kasihkirim.ui.common.StatusBadge
 @Composable
 fun OrdersScreen(vm: OrdersViewModel, onOpenDeliveries: () -> Unit) {
     val state by vm.state.collectAsState()
+
+    // See BoardScreen's identical comment: init{}'s one-shot load() doesn't
+    // refire when this tab is re-entered without this.
+    LaunchedEffect(Unit) { vm.load() }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp),
@@ -48,7 +53,7 @@ fun OrdersScreen(vm: OrdersViewModel, onOpenDeliveries: () -> Unit) {
             }
         }
 
-        if (state.orders.isEmpty() && !state.isLoading) {
+        if (state.orders.isEmpty() && !state.isLoading && state.error == null) {
             item { EmptyStateCard(stringResource(R.string.orders_empty)) }
         }
         items(state.orders, key = { it.id }) { order -> OrderCard(order, state.nodeNames) }

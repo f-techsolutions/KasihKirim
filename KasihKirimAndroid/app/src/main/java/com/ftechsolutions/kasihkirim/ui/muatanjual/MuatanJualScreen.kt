@@ -7,6 +7,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -27,6 +28,10 @@ import java.time.format.DateTimeFormatter
 fun MuatanJualScreen(vm: MuatanJualViewModel) {
     val state by vm.state.collectAsState()
 
+    // See BoardScreen's identical comment: init{}'s one-shot load() doesn't
+    // refire when this tab is re-entered without this.
+    LaunchedEffect(Unit) { vm.load() }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
@@ -37,7 +42,7 @@ fun MuatanJualScreen(vm: MuatanJualViewModel) {
         }
         item { NoticeCard() }
 
-        if (state.listings.isEmpty() && !state.isLoading) {
+        if (state.listings.isEmpty() && !state.isLoading && state.error == null) {
             item { EmptyStateCard(stringResource(R.string.muatan_jual_empty)) }
         }
         items(state.listings, key = { it.id }) { listing -> LotCard(listing) }

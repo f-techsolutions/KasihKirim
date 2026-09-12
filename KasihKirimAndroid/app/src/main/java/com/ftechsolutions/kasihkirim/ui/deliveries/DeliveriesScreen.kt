@@ -73,7 +73,7 @@ fun DeliveriesScreen(vm: DeliveriesViewModel, roles: Set<UserRole>, onBack: () -
         ) {
             item { Spacer(Modifier.height(4.dp)) }
 
-            if (state.deliveries.isEmpty() && !state.isLoading) {
+            if (state.deliveries.isEmpty() && !state.isLoading && state.error == null) {
                 item { EmptyStateCard(stringResource(R.string.deliveries_empty)) }
             }
             items(state.deliveries, key = { it.id }) { delivery ->

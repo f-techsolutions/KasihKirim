@@ -49,7 +49,7 @@ fun VehiclesScreen(vm: VehiclesViewModel, onBack: () -> Unit) {
         ) {
             item { Spacer(Modifier.height(4.dp)) }
 
-            if (state.vehicles.isEmpty() && !state.isLoading) {
+            if (state.vehicles.isEmpty() && !state.isLoading && state.error == null) {
                 item { EmptyStateCard(stringResource(R.string.vehicles_empty)) }
             }
             items(state.vehicles, key = { it.id }) { vehicle ->

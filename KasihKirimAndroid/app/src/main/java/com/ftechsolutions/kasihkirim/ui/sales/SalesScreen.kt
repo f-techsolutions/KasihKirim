@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Photo
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -48,6 +49,11 @@ import java.io.ByteArrayOutputStream
 @Composable
 fun SalesScreen(vm: SalesViewModel, onBack: () -> Unit) {
     val state by vm.state.collectAsState()
+
+    // See BoardScreen's identical comment: init{}'s one-shot load() doesn't
+    // refire when this tab is re-entered without this. load() here refreshes
+    // seller status, products, orders and the dashboard summary together.
+    LaunchedEffect(Unit) { vm.load() }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -319,7 +325,7 @@ private fun OrdersListScreen(vm: SalesViewModel) {
         item { Spacer(Modifier.height(4.dp)) }
         if (state.isLoadingOrders && state.orders.isEmpty()) {
             item { Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
-        } else if (state.orders.isEmpty()) {
+        } else if (state.orders.isEmpty() && state.error == null) {
             item {
                 AppCard {
                     Text(stringResource(R.string.sales_no_orders), style = MaterialTheme.typography.bodyMedium)
@@ -488,7 +494,7 @@ private fun ProductCatalogScreen(vm: SalesViewModel) {
 
         if (state.isLoading) {
             item { Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
-        } else if (state.products.isEmpty() && state.productForm == null) {
+        } else if (state.products.isEmpty() && state.productForm == null && state.error == null) {
             item {
                 AppCard {
                     Text(stringResource(R.string.sales_no_products), style = MaterialTheme.typography.bodyMedium)
