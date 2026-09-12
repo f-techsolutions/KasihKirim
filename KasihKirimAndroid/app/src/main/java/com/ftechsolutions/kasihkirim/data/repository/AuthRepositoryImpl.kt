@@ -41,13 +41,22 @@ class AuthRepositoryImpl : AuthRepository {
     }
 
     override suspend fun signUpWithEmail(email: String, password: String): AppResult<AuthUser> =
-        runAuth {
+        runAuth(noSessionError = AppError.EmailNotConfirmed) {
             SupabaseClientProvider.client.auth.signUpWith(Email) {
                 this.email = email; this.password = password
             }
             // Depending on project settings sign-up may not create a session
             // (email confirmation). Treat "no session" as unauthenticated
-            // rather than pretending the user is signed in.
+            // rather than pretending the user is signed in. Found on-device:
+            // this is the ordinary, successful outcome of a real sign-up on
+            // a project with email confirmation enabled -- signUpWith()
+            // returns without throwing, the account genuinely exists, there
+            // is just no session yet. runAuth's default (SessionExpired,
+            // which AuthScreen.messageRes() has no specific copy for and
+            // falls back to a generic "Ada masalah. Sila cuba lagi.") made a
+            // successful sign-up look like a random failure. EmailNotConfirmed
+            // already has the exactly right string: "check your inbox for the
+            // confirmation link."
             SupabaseClientProvider.client.auth.currentUserOrNull()
         }
 
@@ -74,12 +83,15 @@ class AuthRepositoryImpl : AuthRepository {
         }
     }
 
-    private inline fun runAuth(block: () -> UserInfo?): AppResult<AuthUser> =
+    private inline fun runAuth(
+        noSessionError: AppError = AppError.SessionExpired,
+        block: () -> UserInfo?,
+    ): AppResult<AuthUser> =
         try {
             val info = block()
             if (info == null) {
                 _authState.value = AuthState.Unauthenticated
-                AppResult.Failure(AppError.SessionExpired)
+                AppResult.Failure(noSessionError)
             } else {
                 val user = info.toAuthUser()
                 _authState.value = AuthState.Authenticated(user)
