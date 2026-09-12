@@ -83,6 +83,18 @@ class AuthRepositoryImpl : AuthRepository {
         }
     }
 
+    override suspend fun sendPasswordReset(email: String): AppResult<Unit> =
+        try {
+            SupabaseClientProvider.client.auth.resetPasswordForEmail(email)
+            AppResult.Success(Unit)
+        } catch (t: Throwable) {
+            // Never log the email as part of a broader payload dump, only
+            // the exception itself (matches runAuth's own credential-safety
+            // comment above).
+            SafeLog.e(tag, "password reset request failed: ${t::class.simpleName}", t)
+            AppResult.Failure(t.toAppError())
+        }
+
     private inline fun runAuth(
         noSessionError: AppError = AppError.SessionExpired,
         block: () -> UserInfo?,

@@ -109,6 +109,28 @@ fun AuthScreen(vm: AuthViewModel) {
                 modifier = Modifier.fillMaxWidth(),
             )
 
+            if (!isSignUp) {
+                TextButton(
+                    onClick = vm::sendPasswordReset,
+                    enabled = form.canSendReset,
+                    modifier = Modifier.align(Alignment.End),
+                ) {
+                    if (form.isSendingReset) {
+                        CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
+                    } else {
+                        Text(stringResource(R.string.auth_forgot_password), style = MaterialTheme.typography.labelMedium)
+                    }
+                }
+            }
+
+            if (form.resetEmailSent) {
+                Text(
+                    text = stringResource(R.string.auth_reset_email_sent),
+                    color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+
             form.error?.let { err ->
                 Spacer(Modifier.height(12.dp))
                 Text(

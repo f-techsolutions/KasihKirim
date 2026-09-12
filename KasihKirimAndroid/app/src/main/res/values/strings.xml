@@ -11,6 +11,8 @@
     <string name="auth_no_account">Belum ada akaun? Daftar</string>
     <string name="auth_checking">Menyemak sesi…</string>
     <string name="auth_phone_soon">Log masuk dengan nombor telefon belum tersedia.</string>
+    <string name="auth_forgot_password">Lupa kata laluan?</string>
+    <string name="auth_reset_email_sent">Pautan set semula kata laluan telah dihantar. Sila semak peti masuk e-mel anda.</string>
 
     <string name="err_invalid_email">Sila masukkan e-mel yang sah.</string>
     <string name="err_password_short">Kata laluan mesti sekurang-kurangnya 8 aksara.</string>

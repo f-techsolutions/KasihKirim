@@ -20,17 +20,24 @@ private class FakeAuthRepository(
     var signInResult: AppResult<AuthUser> = AppResult.Success(
         AuthUser("u1", "a@b.com", setOf(UserRole.CUSTOMER), null, null, "active")
     ),
+    var resetResult: AppResult<Unit> = AppResult.Success(Unit),
 ) : AuthRepository {
     val state = MutableStateFlow<AuthState>(AuthState.Initializing)
     override val authState: StateFlow<AuthState> = state
     var restoreCalls = 0
     var signOutCalls = 0
+    var resetCalls = 0
+    var lastResetEmail: String? = null
 
     override suspend fun restoreSession() { restoreCalls++; state.value = AuthState.Unauthenticated }
     override suspend fun signUpWithEmail(email: String, password: String) = signInResult
     override suspend fun signInWithEmail(email: String, password: String) = signInResult
     override suspend fun signOut(): AppResult<Unit> {
         signOutCalls++; state.value = AuthState.Unauthenticated; return AppResult.Success(Unit)
+    }
+
+    override suspend fun sendPasswordReset(email: String): AppResult<Unit> {
+        resetCalls++; lastResetEmail = email; return resetResult
     }
 }
 
@@ -86,5 +93,65 @@ class AuthViewModelTest {
         vm.signOut(); advanceUntilIdle()
         assertEquals(1, repo.signOutCalls)
         assertEquals("", vm.form.value.password)
+    }
+
+    @Test fun `sendPasswordReset sends the typed email and shows a confirmation`() = runTest(dispatcher) {
+        val repo = FakeAuthRepository()
+        val vm = AuthViewModel(repo); advanceUntilIdle()
+        vm.onEmailChange("aisyah@example.com")
+
+        vm.sendPasswordReset(); advanceUntilIdle()
+
+        assertEquals(1, repo.resetCalls)
+        assertEquals("aisyah@example.com", repo.lastResetEmail)
+        assertTrue(vm.form.value.resetEmailSent)
+        assertFalse(vm.form.value.isSendingReset)
+        assertNull(vm.form.value.error)
+    }
+
+    @Test fun `sendPasswordReset does nothing without a valid email`() = runTest(dispatcher) {
+        val repo = FakeAuthRepository()
+        val vm = AuthViewModel(repo); advanceUntilIdle()
+        vm.onEmailChange("not-an-email")
+
+        vm.sendPasswordReset(); advanceUntilIdle()
+
+        assertEquals("an invalid email must never reach the repository", 0, repo.resetCalls)
+        assertFalse(vm.form.value.resetEmailSent)
+    }
+
+    @Test fun `a failed sendPasswordReset surfaces the error and clears the busy flag`() = runTest(dispatcher) {
+        val repo = FakeAuthRepository(resetResult = AppResult.Failure(AppError.Network))
+        val vm = AuthViewModel(repo); advanceUntilIdle()
+        vm.onEmailChange("aisyah@example.com")
+
+        vm.sendPasswordReset(); advanceUntilIdle()
+
+        assertEquals(AppError.Network, vm.form.value.error)
+        assertFalse(vm.form.value.isSendingReset)
+        assertFalse(vm.form.value.resetEmailSent)
+    }
+
+    @Test fun `editing the email after a reset was sent clears the stale confirmation`() = runTest(dispatcher) {
+        val repo = FakeAuthRepository()
+        val vm = AuthViewModel(repo); advanceUntilIdle()
+        vm.onEmailChange("aisyah@example.com")
+        vm.sendPasswordReset(); advanceUntilIdle()
+        assertTrue(vm.form.value.resetEmailSent)
+
+        vm.onEmailChange("aisyah2@example.com")
+
+        assertFalse(vm.form.value.resetEmailSent)
+    }
+
+    @Test fun `sendPasswordReset never touches sign-in submission state`() = runTest(dispatcher) {
+        val repo = FakeAuthRepository()
+        val vm = AuthViewModel(repo); advanceUntilIdle()
+        vm.onEmailChange("aisyah@example.com"); vm.onPasswordChange("longenough123")
+
+        vm.sendPasswordReset(); advanceUntilIdle()
+
+        assertFalse(vm.form.value.isSubmitting)
+        assertTrue("password reset must not clear an in-progress sign-in form", vm.form.value.canSubmit)
     }
 }
