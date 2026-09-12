@@ -8,7 +8,7 @@
 -- orders_select/kirim_select RLS -- those stay exactly as they were.
 -- ============================================================================
 BEGIN;
-SELECT plan(8);
+SELECT plan(9);
 SELECT tests.clear_auth();
 SELECT tests.seed_fixture();
 
@@ -119,6 +119,54 @@ SELECT is(
     WHERE (elem->>'id')::uuid = tests.uid('_p26_kirim')),
   0,
   'TEST C1: an accepted job no longer appears on the board');
+
+-- ── D. a HANTAR kirim reaches the board too, not just BELI/PASARAN ──────────
+-- Production report: a customer's Kirim Barang (HANTAR) request posted from
+-- Beluran to Kota Kinabalu -- an ordinary ALL-SABAH corridor already served
+-- by the seed fixture's own trip -- was invisible on a carrier's board.
+-- rpc_board's WHERE clause (status='POSTED' AND visibility='board' AND
+-- deleted_at IS NULL AND authz.has_role('carrier')) never filters on
+-- kirim_type, so a HANTAR row should appear exactly like the BELI row
+-- TEST A3 already covers -- but nothing in this suite had ever posted a
+-- HANTAR kirim through the real rpc_quote_kirim/rpc_create_kirim path and
+-- then queried rpc_board() for it, so a regression specific to that
+-- combination would have shipped unnoticed.
+SELECT tests.authenticate_as('aisyah');
+DO $$
+DECLARE v_beluran UUID; v_kk UUID; v_kepayan UUID; v_origin UUID; v_quote JSONB; v_kirim JSONB;
+BEGIN
+  SELECT id INTO v_beluran FROM ref.route_nodes WHERE name='Beluran';
+  SELECT id INTO v_kk      FROM ref.route_nodes WHERE name='Kota Kinabalu';
+  SELECT id INTO v_kepayan FROM public.communities WHERE name='Kg Kepayan Baru';
+
+  INSERT INTO public.addresses (user_id,label,recipient_name,recipient_phone,
+    community_id,landmark_note,nearest_node_id)
+  VALUES (tests.uid('aisyah'),'Pejabat','Aisyah','+60128880001',
+    v_kepayan,'Sebelah pasar', v_beluran)
+  RETURNING id INTO v_origin;
+
+  v_quote := public.rpc_quote_kirim('HANTAR','hasil-laut',1800,v_beluran,v_kk);
+  v_kirim := public.rpc_create_kirim((v_quote->>'quote_id')::uuid, 'Ikan bakar 2kg',
+    tests.uid('_addr'), v_origin);
+  INSERT INTO tests.handles (handle,user_id) VALUES ('_p26_hantar',(v_kirim->>'kirim_id')::uuid)
+  ON CONFLICT (handle) DO UPDATE SET user_id=EXCLUDED.user_id;
+END $$;
+SELECT tests.clear_auth();
+
+SELECT tests.authenticate_as('rahman');
+DO $$
+DECLARE r JSONB;
+BEGIN
+  r := public.rpc_board();
+  PERFORM set_config('tests.p26_board4', r::text, false);
+END $$;
+SELECT tests.clear_auth();
+
+SELECT is(
+  (SELECT elem->>'kirim_type' FROM jsonb_array_elements(current_setting('tests.p26_board4')::jsonb) elem
+    WHERE (elem->>'id')::uuid = tests.uid('_p26_hantar')),
+  'HANTAR',
+  'TEST D1: a POSTED HANTAR kirim (Beluran -> Kota Kinabalu) reaches the carrier board same as BELI/PASARAN');
 
 SELECT * FROM finish();
 ROLLBACK;
