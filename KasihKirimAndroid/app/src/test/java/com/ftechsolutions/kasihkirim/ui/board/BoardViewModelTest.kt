@@ -74,13 +74,14 @@ private class FakeKirimRepository(
 
 private class FakeTripRepository(
     var trips: List<Trip> = listOf(ANNOUNCED_TRIP, DEPARTED_TRIP),
+    var listMyTripsResult: AppResult<List<Trip>>? = null,
     var acceptResult: AppResult<Unit> = AppResult.Success(Unit),
 ) : TripRepository {
     var acceptCalls = 0
     var lastAcceptTripId: String? = null
     var lastAcceptKirimId: String? = null
 
-    override suspend fun listMyTrips(): AppResult<List<Trip>> = AppResult.Success(trips)
+    override suspend fun listMyTrips(): AppResult<List<Trip>> = listMyTripsResult ?: AppResult.Success(trips)
     override suspend fun createTrip(draft: NewTripDraft) = throw NotImplementedError()
     override suspend fun sendCapacityInvite(tripId: String) = throw NotImplementedError()
 
@@ -108,6 +109,23 @@ class BoardViewModelTest {
         assertEquals("only the ANNOUNCED trip is eligible, not the DEPARTED one", 1, vm.state.value.eligibleTrips.size)
         assertEquals("t1", vm.state.value.eligibleTrips.first().id)
         assertEquals("Beluran", vm.state.value.nodeNames["n1"])
+        assertFalse(vm.state.value.isLoading)
+    }
+
+    /** Found on-device: a carrier whose 'carrier' role was granted but who
+     *  has no public.carriers row yet makes listMyTrips() throw
+     *  NOT_A_CARRIER (requireCarrierId() has nothing to read). That failure
+     *  used to wipe out an otherwise-successful board load entirely -- the
+     *  carrier saw zero listings and a bare error for a reason that had
+     *  nothing to do with the board itself. */
+    @Test fun `a failed trips load still shows the board, just with no eligible trips`() = runTest(dispatcher) {
+        val tripRepo = FakeTripRepository(listMyTripsResult = AppResult.Failure(AppError.Server("NOT_A_CARRIER")))
+        val vm = BoardViewModel(FakeKirimRepository(), tripRepo, FakeAddressRepository(), isCarrier = true)
+        advanceUntilIdle()
+
+        assertEquals("the board itself must still load", 1, vm.state.value.items.size)
+        assertTrue(vm.state.value.eligibleTrips.isEmpty())
+        assertNull("a trips-only failure must not surface as a board-wide error", vm.state.value.error)
         assertFalse(vm.state.value.isLoading)
     }
 
