@@ -88,9 +88,18 @@ class AuthRepositoryImpl : AuthRepository {
         } catch (t: Throwable) {
             // Never log the credentials or the raw body.
             SafeLog.e(tag, "auth call failed: ${t::class.simpleName}", t)
-            val err = t.toAppError()
-            _authState.value = AuthState.Error(err)
-            AppResult.Failure(err)
+            // Deliberately does NOT touch _authState. A wrong password (or any
+            // other sign-in/sign-up failure) is a routine, expected outcome of
+            // an attempt made while already Unauthenticated -- returning the
+            // Failure below is enough for AuthViewModel to surface it as a
+            // local form.error the user can read and correct. Setting
+            // AuthState.Error here (found on-device: App.kt's root `when`
+            // renders AuthState.Error as a bare, buttonless error screen with
+            // no sign-in form at all) used to strand the user with no way to
+            // retry short of restarting the app. AuthState.Error stays
+            // reserved for restoreSession()'s own catch, where there really
+            // is no form to fall back to.
+            AppResult.Failure(t.toAppError())
         }
 }
 

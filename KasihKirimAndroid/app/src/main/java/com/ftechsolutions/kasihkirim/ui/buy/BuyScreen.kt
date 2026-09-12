@@ -87,7 +87,11 @@ fun BuyScreen(vm: BuyViewModel, onBack: () -> Unit, onOpenOrders: () -> Unit) {
                 }
                 if (state.isLoading && state.listings.isEmpty()) {
                     item { Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
-                } else if (state.listings.isEmpty()) {
+                } else if (state.listings.isEmpty() && state.error == null) {
+                    // Found on-device: a background loadCart()/loadAddresses()
+                    // failure writes into this same state.error, so without
+                    // this check a real error rendered alongside a confusing
+                    // "no products" claim that wasn't actually true.
                     item { EmptyStateCard(stringResource(R.string.buy_empty)) }
                 }
                 items(state.listings, key = { it.id }) { listing ->
