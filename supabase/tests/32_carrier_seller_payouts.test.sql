@@ -5,8 +5,19 @@
 -- this file credits CARRIER_PAYABLE:<_carrier> by RM100 directly (the same
 -- fn_post call a real settlement would make, per 01_constraints.test.sql's
 -- own pattern) before exercising withdrawal against it.
+--
+-- rpc_add_bank_account reads its encryption key from the Postgres GUC
+-- app.settings.bank_account_enc_key, which no migration sets (a real
+-- project configures it once via the Supabase dashboard). SET LOCAL gives
+-- this transaction its own value without needing the elevated privilege
+-- ALTER DATABASE would (confirmed live: ALTER DATABASE ... SET on this
+-- parameter came back "permission denied to set parameter" for the role
+-- CI's psql connects as, while SET LOCAL on the same parameter, in the
+-- same transaction, does not -- the two have different privilege
+-- requirements even for the same custom GUC).
 -- ============================================================================
 BEGIN;
+SET LOCAL app.settings.bank_account_enc_key = 'pgtap-local-test-key-do-not-use-in-production';
 SELECT plan(25);
 SELECT tests.clear_auth();
 SELECT tests.seed_fixture();

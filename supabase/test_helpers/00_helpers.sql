@@ -280,13 +280,3 @@ GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA tests TO authenticated, anon;
 -- helper cannot silently reintroduce the permission-denied failure.
 ALTER DEFAULT PRIVILEGES IN SCHEMA tests
   GRANT EXECUTE ON FUNCTIONS TO authenticated, anon;
-
--- 0042_carrier_seller_payouts.sql's rpc_add_bank_account reads its encryption
--- key from app.settings.bank_account_enc_key, which no migration sets -- a
--- real project configures it once via the Supabase dashboard, never in a
--- file this repo commits. Locally there is no dashboard, so this stands in
--- for it: a database-level default, exactly like the real setting, good for
--- this local stack only. ALTER DATABASE (not set_config) so it is visible to
--- every session pg_prove opens, not just this psql connection.
-ALTER DATABASE postgres SET app.settings.bank_account_enc_key =
-  'pgtap-local-test-key-do-not-use-in-production';
