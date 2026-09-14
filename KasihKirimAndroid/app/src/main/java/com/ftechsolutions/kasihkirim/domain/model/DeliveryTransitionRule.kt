@@ -102,3 +102,27 @@ val PROOF_DELIVERY_TRANSITIONS = listOf(
     ProofDeliveryTransitionRule(KirimStatus.RETURNING, "CONFIRM_RETURN", KirimStatus.RETURNED,
         "dropoff", setOf(UserRole.CARRIER, UserRole.AGENT)),
 )
+
+/**
+ * Mirrors rpc_delivery_transition's own actor resolution (0030): holding a
+ * role isn't enough, the caller must be substantiated as that role ON THIS
+ * DELIVERY. A dual-role account (e.g. a customer who is also a carrier)
+ * holds UserRole.CARRIER account-wide, but that must not surface a carrier
+ * action on a delivery where they're the customer and someone else is
+ * carrying it -- the server would reject it as STATE_ACTOR_NOT_PERMITTED,
+ * this just keeps the button from ever being offered.
+ *
+ * AGENT/ADMIN stay account-wide, same as the server's own `ELSE true` --
+ * those roles are operational and hub-wide by design, not tied to a single
+ * delivery's parties.
+ */
+fun UserRole.appliesTo(
+    delivery: Delivery,
+    currentUserId: String,
+    myCarrierId: String?,
+    roles: Set<UserRole>,
+): Boolean = this in roles && when (this) {
+    UserRole.CUSTOMER -> delivery.requesterId == currentUserId
+    UserRole.CARRIER -> myCarrierId != null && myCarrierId == delivery.carrierId
+    else -> true
+}

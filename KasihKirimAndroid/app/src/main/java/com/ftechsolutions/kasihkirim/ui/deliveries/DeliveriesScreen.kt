@@ -24,11 +24,13 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.ftechsolutions.kasihkirim.R
 import com.ftechsolutions.kasihkirim.domain.model.Delivery
+import com.ftechsolutions.kasihkirim.domain.model.DisputeCategory
 import com.ftechsolutions.kasihkirim.domain.model.KirimStatus
 import com.ftechsolutions.kasihkirim.domain.model.NON_PROOF_DELIVERY_TRANSITIONS
 import com.ftechsolutions.kasihkirim.domain.model.PROOF_DELIVERY_TRANSITIONS
 import com.ftechsolutions.kasihkirim.domain.model.Sen
 import com.ftechsolutions.kasihkirim.domain.model.UserRole
+import com.ftechsolutions.kasihkirim.domain.model.appliesTo
 import com.ftechsolutions.kasihkirim.ui.auth.messageRes
 import com.ftechsolutions.kasihkirim.ui.common.AppCard
 import com.ftechsolutions.kasihkirim.ui.common.BadgeTone
@@ -37,7 +39,13 @@ import com.ftechsolutions.kasihkirim.ui.common.StatusBadge
 import java.io.ByteArrayOutputStream
 
 @Composable
-fun DeliveriesScreen(vm: DeliveriesViewModel, roles: Set<UserRole>, onBack: () -> Unit) {
+fun DeliveriesScreen(
+    vm: DeliveriesViewModel,
+    currentUserId: String,
+    myCarrierId: String?,
+    roles: Set<UserRole>,
+    onBack: () -> Unit,
+) {
     val state by vm.state.collectAsState()
 
     // MediaStore's own camera app writes and returns a downscaled preview
@@ -67,6 +75,17 @@ fun DeliveriesScreen(vm: DeliveriesViewModel, roles: Set<UserRole>, onBack: () -
         )
     }
 
+    state.openDisputeDeliveryId?.let {
+        OpenDisputeDialog(
+            category = state.disputeCategory,
+            description = state.disputeDescription,
+            onCategorySelected = vm::onDisputeCategorySelected,
+            onDescriptionChange = vm::onDisputeDescriptionChange,
+            onConfirm = vm::submitDispute,
+            onDismiss = vm::cancelOpenDispute,
+        )
+    }
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
@@ -91,11 +110,14 @@ fun DeliveriesScreen(vm: DeliveriesViewModel, roles: Set<UserRole>, onBack: () -
             items(state.deliveries, key = { it.id }) { delivery ->
                 DeliveryCard(
                     delivery = delivery,
+                    currentUserId = currentUserId,
+                    myCarrierId = myCarrierId,
                     roles = roles,
                     isTransitioning = state.transitioningId == delivery.id,
                     onEvent = { event -> vm.transition(delivery.id, event) },
                     onRequestProof = { leg, event -> vm.requestProof(delivery.id, leg, event) },
                     onRequestRecordPurchase = { vm.requestRecordPurchase(delivery.id) },
+                    onRequestOpenDispute = { vm.requestOpenDispute(delivery.id) },
                 )
             }
 
@@ -108,17 +130,20 @@ fun DeliveriesScreen(vm: DeliveriesViewModel, roles: Set<UserRole>, onBack: () -
 @Composable
 private fun DeliveryCard(
     delivery: Delivery,
+    currentUserId: String,
+    myCarrierId: String?,
     roles: Set<UserRole>,
     isTransitioning: Boolean,
     onEvent: (String) -> Unit,
     onRequestProof: (leg: String, event: String) -> Unit,
     onRequestRecordPurchase: () -> Unit,
+    onRequestOpenDispute: () -> Unit,
 ) {
     val availableEvents = NON_PROOF_DELIVERY_TRANSITIONS
         .filter {
             it.fromStatus == delivery.status &&
                 delivery.kirimType in it.applicableTypes &&
-                it.allowedRoles.any { role -> role in roles }
+                it.allowedRoles.any { role -> role.appliesTo(delivery, currentUserId, myCarrierId, roles) }
         }
         // REPORT_FAILURE appears twice (pickup and delivery legs) but is
         // never simultaneously available from the same status -- this is
@@ -126,12 +151,26 @@ private fun DeliveryCard(
         .distinctBy { it.event }
 
     val availableProofEvents = PROOF_DELIVERY_TRANSITIONS
-        .filter { it.fromStatus == delivery.status && it.allowedRoles.any { role -> role in roles } }
+        .filter {
+            it.fromStatus == delivery.status &&
+                it.allowedRoles.any { role -> role.appliesTo(delivery, currentUserId, myCarrierId, roles) }
+        }
 
     // RECORD_PURCHASE isn't in NON_PROOF_DELIVERY_TRANSITIONS: it needs an
     // amount from the carrier first, so it gets its own button + dialog
     // rather than firing an event directly like the plain status buttons.
-    val showRecordPurchase = delivery.status == KirimStatus.PROCURING && UserRole.CARRIER in roles
+    val showRecordPurchase = delivery.status == KirimStatus.PROCURING &&
+        UserRole.CARRIER.appliesTo(delivery, currentUserId, myCarrierId, roles)
+
+    // OPEN_DISPUTE isn't in NON_PROOF_DELIVERY_TRANSITIONS either: it needs a
+    // category and description first (rpc_open_carrier_dispute, 0039), not a
+    // bare fire-and-forget event. ref.delivery_transition_rules also allows
+    // this for customer/seller, but this button is the carrier's own path
+    // only -- a customer's marketplace order already has one in
+    // BuyOrdersScreen (rpc_open_dispute) and a seller's in SalesScreen
+    // (rpc_open_seller_dispute, 0038); a carrier had none at all until now.
+    val showOpenDispute = delivery.status == KirimStatus.DELIVERED &&
+        UserRole.CARRIER.appliesTo(delivery, currentUserId, myCarrierId, roles)
 
     AppCard {
         Row(verticalAlignment = Alignment.Top) {
@@ -167,7 +206,7 @@ private fun DeliveryCard(
             Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
         }
 
-        if (availableEvents.isNotEmpty() || availableProofEvents.isNotEmpty() || showRecordPurchase) {
+        if (availableEvents.isNotEmpty() || availableProofEvents.isNotEmpty() || showRecordPurchase || showOpenDispute) {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -214,6 +253,20 @@ private fun DeliveryCard(
                         }
                     }
                 }
+                if (showOpenDispute) {
+                    OutlinedButton(
+                        onClick = onRequestOpenDispute,
+                        enabled = !isTransitioning,
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                        shape = MaterialTheme.shapes.small,
+                    ) {
+                        if (isTransitioning) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                        } else {
+                            Text(stringResource(R.string.deliveries_report_problem))
+                        }
+                    }
+                }
             }
         }
     }
@@ -248,6 +301,74 @@ private fun RecordPurchaseDialog(onConfirm: (actualGoodsSen: Long) -> Unit, onDi
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.deliveries_record_purchase_cancel)) }
         },
     )
+}
+
+@Composable
+private fun OpenDisputeDialog(
+    category: DisputeCategory,
+    description: String,
+    onCategorySelected: (DisputeCategory) -> Unit,
+    onDescriptionChange: (String) -> Unit,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.deliveries_open_dispute_title)) },
+        text = {
+            Column {
+                Text(stringResource(R.string.deliveries_open_dispute_category), style = MaterialTheme.typography.labelLarge)
+                Spacer(Modifier.height(4.dp))
+                DisputeCategoryChips(category, onCategorySelected)
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = description,
+                    onValueChange = onDescriptionChange,
+                    label = { Text(stringResource(R.string.deliveries_open_dispute_description)) },
+                    minLines = 3,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm, enabled = description.trim().length >= 10) {
+                Text(stringResource(R.string.deliveries_open_dispute_submit))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.deliveries_record_purchase_cancel)) }
+        },
+    )
+}
+
+/** Mirrors SalesScreen's own DisputeCategoryChips/BuyOrdersScreen's
+ *  FlowRowChips for the seller's and buyer's own dispute forms -- same
+ *  DisputeCategory enum, same two-row wrapping layout, now also offered to a
+ *  carrier filing via rpc_open_carrier_dispute (0039). */
+@Composable
+private fun DisputeCategoryChips(selected: DisputeCategory, onSelect: (DisputeCategory) -> Unit) {
+    val categories = DisputeCategory.entries
+    val (first, second) = categories.chunked((categories.size + 1) / 2).let { it[0] to (it.getOrNull(1) ?: emptyList()) }
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            first.forEach { category ->
+                FilterChip(
+                    selected = selected == category,
+                    onClick = { onSelect(category) },
+                    label = { Text(category.labelMs) },
+                )
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            second.forEach { category ->
+                FilterChip(
+                    selected = selected == category,
+                    onClick = { onSelect(category) },
+                    label = { Text(category.labelMs) },
+                )
+            }
+        }
+    }
 }
 
 private fun String.proofLabelRes(): Int = when (this) {

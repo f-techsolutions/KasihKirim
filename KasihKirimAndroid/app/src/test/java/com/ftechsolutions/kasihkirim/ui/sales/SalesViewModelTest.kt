@@ -3,6 +3,7 @@ package com.ftechsolutions.kasihkirim.ui.sales
 import com.ftechsolutions.kasihkirim.core.result.AppError
 import com.ftechsolutions.kasihkirim.core.result.AppResult
 import com.ftechsolutions.kasihkirim.domain.model.Community
+import com.ftechsolutions.kasihkirim.domain.model.DisputeCategory
 import com.ftechsolutions.kasihkirim.domain.model.Earnings
 import com.ftechsolutions.kasihkirim.domain.model.Inventory
 import com.ftechsolutions.kasihkirim.domain.model.InventoryMovement
@@ -77,6 +78,8 @@ private class FakeSellerRepository(
     var lastAdjustDelta: Int? = null
     var lastArchivedId: String? = null
     var lastDisputeDeliveryId: String? = null
+    var lastDisputeCategory: String? = null
+    var lastDisputeDescription: String? = null
     var deleteImageCalls = 0
 
     override suspend fun getMySellerApplication(): AppResult<Seller?> = AppResult.Success(seller)
@@ -144,8 +147,10 @@ private class FakeSellerRepository(
             ),
         )
 
-    override suspend fun openOrderDispute(deliveryId: String): AppResult<Unit> {
+    override suspend fun openOrderDispute(deliveryId: String, category: String, description: String): AppResult<Unit> {
         lastDisputeDeliveryId = deliveryId
+        lastDisputeCategory = category
+        lastDisputeDescription = description
         return openDisputeResult ?: AppResult.Success(Unit)
     }
 }
@@ -440,13 +445,36 @@ class SalesViewModelTest {
 
         vm.selectOrder(order); advanceUntilIdle()
         vm.openDisputeConfirm()
+        vm.onDisputeCategorySelected(DisputeCategory.DAMAGED)
+        vm.onDisputeDescriptionChange("Barang sampai dalam keadaan rosak")
         vm.confirmDispute(); advanceUntilIdle()
 
         assertEquals("d1", repo.lastDisputeDeliveryId)
+        assertEquals("damaged", repo.lastDisputeCategory)
+        assertEquals("Barang sampai dalam keadaan rosak", repo.lastDisputeDescription)
         assertTrue(vm.state.value.disputeSubmitted)
         assertFalse(vm.state.value.showDisputeConfirm)
         assertFalse(vm.state.value.isFilingDispute)
         assertNotNull(vm.state.value.selectedOrderStatus)
+    }
+
+    @Test fun `selecting an order resets the dispute category and description`() = runTest(dispatcher) {
+        val order = SellerOrder(
+            id = "o1", referenceCode = "ORD-1", status = OrderStatus.FULFILLED,
+            goodsSubtotalSen = Sen(3000), deliveryFeeSen = Sen(0), discountSen = Sen(0), commissionSen = Sen(300),
+            totalSen = Sen(3000), createdAt = "2026-09-10T00:00:00Z", items = emptyList(),
+        )
+        val repo = FakeSellerRepository(seller = APPROVED_SELLER, orders = listOf(order))
+        val vm = SalesViewModel(repo, FakeAddressRepository(), FakeEarningsRepository())
+        advanceUntilIdle()
+
+        vm.selectOrder(order); advanceUntilIdle()
+        vm.onDisputeCategorySelected(DisputeCategory.WRONG_ITEM)
+        vm.onDisputeDescriptionChange("draft text")
+        vm.selectOrder(order); advanceUntilIdle()
+
+        assertEquals(DisputeCategory.OTHER, vm.state.value.disputeCategory)
+        assertEquals("", vm.state.value.disputeDescription)
     }
 
     @Test fun `confirmDispute does nothing when the order has no delivery id yet`() = runTest(dispatcher) {

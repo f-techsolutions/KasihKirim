@@ -169,7 +169,13 @@ fun AppNavHost(
             }
             composable(DELIVERIES_ROUTE) {
                 val vm: DeliveriesViewModel = viewModel(factory = DeliveriesViewModel.Factory(deliveryRepository))
-                DeliveriesScreen(vm, roles = user.roles, onBack = { nav.popBackStack() })
+                DeliveriesScreen(
+                    vm,
+                    currentUserId = user.id,
+                    myCarrierId = user.carrierId,
+                    roles = user.roles,
+                    onBack = { nav.popBackStack() },
+                )
             }
             composable(Destination.BOARD.route) {
                 val vm: BoardViewModel = viewModel(

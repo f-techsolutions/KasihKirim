@@ -14,6 +14,7 @@ data class DeliveryKirimRefDto(
     @SerialName("reference_code") val referenceCode: String,
     @SerialName("item_description") val itemDescription: String,
     @SerialName("kirim_type") val kirimType: String,
+    @SerialName("requester_id") val requesterId: String,
 )
 
 /** Row shape for public.deliveries (0001_schema.sql), the columns this
@@ -22,6 +23,7 @@ data class DeliveryKirimRefDto(
 data class DeliveryDto(
     val id: String,
     val status: String,
+    @SerialName("carrier_id") val carrierId: String,
     @SerialName("cod_amount_sen") val codAmountSen: Long,
     @SerialName("carrier_earning_sen") val carrierEarningSen: Long? = null,
     @SerialName("failure_reason") val failureReason: String? = null,
@@ -38,5 +40,7 @@ data class DeliveryDto(
         carrierEarningSen = carrierEarningSen?.let(::Sen),
         failureReason = failureReason,
         matchedAt = matchedAt,
+        carrierId = carrierId,
+        requesterId = kirim.requesterId,
     )
 }

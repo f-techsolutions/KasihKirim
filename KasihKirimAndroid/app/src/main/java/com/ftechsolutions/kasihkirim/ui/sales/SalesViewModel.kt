@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.ftechsolutions.kasihkirim.core.result.AppError
 import com.ftechsolutions.kasihkirim.core.result.AppResult
 import com.ftechsolutions.kasihkirim.domain.model.Community
+import com.ftechsolutions.kasihkirim.domain.model.DisputeCategory
 import com.ftechsolutions.kasihkirim.domain.model.Earnings
 import com.ftechsolutions.kasihkirim.domain.model.HandlingFlag
 import com.ftechsolutions.kasihkirim.domain.model.Inventory
@@ -134,6 +135,8 @@ data class SalesUiState(
     val selectedOrderStatus: SellerOrderStatus? = null,
     val isLoadingOrderStatus: Boolean = false,
     val showDisputeConfirm: Boolean = false,
+    val disputeCategory: DisputeCategory = DisputeCategory.OTHER,
+    val disputeDescription: String = "",
     val isFilingDispute: Boolean = false,
     val disputeSubmitted: Boolean = false,
 )
@@ -497,6 +500,7 @@ class SalesViewModel(
             it.copy(
                 selectedOrder = order, selectedOrderStatus = null,
                 showDisputeConfirm = false, disputeSubmitted = false,
+                disputeDescription = "", disputeCategory = DisputeCategory.OTHER,
             )
         }
         viewModelScope.launch {
@@ -513,17 +517,22 @@ class SalesViewModel(
     fun openDisputeConfirm() = _state.update { it.copy(showDisputeConfirm = true) }
     fun dismissDisputeConfirm() = _state.update { it.copy(showDisputeConfirm = false) }
 
-    /** rpc_delivery_transition(delivery, 'OPEN_DISPUTE') -- the same path
-     *  0030 already authorizes a seller to take on their own order's
-     *  delivery. Needs the delivery id from getOrderStatus's own read, since
-     *  this client has no general SELECT on kirim_requests/deliveries to
-     *  derive it another way. */
+    fun onDisputeCategorySelected(category: DisputeCategory) = _state.update { it.copy(disputeCategory = category) }
+    fun onDisputeDescriptionChange(text: String) = _state.update { it.copy(disputeDescription = text) }
+
+    /** rpc_open_seller_dispute (0038) -- the seller-facing counterpart to a
+     *  buyer's rpc_open_dispute, authorized the same way rpc_delivery_transition
+     *  (0030) already authorizes a seller's own order. Needs the delivery id
+     *  from getOrderStatus's own read, since this client has no general
+     *  SELECT on kirim_requests/deliveries to derive it another way. */
     fun confirmDispute() {
         val orderId = _state.value.selectedOrder?.id ?: return
         val deliveryId = _state.value.selectedOrderStatus?.deliveryId ?: return
+        val category = _state.value.disputeCategory
+        val description = _state.value.disputeDescription.trim()
         viewModelScope.launch {
             _state.update { it.copy(isFilingDispute = true, error = null) }
-            when (val result = sellerRepo.openOrderDispute(deliveryId)) {
+            when (val result = sellerRepo.openOrderDispute(deliveryId, category.wire, description)) {
                 is AppResult.Success -> {
                     _state.update { it.copy(isFilingDispute = false, showDisputeConfirm = false, disputeSubmitted = true) }
                     // Re-read directly, not via selectOrder(): that resets
