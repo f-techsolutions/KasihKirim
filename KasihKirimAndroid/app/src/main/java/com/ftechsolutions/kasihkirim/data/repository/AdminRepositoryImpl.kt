@@ -4,9 +4,11 @@ import com.ftechsolutions.kasihkirim.core.result.AppError
 import com.ftechsolutions.kasihkirim.core.result.AppResult
 import com.ftechsolutions.kasihkirim.core.security.SafeLog
 import com.ftechsolutions.kasihkirim.data.remote.SupabaseClientProvider
+import com.ftechsolutions.kasihkirim.data.remote.dto.CarrierApplicationDto
 import com.ftechsolutions.kasihkirim.data.remote.dto.DisputeDto
 import com.ftechsolutions.kasihkirim.data.remote.dto.ProductReviewDto
 import com.ftechsolutions.kasihkirim.data.remote.dto.SellerApplicationDto
+import com.ftechsolutions.kasihkirim.domain.model.CarrierApplication
 import com.ftechsolutions.kasihkirim.domain.model.Dispute
 import com.ftechsolutions.kasihkirim.domain.model.DisputeStatus
 import com.ftechsolutions.kasihkirim.domain.model.ProductReview
@@ -24,6 +26,9 @@ import java.io.IOException
 private const val SELLER_APPLICATION_COLUMNS =
     "id,business_name,ssm_reg_no,status,review_note,created_at"
 
+private const val CARRIER_APPLICATION_COLUMNS =
+    "id,status,review_note,created_at,communities(name)"
+
 private const val PRODUCT_REVIEW_COLUMNS =
     "id,title,description,status,price_sen,unit,created_at,sellers(business_name)"
 
@@ -39,6 +44,15 @@ private val SELLER_QUEUE = setOf(
 )
 
 private val PRODUCT_QUEUE = setOf(ProductStatus.DRAFT, ProductStatus.PENDING_REVIEW)
+
+/** Statuses that still need a decision from a reviewer -- identical set to
+ *  SELLER_QUEUE since both map the same ref.verification_status enum. */
+private val CARRIER_QUEUE = setOf(
+    SellerStatus.NOT_STARTED,
+    SellerStatus.SUBMITTED,
+    SellerStatus.UNDER_REVIEW,
+    SellerStatus.MORE_INFO_REQUIRED,
+)
 
 class AdminRepositoryImpl : AdminRepository {
 
@@ -69,6 +83,32 @@ class AdminRepositoryImpl : AdminRepository {
             "rpc_admin_set_seller_status",
             buildJsonObject {
                 put("p_seller_id", sellerId)
+                put("p_status", status.wire)
+                put("p_reason", reason)
+            },
+        )
+        Unit
+    }
+
+    override suspend fun listCarrierApplications(): AppResult<List<CarrierApplication>> = runCatchingResult {
+        SupabaseClientProvider.client.postgrest.from("carriers")
+            .select(columns = Columns.raw(CARRIER_APPLICATION_COLUMNS)) {
+                order("created_at", Order.ASCENDING)
+            }
+            .decodeList<CarrierApplicationDto>()
+            .map { it.toDomain() }
+            .filter { it.status in CARRIER_QUEUE }
+    }
+
+    override suspend fun setCarrierStatus(
+        carrierId: String,
+        status: SellerStatus,
+        reason: String?,
+    ): AppResult<Unit> = runCatchingResult {
+        SupabaseClientProvider.client.postgrest.rpc(
+            "rpc_admin_set_carrier_status",
+            buildJsonObject {
+                put("p_carrier_id", carrierId)
                 put("p_status", status.wire)
                 put("p_reason", reason)
             },
@@ -145,6 +185,7 @@ private fun Throwable.toAdminAppError(): AppError = when {
     // rpc_admin_* function before it touches a row.
     message?.contains("STATE_ACTOR_NOT_PERMITTED", true) == true -> AppError.NotAuthorized
     message?.contains("SELLER_NOT_FOUND", true) == true -> AppError.Server("SELLER_NOT_FOUND")
+    message?.contains("CARRIER_NOT_FOUND", true) == true -> AppError.Server("CARRIER_NOT_FOUND")
     message?.contains("PRODUCT_NOT_FOUND", true) == true -> AppError.Server("PRODUCT_NOT_FOUND")
     message?.contains("DISPUTE_NOT_FOUND", true) == true -> AppError.Server("DISPUTE_NOT_FOUND")
     message?.contains("INVALID_STATUS", true) == true -> AppError.Server("INVALID_STATUS")

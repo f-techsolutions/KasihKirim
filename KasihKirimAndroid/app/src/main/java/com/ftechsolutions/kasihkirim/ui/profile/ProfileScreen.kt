@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.MyLocation
@@ -38,6 +39,7 @@ fun ProfileScreen(
     onOpenAddresses: () -> Unit,
     onOpenServiceability: () -> Unit,
     onOpenSales: () -> Unit,
+    onOpenCarrierApplication: () -> Unit,
 ) {
     val profileState by profileVm.state.collectAsState()
 
@@ -77,6 +79,21 @@ fun ProfileScreen(
                 ),
                 onClick = onOpenSales,
             )
+            // Unlike Sales, once the carrier role is held there is nothing
+            // further this row needs to offer -- Board/Trips/Vehicles/
+            // Deliveries/Earnings (existing tabs) are the carrier's working
+            // screens, and CarrierApplicationScreen has nothing to add past
+            // onboarding. So this row disappears entirely on approval,
+            // rather than switching to a "my carrier" destination like
+            // Sales does.
+            if (UserRole.CARRIER !in user.roles) {
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                ActionRow(
+                    icon = Icons.Filled.LocalShipping,
+                    label = stringResource(R.string.profile_become_carrier),
+                    onClick = onOpenCarrierApplication,
+                )
+            }
         }
 
         Spacer(Modifier.weight(1f))

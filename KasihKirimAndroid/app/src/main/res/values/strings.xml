@@ -119,6 +119,7 @@
     <string name="err_photo_path_required">Sila ambil gambar bukti dahulu.</string>
     <string name="err_proof_required">Bukti belum berjaya dihantar. Sila cuba ambil gambar semula.</string>
     <string name="err_seller_application_exists">Anda sudah memohon menjadi penjual.</string>
+    <string name="err_carrier_application_exists">Anda sudah memohon menjadi penghantar.</string>
     <string name="err_community_not_found">Kampung / pekan tidak sah.</string>
     <string name="err_business_name_too_short">Nama perniagaan terlalu pendek.</string>
     <string name="err_product_not_found">Produk tidak dijumpai.</string>
@@ -127,9 +128,12 @@
     <string name="nav_admin">Semakan</string>
     <string name="admin_title">Semakan Pentadbir</string>
     <string name="admin_tab_sellers">Penjual</string>
+    <string name="admin_tab_carriers">Penghantar</string>
     <string name="admin_tab_products">Produk</string>
     <string name="admin_tab_disputes">Pertikaian</string>
     <string name="admin_no_sellers">Tiada permohonan penjual menunggu semakan.</string>
+    <string name="admin_no_carriers">Tiada permohonan penghantar menunggu semakan.</string>
+    <string name="admin_carrier_unknown_community">Kampung / pekan tidak diketahui</string>
     <string name="admin_no_products">Tiada produk menunggu semakan.</string>
     <string name="admin_no_disputes">Tiada pertikaian dibuka.</string>
     <string name="admin_approve">Luluskan</string>
@@ -149,6 +153,7 @@
     <string name="admin_dispute_holds_escrow">Menahan penyelesaian sehingga diselesaikan.</string>
     <string name="admin_ssm_prefix">SSM: %1$s</string>
     <string name="admin_notice_seller_must_resign">Penjual diluluskan. Mereka perlu log keluar dan log masuk semula sebelum skrin penjual muncul.</string>
+    <string name="admin_notice_carrier_must_resign">Penghantar diluluskan. Mereka perlu log keluar dan log masuk semula sebelum skrin penghantar muncul.</string>
     <string name="sales_title">Jualan Saya</string>
     <string name="sales_tab_products">Produk</string>
     <string name="sales_tab_orders">Pesanan</string>
@@ -160,6 +165,11 @@
     <string name="sales_community">Kampung / Pekan</string>
     <string name="sales_apply_submit">Hantar Permohonan</string>
     <string name="sales_status_pending_hint">Anda akan dapat menyenaraikan produk sebaik sahaja permohonan diluluskan.</string>
+    <string name="carrier_apply_title">Jadi Penghantar</string>
+    <string name="carrier_apply_intro">Mohon menjadi penghantar untuk mula menerima kirim. Permohonan akan disemak oleh pentadbir.</string>
+    <string name="carrier_apply_community">Kampung / Pekan Asal</string>
+    <string name="carrier_apply_submit">Hantar Permohonan</string>
+    <string name="carrier_status_pending_hint">Anda akan dapat menerima kirim sebaik sahaja permohonan diluluskan.</string>
     <string name="sales_no_products">Belum ada produk. Tambah produk pertama anda di bawah.</string>
     <string name="sales_add_product">Tambah Produk</string>
     <string name="sales_edit_product">Kemaskini Produk</string>
@@ -231,6 +241,7 @@
 
     <string name="profile_become_seller">Jadi Penjual</string>
     <string name="profile_my_sales">Jualan Saya</string>
+    <string name="profile_become_carrier">Jadi Penghantar</string>
     <string name="deliveries_confirm_pickup">Sahkan Ambil</string>
     <string name="deliveries_confirm_delivery">Sahkan Hantar</string>
     <string name="deliveries_confirm_return">Sahkan Pulang</string>

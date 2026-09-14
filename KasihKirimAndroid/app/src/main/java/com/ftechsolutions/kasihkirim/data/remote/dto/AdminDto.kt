@@ -1,5 +1,6 @@
 package com.ftechsolutions.kasihkirim.data.remote.dto
 
+import com.ftechsolutions.kasihkirim.domain.model.CarrierApplication
 import com.ftechsolutions.kasihkirim.domain.model.Dispute
 import com.ftechsolutions.kasihkirim.domain.model.DisputeStatus
 import com.ftechsolutions.kasihkirim.domain.model.ProductReview
@@ -29,6 +30,31 @@ data class SellerApplicationDto(
         createdAt = createdAt,
     )
 }
+
+/** public.carriers read as a reviewer, with its home community embedded --
+ *  mirrors ProductReviewDto's own sellers(business_name) pattern, so an
+ *  admin sees a place name instead of a bare UUID. review_note added in 0040. */
+@Serializable
+data class CarrierApplicationDto(
+    val id: String,
+    val status: String,
+    @SerialName("review_note") val reviewNote: String? = null,
+    @SerialName("created_at") val createdAt: String,
+    val communities: CarrierApplicationCommunityDto? = null,
+) {
+    fun toDomain() = CarrierApplication(
+        id = id,
+        status = SellerStatus.fromWire(status) ?: SellerStatus.NOT_STARTED,
+        homeCommunityName = communities?.name,
+        reviewNote = reviewNote,
+        createdAt = createdAt,
+    )
+}
+
+@Serializable
+data class CarrierApplicationCommunityDto(
+    val name: String,
+)
 
 /** public.products with its seller embedded, read as a reviewer. */
 @Serializable

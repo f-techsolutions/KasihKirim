@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.ftechsolutions.kasihkirim.core.result.AppError
 import com.ftechsolutions.kasihkirim.core.result.AppResult
+import com.ftechsolutions.kasihkirim.domain.model.CarrierApplication
 import com.ftechsolutions.kasihkirim.domain.model.Dispute
 import com.ftechsolutions.kasihkirim.domain.model.DisputeStatus
 import com.ftechsolutions.kasihkirim.domain.model.ProductReview
@@ -18,12 +19,13 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-enum class AdminQueue { SELLERS, PRODUCTS, DISPUTES }
+enum class AdminQueue { SELLERS, CARRIERS, PRODUCTS, DISPUTES }
 
 data class AdminUiState(
     val isLoading: Boolean = true,
     val queue: AdminQueue = AdminQueue.SELLERS,
     val sellers: List<SellerApplication> = emptyList(),
+    val carriers: List<CarrierApplication> = emptyList(),
     val products: List<ProductReview> = emptyList(),
     val disputes: List<Dispute> = emptyList(),
     /** The row currently being decided, so only its own buttons disable. */
@@ -34,7 +36,7 @@ data class AdminUiState(
     val error: AppError? = null,
 )
 
-enum class AdminNotice { SELLER_APPROVED_MUST_RESIGN }
+enum class AdminNotice { SELLER_APPROVED_MUST_RESIGN, CARRIER_APPROVED_MUST_RESIGN }
 
 class AdminViewModel(private val repo: AdminRepository) : ViewModel() {
 
@@ -47,6 +49,7 @@ class AdminViewModel(private val repo: AdminRepository) : ViewModel() {
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true, error = null) }
             val sellers = repo.listSellerApplications()
+            val carriers = repo.listCarrierApplications()
             val products = repo.listProductReviews()
             val disputes = repo.listOpenDisputes()
             // One failure is reported, but whatever did load still renders --
@@ -55,9 +58,10 @@ class AdminViewModel(private val repo: AdminRepository) : ViewModel() {
                 it.copy(
                     isLoading = false,
                     sellers = (sellers as? AppResult.Success)?.data ?: it.sellers,
+                    carriers = (carriers as? AppResult.Success)?.data ?: it.carriers,
                     products = (products as? AppResult.Success)?.data ?: it.products,
                     disputes = (disputes as? AppResult.Success)?.data ?: it.disputes,
-                    error = listOf(sellers, products, disputes)
+                    error = listOf(sellers, carriers, products, disputes)
                         .filterIsInstance<AppResult.Failure>()
                         .firstOrNull()?.error,
                 )
@@ -74,6 +78,16 @@ class AdminViewModel(private val repo: AdminRepository) : ViewModel() {
             val result = repo.setSellerStatus(sellerId, status, reason)
             if (result is AppResult.Success && status == SellerStatus.APPROVED) {
                 _state.update { it.copy(notice = AdminNotice.SELLER_APPROVED_MUST_RESIGN) }
+            }
+            result
+        }
+    }
+
+    fun decideCarrier(carrierId: String, status: SellerStatus, reason: String? = null) {
+        decide(carrierId) {
+            val result = repo.setCarrierStatus(carrierId, status, reason)
+            if (result is AppResult.Success && status == SellerStatus.APPROVED) {
+                _state.update { it.copy(notice = AdminNotice.CARRIER_APPROVED_MUST_RESIGN) }
             }
             result
         }

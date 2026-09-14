@@ -17,6 +17,7 @@ import com.ftechsolutions.kasihkirim.domain.repository.AddressRepository
 import com.ftechsolutions.kasihkirim.domain.repository.AdminRepository
 import com.ftechsolutions.kasihkirim.domain.repository.BadgeRepository
 import com.ftechsolutions.kasihkirim.domain.repository.BuyRepository
+import com.ftechsolutions.kasihkirim.domain.repository.CarrierRepository
 import com.ftechsolutions.kasihkirim.domain.repository.DeliveryRepository
 import com.ftechsolutions.kasihkirim.domain.repository.EarningsRepository
 import com.ftechsolutions.kasihkirim.domain.repository.KirimRepository
@@ -35,6 +36,8 @@ import com.ftechsolutions.kasihkirim.ui.buy.BuyOrdersScreen
 import com.ftechsolutions.kasihkirim.ui.buy.BuyOrdersViewModel
 import com.ftechsolutions.kasihkirim.ui.buy.BuyScreen
 import com.ftechsolutions.kasihkirim.ui.buy.BuyViewModel
+import com.ftechsolutions.kasihkirim.ui.carrier.CarrierApplicationScreen
+import com.ftechsolutions.kasihkirim.ui.carrier.CarrierApplicationViewModel
 import com.ftechsolutions.kasihkirim.ui.deliveries.DeliveriesScreen
 import com.ftechsolutions.kasihkirim.ui.deliveries.DeliveriesViewModel
 import com.ftechsolutions.kasihkirim.ui.earnings.EarningsScreen
@@ -63,6 +66,7 @@ private const val VEHICLES_ROUTE = "vehicles"
 private const val DELIVERIES_ROUTE = "deliveries"
 private const val BUY_ROUTE = "buy"
 private const val BUY_ORDERS_ROUTE = "buy_orders"
+private const val CARRIER_APPLICATION_ROUTE = "carrier_application"
 
 @Composable
 fun AppNavHost(
@@ -76,6 +80,7 @@ fun AppNavHost(
     deliveryRepository: DeliveryRepository,
     muatanJualRepository: MuatanJualRepository,
     sellerRepository: SellerRepository,
+    carrierRepository: CarrierRepository,
     buyRepository: BuyRepository,
     badgeRepository: BadgeRepository,
     adminRepository: AdminRepository,
@@ -122,7 +127,14 @@ fun AppNavHost(
                     onOpenAddresses = { nav.navigate(ADDRESSES_ROUTE) },
                     onOpenServiceability = { nav.navigate(SERVICEABILITY_ROUTE) },
                     onOpenSales = { nav.navigate(Destination.SALES.route) },
+                    onOpenCarrierApplication = { nav.navigate(CARRIER_APPLICATION_ROUTE) },
                 )
+            }
+            composable(CARRIER_APPLICATION_ROUTE) {
+                val vm: CarrierApplicationViewModel = viewModel(
+                    factory = CarrierApplicationViewModel.Factory(carrierRepository, addressRepository),
+                )
+                CarrierApplicationScreen(vm, onBack = { nav.popBackStack() })
             }
             // Jualan Phase B (0020_jualan_checkout_and_growth.sql): browse
             // active products across all sellers, cart, checkout. Reached

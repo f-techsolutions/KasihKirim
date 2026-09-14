@@ -2,6 +2,7 @@ package com.ftechsolutions.kasihkirim.ui.admin
 
 import com.ftechsolutions.kasihkirim.core.result.AppError
 import com.ftechsolutions.kasihkirim.core.result.AppResult
+import com.ftechsolutions.kasihkirim.domain.model.CarrierApplication
 import com.ftechsolutions.kasihkirim.domain.model.Dispute
 import com.ftechsolutions.kasihkirim.domain.model.DisputeStatus
 import com.ftechsolutions.kasihkirim.domain.model.ProductReview
@@ -23,6 +24,11 @@ private val PENDING_SELLER = SellerApplication(
     status = SellerStatus.SUBMITTED, reviewNote = null, createdAt = "2026-09-10T00:00:00Z",
 )
 
+private val PENDING_CARRIER = CarrierApplication(
+    id = "c1", status = SellerStatus.SUBMITTED, homeCommunityName = "Kg Kepayan Baru",
+    reviewNote = null, createdAt = "2026-09-10T00:00:00Z",
+)
+
 private val PENDING_PRODUCT = ProductReview(
     id = "p1", title = "Ikan Pari", description = null, status = ProductStatus.PENDING_REVIEW,
     priceSen = Sen(800), unit = "kg", sellerName = "Kedai Aisyah", createdAt = "2026-09-10T00:00:00Z",
@@ -36,11 +42,14 @@ private val OPEN_DISPUTE = Dispute(
 
 private class FakeAdminRepository(
     var sellers: List<SellerApplication> = emptyList(),
+    var carriers: List<CarrierApplication> = emptyList(),
     var products: List<ProductReview> = emptyList(),
     var disputes: List<Dispute> = emptyList(),
     var sellerResult: AppResult<Unit> = AppResult.Success(Unit),
+    var carrierResult: AppResult<Unit> = AppResult.Success(Unit),
 ) : AdminRepository {
     var sellerCalls = mutableListOf<Triple<String, SellerStatus, String?>>()
+    var carrierCalls = mutableListOf<Triple<String, SellerStatus, String?>>()
     var productCalls = mutableListOf<Triple<String, ProductStatus, String?>>()
     var disputeCalls = mutableListOf<Triple<String, DisputeStatus, Long>>()
     var listCalls = 0
@@ -53,6 +62,13 @@ private class FakeAdminRepository(
     override suspend fun setSellerStatus(sellerId: String, status: SellerStatus, reason: String?): AppResult<Unit> {
         sellerCalls += Triple(sellerId, status, reason)
         return sellerResult
+    }
+
+    override suspend fun listCarrierApplications(): AppResult<List<CarrierApplication>> = AppResult.Success(carriers)
+
+    override suspend fun setCarrierStatus(carrierId: String, status: SellerStatus, reason: String?): AppResult<Unit> {
+        carrierCalls += Triple(carrierId, status, reason)
+        return carrierResult
     }
 
     override suspend fun listProductReviews(): AppResult<List<ProductReview>> = AppResult.Success(products)
@@ -87,10 +103,11 @@ class AdminViewModelTest {
     @Before fun setUp() = Dispatchers.setMain(dispatcher)
     @After fun tearDown() = Dispatchers.resetMain()
 
-    @Test fun `all three queues load on construction, sellers first`() = runTest(dispatcher) {
+    @Test fun `all four queues load on construction, sellers first`() = runTest(dispatcher) {
         val vm = AdminViewModel(
             FakeAdminRepository(
                 sellers = listOf(PENDING_SELLER),
+                carriers = listOf(PENDING_CARRIER),
                 products = listOf(PENDING_PRODUCT),
                 disputes = listOf(OPEN_DISPUTE),
             ),
@@ -99,6 +116,7 @@ class AdminViewModelTest {
 
         assertEquals(AdminQueue.SELLERS, vm.state.value.queue)
         assertEquals(1, vm.state.value.sellers.size)
+        assertEquals(1, vm.state.value.carriers.size)
         assertEquals(1, vm.state.value.products.size)
         assertEquals(1, vm.state.value.disputes.size)
         assertFalse(vm.state.value.isLoading)
@@ -141,6 +159,45 @@ class AdminViewModelTest {
             repo.sellerCalls,
         )
         assertNull("a rejection is not an approval, so no re-sign-in notice", vm.state.value.notice)
+    }
+
+    @Test fun `approving a carrier sends APPROVED and reloads the queues`() = runTest(dispatcher) {
+        val repo = FakeAdminRepository(carriers = listOf(PENDING_CARRIER))
+        val vm = AdminViewModel(repo)
+        advanceUntilIdle()
+        val loadsAfterInit = repo.listCalls
+
+        vm.decideCarrier("c1", SellerStatus.APPROVED); advanceUntilIdle()
+
+        assertEquals(listOf(Triple("c1", SellerStatus.APPROVED, null)), repo.carrierCalls)
+        assertTrue("queue is re-read from the server, not patched locally", repo.listCalls > loadsAfterInit)
+        assertNull(vm.state.value.decidingId)
+    }
+
+    @Test fun `approving a carrier warns that the role only lands at next sign-in`() = runTest(dispatcher) {
+        val vm = AdminViewModel(FakeAdminRepository(carriers = listOf(PENDING_CARRIER)))
+        advanceUntilIdle()
+
+        vm.decideCarrier("c1", SellerStatus.APPROVED); advanceUntilIdle()
+
+        assertEquals(AdminNotice.CARRIER_APPROVED_MUST_RESIGN, vm.state.value.notice)
+
+        vm.dismissNotice()
+        assertNull(vm.state.value.notice)
+    }
+
+    @Test fun `rejecting a carrier carries the reason through, with no re-sign-in notice`() = runTest(dispatcher) {
+        val repo = FakeAdminRepository(carriers = listOf(PENDING_CARRIER))
+        val vm = AdminViewModel(repo)
+        advanceUntilIdle()
+
+        vm.decideCarrier("c1", SellerStatus.REJECTED, "Vehicle documents incomplete."); advanceUntilIdle()
+
+        assertEquals(
+            listOf(Triple("c1", SellerStatus.REJECTED, "Vehicle documents incomplete.")),
+            repo.carrierCalls,
+        )
+        assertNull(vm.state.value.notice)
     }
 
     @Test fun `publishing a product sends ACTIVE`() = runTest(dispatcher) {

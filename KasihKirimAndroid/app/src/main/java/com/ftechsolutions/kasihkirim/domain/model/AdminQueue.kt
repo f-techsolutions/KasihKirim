@@ -49,6 +49,18 @@ data class SellerApplication(
     val createdAt: String,
 )
 
+/** A carrier application waiting on a decision. Distinct from [CarrierProfile],
+ *  which models the applicant's own view of their single row -- mirrors
+ *  [SellerApplication]'s own split for the same reason: only an admin can
+ *  read another user's review_note, per carriers_select's is_admin() clause. */
+data class CarrierApplication(
+    val id: String,
+    val status: SellerStatus,
+    val homeCommunityName: String?,
+    val reviewNote: String?,
+    val createdAt: String,
+)
+
 /** A product waiting on moderation. Only the fields a reviewer decides on --
  *  the seller's own catalogue view is [Product]. */
 data class ProductReview(

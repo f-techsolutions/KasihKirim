@@ -20,6 +20,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.ftechsolutions.kasihkirim.R
+import com.ftechsolutions.kasihkirim.domain.model.CarrierApplication
 import com.ftechsolutions.kasihkirim.domain.model.Dispute
 import com.ftechsolutions.kasihkirim.domain.model.DisputeStatus
 import com.ftechsolutions.kasihkirim.domain.model.ProductReview
@@ -54,6 +55,11 @@ fun AdminScreen(vm: AdminViewModel) {
                 text = { Text(tabLabel(R.string.admin_tab_sellers, state.sellers.size)) },
             )
             Tab(
+                selected = state.queue == AdminQueue.CARRIERS,
+                onClick = { vm.selectQueue(AdminQueue.CARRIERS) },
+                text = { Text(tabLabel(R.string.admin_tab_carriers, state.carriers.size)) },
+            )
+            Tab(
                 selected = state.queue == AdminQueue.PRODUCTS,
                 onClick = { vm.selectQueue(AdminQueue.PRODUCTS) },
                 text = { Text(tabLabel(R.string.admin_tab_products, state.products.size)) },
@@ -80,6 +86,8 @@ fun AdminScreen(vm: AdminViewModel) {
                                     when (notice) {
                                         AdminNotice.SELLER_APPROVED_MUST_RESIGN ->
                                             R.string.admin_notice_seller_must_resign
+                                        AdminNotice.CARRIER_APPROVED_MUST_RESIGN ->
+                                            R.string.admin_notice_carrier_must_resign
                                     },
                                 ),
                                 style = MaterialTheme.typography.bodyMedium,
@@ -103,6 +111,22 @@ fun AdminScreen(vm: AdminViewModel) {
                                 onApprove = { vm.decideSeller(application.id, SellerStatus.APPROVED) },
                                 onReject = { reason ->
                                     vm.decideSeller(application.id, SellerStatus.REJECTED, reason)
+                                },
+                            )
+                        }
+                    }
+
+                    AdminQueue.CARRIERS -> {
+                        if (state.carriers.isEmpty() && !state.isLoading && state.error == null) {
+                            item { EmptyStateCard(stringResource(R.string.admin_no_carriers)) }
+                        }
+                        items(state.carriers, key = { it.id }) { application ->
+                            CarrierApplicationCard(
+                                application = application,
+                                isDeciding = state.decidingId == application.id,
+                                onApprove = { vm.decideCarrier(application.id, SellerStatus.APPROVED) },
+                                onReject = { reason ->
+                                    vm.decideCarrier(application.id, SellerStatus.REJECTED, reason)
                                 },
                             )
                         }
@@ -176,6 +200,36 @@ private fun SellerApplicationCard(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        }
+        application.reviewNote?.let {
+            Spacer(Modifier.height(4.dp))
+            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        DecisionRow(
+            isDeciding = isDeciding,
+            approveLabel = stringResource(R.string.admin_approve),
+            rejectLabel = stringResource(R.string.admin_reject),
+            onApprove = onApprove,
+            onReject = onReject,
+        )
+    }
+}
+
+@Composable
+private fun CarrierApplicationCard(
+    application: CarrierApplication,
+    isDeciding: Boolean,
+    onApprove: () -> Unit,
+    onReject: (String?) -> Unit,
+) {
+    AppCard {
+        Row(verticalAlignment = Alignment.Top) {
+            Text(
+                application.homeCommunityName ?: stringResource(R.string.admin_carrier_unknown_community),
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.weight(1f),
+            )
+            StatusBadge(application.status.labelMs, tone = BadgeTone.WARNING)
         }
         application.reviewNote?.let {
             Spacer(Modifier.height(4.dp))

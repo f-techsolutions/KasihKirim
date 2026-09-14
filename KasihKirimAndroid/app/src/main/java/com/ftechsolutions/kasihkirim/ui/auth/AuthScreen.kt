@@ -211,6 +211,7 @@ internal fun AppError.messageRes(): Int = when (this) {
         "PHOTO_PATH_REQUIRED" -> R.string.err_photo_path_required
         "PROOF_REQUIRED" -> R.string.err_proof_required
         "SELLER_APPLICATION_EXISTS" -> R.string.err_seller_application_exists
+        "CARRIER_APPLICATION_EXISTS" -> R.string.err_carrier_application_exists
         "COMMUNITY_NOT_FOUND" -> R.string.err_community_not_found
         "BUSINESS_NAME_TOO_SHORT" -> R.string.err_business_name_too_short
         "PRODUCT_NOT_FOUND" -> R.string.err_product_not_found
