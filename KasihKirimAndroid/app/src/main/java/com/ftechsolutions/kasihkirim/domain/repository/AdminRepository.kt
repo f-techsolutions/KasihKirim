@@ -1,6 +1,7 @@
 package com.ftechsolutions.kasihkirim.domain.repository
 
 import com.ftechsolutions.kasihkirim.core.result.AppResult
+import com.ftechsolutions.kasihkirim.domain.model.CarrierApplication
 import com.ftechsolutions.kasihkirim.domain.model.Dispute
 import com.ftechsolutions.kasihkirim.domain.model.DisputeStatus
 import com.ftechsolutions.kasihkirim.domain.model.ProductReview
@@ -27,6 +28,14 @@ interface AdminRepository {
     /** rpc_admin_set_seller_status. On APPROVED this also grants the seller
      *  role, which only reaches the applicant's session at their next sign-in. */
     suspend fun setSellerStatus(sellerId: String, status: SellerStatus, reason: String?): AppResult<Unit>
+
+    /** Applications not yet APPROVED/REJECTED, oldest first -- a queue. */
+    suspend fun listCarrierApplications(): AppResult<List<CarrierApplication>>
+
+    /** rpc_admin_set_carrier_status (0040). On APPROVED this also grants the
+     *  carrier role, which only reaches the applicant's session at their next
+     *  sign-in -- same as setSellerStatus's own APPROVED case. */
+    suspend fun setCarrierStatus(carrierId: String, status: SellerStatus, reason: String?): AppResult<Unit>
 
     /** Products in draft or pending_review, oldest first. */
     suspend fun listProductReviews(): AppResult<List<ProductReview>>
