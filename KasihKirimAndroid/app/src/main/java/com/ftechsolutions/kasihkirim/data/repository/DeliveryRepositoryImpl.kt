@@ -75,7 +75,7 @@ class DeliveryRepositoryImpl : DeliveryRepository {
         val authPlugin = SupabaseClientProvider.client.auth
         val debugSession = authPlugin.currentSessionOrNull()
         val debugExpiresInSec = debugSession?.let {
-            (it.expiresAt - kotlinx.datetime.Clock.System.now()).inWholeSeconds
+            (it.expiresAt.toEpochMilliseconds() - Instant.now().toEpochMilli()) / 1000
         }
         SupabaseClientProvider.client.storage.from(POD_BUCKET).upload(path, photoBytes) {
             httpOverride {
