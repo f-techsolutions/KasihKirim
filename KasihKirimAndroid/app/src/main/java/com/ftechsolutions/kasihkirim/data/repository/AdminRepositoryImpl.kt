@@ -4,10 +4,13 @@ import com.ftechsolutions.kasihkirim.core.result.AppError
 import com.ftechsolutions.kasihkirim.core.result.AppResult
 import com.ftechsolutions.kasihkirim.core.security.SafeLog
 import com.ftechsolutions.kasihkirim.data.remote.SupabaseClientProvider
+import com.ftechsolutions.kasihkirim.data.remote.dto.AdminAccountDto
 import com.ftechsolutions.kasihkirim.data.remote.dto.CarrierApplicationDto
 import com.ftechsolutions.kasihkirim.data.remote.dto.DisputeDto
 import com.ftechsolutions.kasihkirim.data.remote.dto.ProductReviewDto
 import com.ftechsolutions.kasihkirim.data.remote.dto.SellerApplicationDto
+import com.ftechsolutions.kasihkirim.domain.model.AccountStatus
+import com.ftechsolutions.kasihkirim.domain.model.AdminAccount
 import com.ftechsolutions.kasihkirim.domain.model.CarrierApplication
 import com.ftechsolutions.kasihkirim.domain.model.Dispute
 import com.ftechsolutions.kasihkirim.domain.model.DisputeStatus
@@ -34,6 +37,9 @@ private const val PRODUCT_REVIEW_COLUMNS =
 
 private const val DISPUTE_COLUMNS =
     "id,category,description,status,refund_sen,holds_escrow,resolution_note,sla_due_at,created_at"
+
+private const val ACCOUNT_COLUMNS =
+    "id,phone,full_name,display_name,status,suspended_reason,created_at"
 
 /** Statuses that still need a decision from a reviewer. */
 private val SELLER_QUEUE = setOf(
@@ -171,6 +177,38 @@ class AdminRepositoryImpl : AdminRepository {
         Unit
     }
 
+    override suspend fun searchAccounts(query: String): AppResult<List<AdminAccount>> = runCatchingResult {
+        if (query.isBlank()) return@runCatchingResult emptyList()
+        val pattern = "%$query%"
+        val byPhone = SupabaseClientProvider.client.postgrest.from("profiles")
+            .select(columns = Columns.raw(ACCOUNT_COLUMNS)) {
+                filter { ilike("phone", pattern) }
+            }
+            .decodeList<AdminAccountDto>()
+        val byName = SupabaseClientProvider.client.postgrest.from("profiles")
+            .select(columns = Columns.raw(ACCOUNT_COLUMNS)) {
+                filter { ilike("full_name", pattern) }
+            }
+            .decodeList<AdminAccountDto>()
+        (byPhone + byName).distinctBy { it.id }.map { it.toDomain() }
+    }
+
+    override suspend fun setAccountStatus(
+        userId: String,
+        status: AccountStatus,
+        reason: String?,
+    ): AppResult<Unit> = runCatchingResult {
+        SupabaseClientProvider.client.postgrest.rpc(
+            "rpc_admin_set_account_status",
+            buildJsonObject {
+                put("p_user_id", userId)
+                put("p_status", status.wire)
+                put("p_reason", reason)
+            },
+        )
+        Unit
+    }
+
     private inline fun <T> runCatchingResult(block: () -> T): AppResult<T> =
         try {
             AppResult.Success(block())
@@ -188,6 +226,8 @@ private fun Throwable.toAdminAppError(): AppError = when {
     message?.contains("CARRIER_NOT_FOUND", true) == true -> AppError.Server("CARRIER_NOT_FOUND")
     message?.contains("PRODUCT_NOT_FOUND", true) == true -> AppError.Server("PRODUCT_NOT_FOUND")
     message?.contains("DISPUTE_NOT_FOUND", true) == true -> AppError.Server("DISPUTE_NOT_FOUND")
+    message?.contains("USER_NOT_FOUND", true) == true -> AppError.Server("USER_NOT_FOUND")
+    message?.contains("CANNOT_ACT_ON_SELF", true) == true -> AppError.Server("CANNOT_ACT_ON_SELF")
     message?.contains("INVALID_STATUS", true) == true -> AppError.Server("INVALID_STATUS")
     message?.contains("INVALID_REFUND", true) == true -> AppError.Server("INVALID_REFUND")
     this is IOException -> AppError.Network

@@ -1,6 +1,8 @@
 package com.ftechsolutions.kasihkirim.domain.repository
 
 import com.ftechsolutions.kasihkirim.core.result.AppResult
+import com.ftechsolutions.kasihkirim.domain.model.AccountStatus
+import com.ftechsolutions.kasihkirim.domain.model.AdminAccount
 import com.ftechsolutions.kasihkirim.domain.model.CarrierApplication
 import com.ftechsolutions.kasihkirim.domain.model.Dispute
 import com.ftechsolutions.kasihkirim.domain.model.DisputeStatus
@@ -54,4 +56,17 @@ interface AdminRepository {
         note: String?,
         refundSen: Long,
     ): AppResult<Unit>
+
+    /** Not a queue: profiles matching [query] against phone or full name,
+     *  merged from two separate ilike reads (postgrest-kt's `or {}` filter
+     *  combinator has no proven working example anywhere in this module,
+     *  same caution the other queue reads here already document). Empty
+     *  query returns no results rather than the whole user base. */
+    suspend fun searchAccounts(query: String): AppResult<List<AdminAccount>>
+
+    /** rpc_admin_set_account_status (0041). Unlike every other rpc_admin_*
+     *  write in this file, this one is actually enforced server-side --
+     *  custom_access_token_hook now refuses to mint a token at all for a
+     *  SUSPENDED/BANNED account, not just label it that way. */
+    suspend fun setAccountStatus(userId: String, status: AccountStatus, reason: String?): AppResult<Unit>
 }

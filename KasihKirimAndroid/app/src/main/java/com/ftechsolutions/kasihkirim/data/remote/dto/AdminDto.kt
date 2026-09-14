@@ -1,5 +1,7 @@
 package com.ftechsolutions.kasihkirim.data.remote.dto
 
+import com.ftechsolutions.kasihkirim.domain.model.AccountStatus
+import com.ftechsolutions.kasihkirim.domain.model.AdminAccount
 import com.ftechsolutions.kasihkirim.domain.model.CarrierApplication
 import com.ftechsolutions.kasihkirim.domain.model.Dispute
 import com.ftechsolutions.kasihkirim.domain.model.DisputeStatus
@@ -55,6 +57,30 @@ data class CarrierApplicationDto(
 data class CarrierApplicationCommunityDto(
     val name: String,
 )
+
+/** public.profiles read as a reviewer, per profiles_select's own
+ *  is_admin() clause (0003). suspended_reason added in 0001, only ever
+ *  meaningful once 0041 gave it a write path. */
+@Serializable
+data class AdminAccountDto(
+    val id: String,
+    val phone: String,
+    @SerialName("full_name") val fullName: String? = null,
+    @SerialName("display_name") val displayName: String? = null,
+    val status: String,
+    @SerialName("suspended_reason") val suspendedReason: String? = null,
+    @SerialName("created_at") val createdAt: String,
+) {
+    fun toDomain() = AdminAccount(
+        id = id,
+        phone = phone,
+        fullName = fullName,
+        displayName = displayName,
+        status = AccountStatus.fromWire(status) ?: AccountStatus.PENDING,
+        suspendedReason = suspendedReason,
+        createdAt = createdAt,
+    )
+}
 
 /** public.products with its seller embedded, read as a reviewer. */
 @Serializable

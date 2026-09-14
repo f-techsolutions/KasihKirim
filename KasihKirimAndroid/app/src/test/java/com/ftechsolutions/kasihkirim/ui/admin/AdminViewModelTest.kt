@@ -2,6 +2,8 @@ package com.ftechsolutions.kasihkirim.ui.admin
 
 import com.ftechsolutions.kasihkirim.core.result.AppError
 import com.ftechsolutions.kasihkirim.core.result.AppResult
+import com.ftechsolutions.kasihkirim.domain.model.AccountStatus
+import com.ftechsolutions.kasihkirim.domain.model.AdminAccount
 import com.ftechsolutions.kasihkirim.domain.model.CarrierApplication
 import com.ftechsolutions.kasihkirim.domain.model.Dispute
 import com.ftechsolutions.kasihkirim.domain.model.DisputeStatus
@@ -40,18 +42,27 @@ private val OPEN_DISPUTE = Dispute(
     resolutionNote = null, slaDueAt = "2026-09-13T00:00:00Z", createdAt = "2026-09-10T00:00:00Z",
 )
 
+private val ACTIVE_ACCOUNT = AdminAccount(
+    id = "u1", phone = "+60191234567", fullName = "Aisyah Rahman", displayName = null,
+    status = AccountStatus.ACTIVE, suspendedReason = null, createdAt = "2026-09-10T00:00:00Z",
+)
+
 private class FakeAdminRepository(
     var sellers: List<SellerApplication> = emptyList(),
     var carriers: List<CarrierApplication> = emptyList(),
     var products: List<ProductReview> = emptyList(),
     var disputes: List<Dispute> = emptyList(),
+    var accounts: List<AdminAccount> = emptyList(),
     var sellerResult: AppResult<Unit> = AppResult.Success(Unit),
     var carrierResult: AppResult<Unit> = AppResult.Success(Unit),
+    var accountStatusResult: AppResult<Unit> = AppResult.Success(Unit),
 ) : AdminRepository {
     var sellerCalls = mutableListOf<Triple<String, SellerStatus, String?>>()
     var carrierCalls = mutableListOf<Triple<String, SellerStatus, String?>>()
     var productCalls = mutableListOf<Triple<String, ProductStatus, String?>>()
     var disputeCalls = mutableListOf<Triple<String, DisputeStatus, Long>>()
+    var accountStatusCalls = mutableListOf<Triple<String, AccountStatus, String?>>()
+    var searchCalls = mutableListOf<String>()
     var listCalls = 0
 
     override suspend fun listSellerApplications(): AppResult<List<SellerApplication>> {
@@ -92,6 +103,16 @@ private class FakeAdminRepository(
     ): AppResult<Unit> {
         disputeCalls += Triple(disputeId, status, refundSen)
         return AppResult.Success(Unit)
+    }
+
+    override suspend fun searchAccounts(query: String): AppResult<List<AdminAccount>> {
+        searchCalls += query
+        return AppResult.Success(accounts)
+    }
+
+    override suspend fun setAccountStatus(userId: String, status: AccountStatus, reason: String?): AppResult<Unit> {
+        accountStatusCalls += Triple(userId, status, reason)
+        return accountStatusResult
     }
 }
 
@@ -234,6 +255,64 @@ class AdminViewModelTest {
         assertEquals(AppError.NotAuthorized, vm.state.value.error)
         assertNull(vm.state.value.decidingId)
         assertNull(vm.state.value.notice)
+    }
+
+    @Test fun `a blank account query is refused client-side, no repository call`() = runTest(dispatcher) {
+        val repo = FakeAdminRepository()
+        val vm = AdminViewModel(repo)
+        advanceUntilIdle()
+
+        vm.onAccountQueryChange("   ")
+        vm.searchAccounts(); advanceUntilIdle()
+
+        assertTrue(repo.searchCalls.isEmpty())
+        assertTrue(vm.state.value.accounts.isEmpty())
+    }
+
+    @Test fun `searching accounts populates the accounts list`() = runTest(dispatcher) {
+        val repo = FakeAdminRepository(accounts = listOf(ACTIVE_ACCOUNT))
+        val vm = AdminViewModel(repo)
+        advanceUntilIdle()
+
+        vm.onAccountQueryChange("aisyah")
+        vm.searchAccounts(); advanceUntilIdle()
+
+        assertEquals(listOf("aisyah"), repo.searchCalls)
+        assertEquals(listOf(ACTIVE_ACCOUNT), vm.state.value.accounts)
+        assertFalse(vm.state.value.isSearchingAccounts)
+    }
+
+    @Test fun `suspending an account carries the reason and re-runs the search`() = runTest(dispatcher) {
+        val repo = FakeAdminRepository(accounts = listOf(ACTIVE_ACCOUNT))
+        val vm = AdminViewModel(repo)
+        advanceUntilIdle()
+        vm.onAccountQueryChange("aisyah")
+        vm.searchAccounts(); advanceUntilIdle()
+        val searchesAfterFirst = repo.searchCalls.size
+
+        vm.setAccountStatus("u1", AccountStatus.SUSPENDED, "reported by another user")
+        advanceUntilIdle()
+
+        assertEquals(
+            listOf(Triple("u1", AccountStatus.SUSPENDED, "reported by another user")),
+            repo.accountStatusCalls,
+        )
+        assertTrue("a successful status change re-runs the same search", repo.searchCalls.size > searchesAfterFirst)
+        assertNull(vm.state.value.decidingId)
+    }
+
+    @Test fun `a failed account status change surfaces the error and clears the busy row`() = runTest(dispatcher) {
+        val repo = FakeAdminRepository(
+            accounts = listOf(ACTIVE_ACCOUNT),
+            accountStatusResult = AppResult.Failure(AppError.Server("CANNOT_ACT_ON_SELF")),
+        )
+        val vm = AdminViewModel(repo)
+        advanceUntilIdle()
+
+        vm.setAccountStatus("u1", AccountStatus.SUSPENDED, null); advanceUntilIdle()
+
+        assertEquals(AppError.Server("CANNOT_ACT_ON_SELF"), vm.state.value.error)
+        assertNull(vm.state.value.decidingId)
     }
 
     @Test fun `only final dispute statuses are treated as resolving`() {
