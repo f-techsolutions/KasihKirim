@@ -63,6 +63,18 @@ class DeliveryRepositoryImpl : DeliveryRepository {
         event: String,
         photoBytes: ByteArray,
     ): AppResult<KirimStatus> = runCatchingResult {
+        // Same guard SellerRepositoryImpl.uploadProductImage/KirimRepositoryImpl
+        // already use before a Storage upload. Found on-device: the cached
+        // AuthState the UI reads can briefly lag the SDK's real session state
+        // (e.g. right after a sign-in/sign-out cycle), so a screen the UI
+        // still believes is authenticated can fire this call after the SDK's
+        // own session is already gone -- the request then reaches Storage
+        // unauthenticated and fails as an opaque row-level-security error
+        // instead of a clear "sign in again". Checking here fails fast,
+        // locally, with the right error, instead of hitting the network.
+        SupabaseClientProvider.client.auth.currentUserOrNull()
+            ?: throw IllegalStateException("SESSION_EXPIRED")
+
         // First path segment must equal the delivery id -- storage RLS
         // (pod_insert_assigned_carrier) checks exactly that:
         // (storage.foldername(objects.name))[1] = d.id::text.
@@ -115,6 +127,7 @@ private fun Throwable.toDeliveryAppError(): AppError = when {
     message?.contains("STATE_ACTOR_NOT_PERMITTED", true) == true -> AppError.NotAuthorized
     this is IOException -> AppError.Network
     message?.contains("timeout", true) == true -> AppError.Timeout
+    message?.contains("SESSION_EXPIRED", true) == true -> AppError.SessionExpired
     message?.contains("JWT", true) == true -> AppError.SessionExpired
     message?.contains("row-level security", true) == true -> AppError.NotAuthorized
     message?.contains("permission denied", true) == true -> AppError.NotAuthorized
