@@ -241,6 +241,8 @@ internal fun AppError.messageRes(): Int = when (this) {
         "STOCK_NEGATIVE" -> R.string.err_stock_negative
         "STOCK_BELOW_RESERVED" -> R.string.err_stock_below_reserved
         "STOCK_DELTA_ZERO" -> R.string.err_stock_delta_zero
+        "BUDGET_EXCEEDED_NEEDS_VARIANCE" -> R.string.err_budget_exceeded_needs_variance
+        "INVALID_AMOUNT" -> R.string.err_invalid_amount
         else -> R.string.err_unexpected
     }
     else -> R.string.err_unexpected

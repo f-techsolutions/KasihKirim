@@ -9,12 +9,17 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.ftechsolutions.kasihkirim.R
@@ -55,6 +60,13 @@ fun DeliveriesScreen(vm: DeliveriesViewModel, roles: Set<UserRole>, onBack: () -
         if (state.pendingProof != null) cameraLauncher.launch(null)
     }
 
+    state.recordPurchaseDeliveryId?.let {
+        RecordPurchaseDialog(
+            onConfirm = vm::recordPurchase,
+            onDismiss = vm::cancelRecordPurchase,
+        )
+    }
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
@@ -83,6 +95,7 @@ fun DeliveriesScreen(vm: DeliveriesViewModel, roles: Set<UserRole>, onBack: () -
                     isTransitioning = state.transitioningId == delivery.id,
                     onEvent = { event -> vm.transition(delivery.id, event) },
                     onRequestProof = { leg, event -> vm.requestProof(delivery.id, leg, event) },
+                    onRequestRecordPurchase = { vm.requestRecordPurchase(delivery.id) },
                 )
             }
 
@@ -99,6 +112,7 @@ private fun DeliveryCard(
     isTransitioning: Boolean,
     onEvent: (String) -> Unit,
     onRequestProof: (leg: String, event: String) -> Unit,
+    onRequestRecordPurchase: () -> Unit,
 ) {
     val availableEvents = NON_PROOF_DELIVERY_TRANSITIONS
         .filter {
@@ -113,6 +127,11 @@ private fun DeliveryCard(
 
     val availableProofEvents = PROOF_DELIVERY_TRANSITIONS
         .filter { it.fromStatus == delivery.status && it.allowedRoles.any { role -> role in roles } }
+
+    // RECORD_PURCHASE isn't in NON_PROOF_DELIVERY_TRANSITIONS: it needs an
+    // amount from the carrier first, so it gets its own button + dialog
+    // rather than firing an event directly like the plain status buttons.
+    val showRecordPurchase = delivery.status == KirimStatus.PROCURING && UserRole.CARRIER in roles
 
     AppCard {
         Row(verticalAlignment = Alignment.Top) {
@@ -148,11 +167,24 @@ private fun DeliveryCard(
             Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
         }
 
-        if (availableEvents.isNotEmpty() || availableProofEvents.isNotEmpty()) {
+        if (availableEvents.isNotEmpty() || availableProofEvents.isNotEmpty() || showRecordPurchase) {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
+                if (showRecordPurchase) {
+                    Button(
+                        onClick = onRequestRecordPurchase,
+                        enabled = !isTransitioning,
+                        shape = MaterialTheme.shapes.small,
+                    ) {
+                        if (isTransitioning) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                        } else {
+                            Text(stringResource(R.string.deliveries_record_purchase))
+                        }
+                    }
+                }
                 availableEvents.forEach { rule ->
                     OutlinedButton(
                         onClick = { onEvent(rule.event) },
@@ -185,6 +217,37 @@ private fun DeliveryCard(
             }
         }
     }
+}
+
+@Composable
+private fun RecordPurchaseDialog(onConfirm: (actualGoodsSen: Long) -> Unit, onDismiss: () -> Unit) {
+    var amountRinggit by remember { mutableStateOf("") }
+    // Mirrors the RM-to-sen parsing already used by SalesViewModel/AdminScreen.
+    val amountSen = amountRinggit.toDoubleOrNull()?.takeIf { it > 0 }?.let { (it * 100).toLong() }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.deliveries_record_purchase_title)) },
+        text = {
+            OutlinedTextField(
+                value = amountRinggit,
+                onValueChange = { amountRinggit = it },
+                label = { Text(stringResource(R.string.deliveries_record_purchase_amount_label)) },
+                singleLine = true,
+                shape = MaterialTheme.shapes.small,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                modifier = Modifier.fillMaxWidth(),
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = { amountSen?.let(onConfirm) }, enabled = amountSen != null) {
+                Text(stringResource(R.string.deliveries_record_purchase_submit))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.deliveries_record_purchase_cancel)) }
+        },
+    )
 }
 
 private fun String.proofLabelRes(): Int = when (this) {

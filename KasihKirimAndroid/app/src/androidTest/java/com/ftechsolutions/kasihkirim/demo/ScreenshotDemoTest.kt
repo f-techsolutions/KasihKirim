@@ -148,6 +148,8 @@ private class FakeDeliveryRepository : DeliveryRepository {
         event: String,
         photoBytes: ByteArray,
     ) = AppResult.Success(KirimStatus.PICKED_UP)
+    override suspend fun recordPurchase(deliveryId: String, actualGoodsSen: Long) =
+        AppResult.Success(KirimStatus.AWAITING_PICKUP)
 }
 
 private class FakeMuatanJualRepository : MuatanJualRepository {

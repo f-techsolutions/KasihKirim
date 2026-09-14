@@ -24,6 +24,9 @@ data class DeliveriesUiState(
      *  transition is open, so the screen knows which delivery/leg/event a
      *  captured photo belongs to once the camera returns. */
     val pendingProof: PendingProof? = null,
+    /** Non-null while the "record purchase" amount dialog is open for this
+     *  BELI delivery. */
+    val recordPurchaseDeliveryId: String? = null,
 )
 
 data class PendingProof(val deliveryId: String, val leg: String, val event: String)
@@ -81,6 +84,31 @@ class DeliveriesViewModel(private val repo: DeliveryRepository) : ViewModel() {
                     pending.deliveryId, pending.leg, pending.event, photoBytes,
                 )
             ) {
+                is AppResult.Success -> {
+                    _state.update { it.copy(transitioningId = null) }
+                    load()
+                }
+                is AppResult.Failure -> _state.update { it.copy(transitioningId = null, error = result.error) }
+            }
+        }
+    }
+
+    /** Opens the amount-entry dialog for recording a BELI purchase. */
+    fun requestRecordPurchase(deliveryId: String) {
+        _state.update { it.copy(recordPurchaseDeliveryId = deliveryId, error = null) }
+    }
+
+    fun cancelRecordPurchase() {
+        _state.update { it.copy(recordPurchaseDeliveryId = null) }
+    }
+
+    /** The carrier confirmed how much they actually spent -- record it and
+     *  advance the delivery out of PROCURING. */
+    fun recordPurchase(actualGoodsSen: Long) {
+        val deliveryId = _state.value.recordPurchaseDeliveryId ?: return
+        viewModelScope.launch {
+            _state.update { it.copy(transitioningId = deliveryId, recordPurchaseDeliveryId = null, error = null) }
+            when (val result = repo.recordPurchase(deliveryId, actualGoodsSen)) {
                 is AppResult.Success -> {
                     _state.update { it.copy(transitioningId = null) }
                     load()
