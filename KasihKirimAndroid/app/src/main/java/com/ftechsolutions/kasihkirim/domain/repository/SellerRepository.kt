@@ -96,10 +96,12 @@ interface SellerRepository {
      *  ownership-checked substitute, not a policy change. */
     suspend fun getOrderStatus(orderId: String): AppResult<SellerOrderStatus>
 
-    /** rpc_delivery_transition(delivery, 'OPEN_DISPUTE') -- the same generic
-     *  transition RPC 0030 already authorizes a seller to call on their own
-     *  order's delivery. Unlike rpc_open_dispute (customer-only), this path
-     *  carries no category/description: the resulting dispute record gets a
-     *  truthful default (0032's own documented limitation), not free text. */
-    suspend fun openOrderDispute(deliveryId: String): AppResult<Unit>
+    /** rpc_open_seller_dispute (0038) -- a seller-facing counterpart to the
+     *  buyer's rpc_open_dispute, authorized the same way rpc_delivery_transition
+     *  (0030) already authorizes a seller's bare OPEN_DISPUTE: ownership via
+     *  orders.seller_id -> sellers.user_id, not role membership alone. Unlike
+     *  the generic transition RPC this used to call, this one takes a real
+     *  category and description instead of falling back to 0032's truthful
+     *  'other' default. */
+    suspend fun openOrderDispute(deliveryId: String, category: String, description: String): AppResult<Unit>
 }

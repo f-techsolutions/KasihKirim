@@ -223,6 +223,8 @@
     <string name="sales_order_carrier_not_assigned">Belum ada penghantar</string>
     <string name="sales_order_report_problem">Laporkan Masalah</string>
     <string name="sales_order_dispute_hint">Ini akan menandakan pesanan sebagai dipertikaikan untuk semakan pentadbir.</string>
+    <string name="sales_order_dispute_category">Kategori</string>
+    <string name="sales_order_dispute_description">Terangkan masalah anda</string>
     <string name="sales_order_dispute_confirm">Ya, Tandakan Dipertikaikan</string>
     <string name="sales_order_dispute_submitted">Pesanan telah ditandakan sebagai dipertikaikan.</string>
     <string name="sales_close">Tutup</string>
