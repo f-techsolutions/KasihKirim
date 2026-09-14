@@ -7,7 +7,9 @@ import com.ftechsolutions.kasihkirim.core.result.AppError
 import com.ftechsolutions.kasihkirim.core.result.AppResult
 import com.ftechsolutions.kasihkirim.domain.model.AccountStatus
 import com.ftechsolutions.kasihkirim.domain.model.AdminAccount
+import com.ftechsolutions.kasihkirim.domain.model.AdminOrderSearchResult
 import com.ftechsolutions.kasihkirim.domain.model.AdminPayout
+import com.ftechsolutions.kasihkirim.domain.model.AdminPaymentRecord
 import com.ftechsolutions.kasihkirim.domain.model.CarrierApplication
 import com.ftechsolutions.kasihkirim.domain.model.Dispute
 import com.ftechsolutions.kasihkirim.domain.model.DisputeStatus
@@ -22,7 +24,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-enum class AdminQueue { SELLERS, CARRIERS, PRODUCTS, DISPUTES, ACCOUNTS, PAYOUTS }
+enum class AdminQueue { SELLERS, CARRIERS, PRODUCTS, DISPUTES, ACCOUNTS, PAYOUTS, ORDER_SEARCH, PAYMENTS }
 
 data class AdminUiState(
     val isLoading: Boolean = true,
@@ -37,6 +39,16 @@ data class AdminUiState(
     val accountQuery: String = "",
     val accounts: List<AdminAccount> = emptyList(),
     val isSearchingAccounts: Boolean = false,
+    /** Not a queue either, same reasoning as [accountQuery]/[accounts] --
+     *  null means "nothing searched yet", distinct from a search that ran
+     *  and found nothing (searchedOrder true, orderResult null). */
+    val orderQuery: String = "",
+    val orderResult: AdminOrderSearchResult? = null,
+    val searchedOrder: Boolean = false,
+    val isSearchingOrder: Boolean = false,
+    /** rpc_admin_recent_payments (0043) -- loaded alongside the other queues
+     *  in [load], since it's capped server-side and read-only. */
+    val recentPayments: List<AdminPaymentRecord> = emptyList(),
     /** The row currently being decided, so only its own buttons disable. */
     val decidingId: String? = null,
     /** Set after an approval that grants a role, since the grant only reaches
@@ -62,6 +74,7 @@ class AdminViewModel(private val repo: AdminRepository) : ViewModel() {
             val products = repo.listProductReviews()
             val disputes = repo.listOpenDisputes()
             val payouts = repo.listPayouts()
+            val recentPayments = repo.listRecentPayments()
             // One failure is reported, but whatever did load still renders --
             // a broken dispute read shouldn't hide a seller waiting on approval.
             _state.update {
@@ -72,7 +85,8 @@ class AdminViewModel(private val repo: AdminRepository) : ViewModel() {
                     products = (products as? AppResult.Success)?.data ?: it.products,
                     disputes = (disputes as? AppResult.Success)?.data ?: it.disputes,
                     payouts = (payouts as? AppResult.Success)?.data ?: it.payouts,
-                    error = listOf(sellers, carriers, products, disputes, payouts)
+                    recentPayments = (recentPayments as? AppResult.Success)?.data ?: it.recentPayments,
+                    error = listOf(sellers, carriers, products, disputes, payouts, recentPayments)
                         .filterIsInstance<AppResult.Failure>()
                         .firstOrNull()?.error,
                 )
@@ -152,6 +166,30 @@ class AdminViewModel(private val repo: AdminRepository) : ViewModel() {
                 }
                 is AppResult.Failure ->
                     _state.update { it.copy(decidingId = null, error = result.error) }
+            }
+        }
+    }
+
+    fun onOrderQueryChange(query: String) = _state.update { it.copy(orderQuery = query) }
+
+    /** rpc_admin_search_order (0043). An empty query returns no result
+     *  client-side, same as [searchAccounts] refuses one server-side --
+     *  there is no "browse everything" mode for either search. */
+    fun searchOrder() {
+        val query = _state.value.orderQuery
+        if (query.isBlank()) {
+            _state.update { it.copy(orderResult = null, searchedOrder = false) }
+            return
+        }
+        viewModelScope.launch {
+            _state.update { it.copy(isSearchingOrder = true, error = null) }
+            when (val result = repo.searchOrder(query)) {
+                is AppResult.Success ->
+                    _state.update {
+                        it.copy(isSearchingOrder = false, orderResult = result.data, searchedOrder = true)
+                    }
+                is AppResult.Failure ->
+                    _state.update { it.copy(isSearchingOrder = false, error = result.error) }
             }
         }
     }

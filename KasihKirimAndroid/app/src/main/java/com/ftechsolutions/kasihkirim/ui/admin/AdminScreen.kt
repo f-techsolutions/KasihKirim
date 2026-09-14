@@ -24,7 +24,10 @@ import androidx.compose.ui.unit.dp
 import com.ftechsolutions.kasihkirim.R
 import com.ftechsolutions.kasihkirim.domain.model.AccountStatus
 import com.ftechsolutions.kasihkirim.domain.model.AdminAccount
+import com.ftechsolutions.kasihkirim.domain.model.AdminDeliveryAttempt
+import com.ftechsolutions.kasihkirim.domain.model.AdminOrderSearchResult
 import com.ftechsolutions.kasihkirim.domain.model.AdminPayout
+import com.ftechsolutions.kasihkirim.domain.model.AdminPaymentRecord
 import com.ftechsolutions.kasihkirim.domain.model.CarrierApplication
 import com.ftechsolutions.kasihkirim.domain.model.Dispute
 import com.ftechsolutions.kasihkirim.domain.model.DisputeStatus
@@ -39,6 +42,9 @@ import com.ftechsolutions.kasihkirim.ui.common.BadgeTone
 import com.ftechsolutions.kasihkirim.ui.common.EmptyStateCard
 import com.ftechsolutions.kasihkirim.ui.common.ScreenHeader
 import com.ftechsolutions.kasihkirim.ui.common.StatusBadge
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 @Composable
 fun AdminScreen(vm: AdminViewModel) {
@@ -85,6 +91,16 @@ fun AdminScreen(vm: AdminViewModel) {
                 onClick = { vm.selectQueue(AdminQueue.PAYOUTS) },
                 text = { Text(tabLabel(R.string.admin_tab_payouts, state.payouts.size)) },
             )
+            Tab(
+                selected = state.queue == AdminQueue.ORDER_SEARCH,
+                onClick = { vm.selectQueue(AdminQueue.ORDER_SEARCH) },
+                text = { Text(stringResource(R.string.admin_tab_order_search)) },
+            )
+            Tab(
+                selected = state.queue == AdminQueue.PAYMENTS,
+                onClick = { vm.selectQueue(AdminQueue.PAYMENTS) },
+                text = { Text(tabLabel(R.string.admin_tab_payments, state.recentPayments.size)) },
+            )
         }
 
         if (state.queue == AdminQueue.ACCOUNTS) {
@@ -99,6 +115,23 @@ fun AdminScreen(vm: AdminViewModel) {
                     shape = MaterialTheme.shapes.small,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                     keyboardActions = KeyboardActions(onSearch = { vm.searchAccounts() }),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
+
+        if (state.queue == AdminQueue.ORDER_SEARCH) {
+            Column(Modifier.padding(horizontal = 20.dp)) {
+                Spacer(Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = state.orderQuery,
+                    onValueChange = vm::onOrderQueryChange,
+                    label = { Text(stringResource(R.string.admin_order_search_label)) },
+                    placeholder = { Text(stringResource(R.string.admin_order_search_hint)) },
+                    singleLine = true,
+                    shape = MaterialTheme.shapes.small,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(onSearch = { vm.searchOrder() }),
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -224,6 +257,26 @@ fun AdminScreen(vm: AdminViewModel) {
                                 onMarkPaid = { providerRef -> vm.markPayoutPaid(payout.id, providerRef) },
                                 onMarkFailed = { reason -> vm.markPayoutFailed(payout.id, reason) },
                             )
+                        }
+                    }
+
+                    AdminQueue.ORDER_SEARCH -> {
+                        val result = state.orderResult
+                        if (result != null) {
+                            item { OrderSearchResultCard(result) }
+                        } else if (state.searchedOrder && !state.isSearchingOrder) {
+                            item { EmptyStateCard(stringResource(R.string.admin_order_search_not_found)) }
+                        } else if (!state.isSearchingOrder && state.orderQuery.isBlank()) {
+                            item { EmptyStateCard(stringResource(R.string.admin_order_search_hint)) }
+                        }
+                    }
+
+                    AdminQueue.PAYMENTS -> {
+                        if (state.recentPayments.isEmpty() && !state.isLoading && state.error == null) {
+                            item { EmptyStateCard(stringResource(R.string.admin_no_payments)) }
+                        }
+                        items(state.recentPayments, key = { it.id }) { payment ->
+                            PaymentRecordCard(payment)
                         }
                     }
                 }
@@ -636,6 +689,164 @@ private fun PayoutCard(
             else -> Unit
         }
     }
+}
+
+/** rpc_admin_search_order's result -- everything an admin support agent needs
+ *  for one lookup: the kirim itself, its wrapping order if it's PASARAN, its
+ *  payment intent if one exists, and every delivery attempt made against it.
+ *  Read-only: there is no decision to make here, unlike every other card in
+ *  this screen. */
+@Composable
+private fun OrderSearchResultCard(result: AdminOrderSearchResult) {
+    AppCard {
+        Row(verticalAlignment = Alignment.Top) {
+            Column(Modifier.weight(1f)) {
+                Text(result.referenceCode, style = MaterialTheme.typography.titleMedium)
+                Text(
+                    result.itemDescription,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                StatusBadge(result.kirimType.wire, tone = BadgeTone.NEUTRAL)
+                Spacer(Modifier.height(4.dp))
+                StatusBadge(result.status?.labelMs ?: "-", tone = BadgeTone.INFO)
+            }
+        }
+
+        Spacer(Modifier.height(8.dp))
+        (result.requesterName ?: result.requesterPhone)?.let {
+            Text(
+                stringResource(R.string.admin_order_requester_prefix, it),
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+        result.budgetCapSen?.let {
+            Text(
+                stringResource(R.string.admin_order_budget_prefix, it.format()),
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+        result.totalEscrowSen?.let {
+            Text(
+                stringResource(R.string.admin_order_escrow_prefix, it.format()),
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+
+        result.order?.let { order ->
+            Spacer(Modifier.height(10.dp))
+            HorizontalDivider()
+            Spacer(Modifier.height(10.dp))
+            Text(stringResource(R.string.admin_order_section_order), style = MaterialTheme.typography.titleSmall)
+            Text("${order.referenceCode} · ${order.status}", style = MaterialTheme.typography.bodySmall)
+            Text(
+                stringResource(R.string.admin_order_total_prefix, order.totalSen.format()),
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+
+        result.payment?.let { payment ->
+            Spacer(Modifier.height(10.dp))
+            HorizontalDivider()
+            Spacer(Modifier.height(10.dp))
+            Text(stringResource(R.string.admin_order_section_payment), style = MaterialTheme.typography.titleSmall)
+            Text(
+                "${payment.method} · ${payment.status} · ${payment.amountSen.format()}",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            payment.failureCode?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+            }
+        } ?: Text(
+            stringResource(R.string.admin_order_no_payment),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        if (result.deliveries.isNotEmpty()) {
+            Spacer(Modifier.height(10.dp))
+            HorizontalDivider()
+            Spacer(Modifier.height(10.dp))
+            Text(
+                stringResource(R.string.admin_order_section_deliveries),
+                style = MaterialTheme.typography.titleSmall,
+            )
+            result.deliveries.forEach { attempt ->
+                Spacer(Modifier.height(6.dp))
+                DeliveryAttemptRow(attempt)
+            }
+        }
+    }
+}
+
+@Composable
+private fun DeliveryAttemptRow(attempt: AdminDeliveryAttempt) {
+    Column {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                stringResource(R.string.admin_order_attempt_prefix, attempt.attemptNo),
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1f),
+            )
+            StatusBadge(
+                attempt.status?.labelMs ?: "-",
+                tone = if (attempt.hasOpenDispute) BadgeTone.ERROR else BadgeTone.NEUTRAL,
+            )
+        }
+        (attempt.carrierName ?: attempt.carrierPhone)?.let {
+            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        attempt.failureReason?.let {
+            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+        }
+        if (attempt.hasOpenDispute) {
+            Text(
+                stringResource(R.string.admin_order_open_dispute),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
+    }
+}
+
+/** rpc_admin_recent_payments' own row -- deliberately basic per the roadmap:
+ *  did this go through, who paid, how much. Read-only, no decisions here. */
+@Composable
+private fun PaymentRecordCard(payment: AdminPaymentRecord) {
+    AppCard {
+        Row(verticalAlignment = Alignment.Top) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    payment.payerName ?: payment.payerPhone ?: payment.referenceType,
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                Text(
+                    formatTimestamp(payment.createdAt),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            StatusBadge(payment.status, tone = BadgeTone.NEUTRAL)
+        }
+        Spacer(Modifier.height(4.dp))
+        Text(payment.amountSen.format(), style = MaterialTheme.typography.bodyMedium)
+        Text(
+            "${payment.provider} · ${payment.method} · ${payment.referenceType}",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        payment.failureCode?.let {
+            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+        }
+    }
+}
+
+private fun formatTimestamp(iso: String): String = try {
+    DateTimeFormatter.ofPattern("d MMM yyyy, HH:mm").withZone(ZoneId.systemDefault()).format(Instant.parse(iso))
+} catch (e: Exception) {
+    iso
 }
 
 /** Approve is one tap; rejecting asks why first, so the applicant is told
