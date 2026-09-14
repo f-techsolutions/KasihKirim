@@ -26,6 +26,7 @@ import com.ftechsolutions.kasihkirim.R
 import com.ftechsolutions.kasihkirim.domain.model.Trip
 import com.ftechsolutions.kasihkirim.domain.model.TripStatus
 import com.ftechsolutions.kasihkirim.domain.model.Vehicle
+import com.ftechsolutions.kasihkirim.domain.model.kgDecimalString
 import com.ftechsolutions.kasihkirim.ui.auth.messageRes
 import com.ftechsolutions.kasihkirim.ui.common.AppCard
 import com.ftechsolutions.kasihkirim.ui.common.BadgeTone
@@ -122,7 +123,7 @@ private fun TripCard(
         )
         Spacer(Modifier.height(2.dp))
         Text(
-            "${trip.reservedWeightGrams / 1000}/${trip.capacityWeightGrams / 1000}kg · " +
+            "${trip.reservedWeightGrams.kgDecimalString()}/${trip.capacityWeightGrams.kgDecimalString()}kg · " +
                 "${trip.reservedParcels}/${trip.capacityParcels}x",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
