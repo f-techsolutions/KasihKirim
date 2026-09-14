@@ -3,6 +3,7 @@ package com.ftechsolutions.kasihkirim.domain.repository
 import com.ftechsolutions.kasihkirim.core.result.AppResult
 import com.ftechsolutions.kasihkirim.domain.model.AccountStatus
 import com.ftechsolutions.kasihkirim.domain.model.AdminAccount
+import com.ftechsolutions.kasihkirim.domain.model.AdminPayout
 import com.ftechsolutions.kasihkirim.domain.model.CarrierApplication
 import com.ftechsolutions.kasihkirim.domain.model.Dispute
 import com.ftechsolutions.kasihkirim.domain.model.DisputeStatus
@@ -69,4 +70,27 @@ interface AdminRepository {
      *  custom_access_token_hook now refuses to mint a token at all for a
      *  SUSPENDED/BANNED account, not just label it that way. */
     suspend fun setAccountStatus(userId: String, status: AccountStatus, reason: String?): AppResult<Unit>
+
+    /** rpc_admin_list_payouts (0042). The actionable set only (REQUESTED
+     *  through PROCESSING), same reasoning as the other queues here --
+     *  internal.payouts has no RLS an admin could otherwise read through. */
+    suspend fun listPayouts(): AppResult<List<AdminPayout>>
+
+    /** rpc_admin_review_payout: first look. REQUESTED -> UNDER_REVIEW or
+     *  REJECTED. Needs no second admin -- only paying money out does. */
+    suspend fun reviewPayout(payoutId: String, approve: Boolean, reason: String?): AppResult<Unit>
+
+    /** rpc_admin_approve_payout: second look, by someone else. UNDER_REVIEW
+     *  -> APPROVED or REJECTED. The server refuses the same admin who
+     *  reviewed it (CANNOT_APPROVE_OWN_REVIEW) -- this is the actual
+     *  maker-checker enforcement, backed by ck_payout_segregation (0001). */
+    suspend fun approvePayout(payoutId: String, approve: Boolean, reason: String?): AppResult<Unit>
+
+    /** rpc_admin_mark_payout_paid: the only step that posts to the ledger.
+     *  providerRef is whatever reference a manual/offline transfer produced
+     *  -- this never calls a real disbursement rail (0042's own header). */
+    suspend fun markPayoutPaid(payoutId: String, providerRef: String?): AppResult<Unit>
+
+    /** rpc_admin_mark_payout_failed. No ledger effect: money never moved. */
+    suspend fun markPayoutFailed(payoutId: String, reason: String): AppResult<Unit>
 }

@@ -24,9 +24,11 @@ import androidx.compose.ui.unit.dp
 import com.ftechsolutions.kasihkirim.R
 import com.ftechsolutions.kasihkirim.domain.model.AccountStatus
 import com.ftechsolutions.kasihkirim.domain.model.AdminAccount
+import com.ftechsolutions.kasihkirim.domain.model.AdminPayout
 import com.ftechsolutions.kasihkirim.domain.model.CarrierApplication
 import com.ftechsolutions.kasihkirim.domain.model.Dispute
 import com.ftechsolutions.kasihkirim.domain.model.DisputeStatus
+import com.ftechsolutions.kasihkirim.domain.model.PayoutStatus
 import com.ftechsolutions.kasihkirim.domain.model.ProductReview
 import com.ftechsolutions.kasihkirim.domain.model.ProductStatus
 import com.ftechsolutions.kasihkirim.domain.model.SellerApplication
@@ -77,6 +79,11 @@ fun AdminScreen(vm: AdminViewModel) {
                 selected = state.queue == AdminQueue.ACCOUNTS,
                 onClick = { vm.selectQueue(AdminQueue.ACCOUNTS) },
                 text = { Text(stringResource(R.string.admin_tab_accounts)) },
+            )
+            Tab(
+                selected = state.queue == AdminQueue.PAYOUTS,
+                onClick = { vm.selectQueue(AdminQueue.PAYOUTS) },
+                text = { Text(tabLabel(R.string.admin_tab_payouts, state.payouts.size)) },
             )
         }
 
@@ -200,6 +207,22 @@ fun AdminScreen(vm: AdminViewModel) {
                                 account = account,
                                 isDeciding = state.decidingId == account.id,
                                 onSetStatus = { status, reason -> vm.setAccountStatus(account.id, status, reason) },
+                            )
+                        }
+                    }
+
+                    AdminQueue.PAYOUTS -> {
+                        if (state.payouts.isEmpty() && !state.isLoading && state.error == null) {
+                            item { EmptyStateCard(stringResource(R.string.admin_no_payouts)) }
+                        }
+                        items(state.payouts, key = { it.id }) { payout ->
+                            PayoutCard(
+                                payout = payout,
+                                isDeciding = state.decidingId == payout.id,
+                                onReview = { approve, reason -> vm.reviewPayout(payout.id, approve, reason) },
+                                onApprove = { approve, reason -> vm.approvePayout(payout.id, approve, reason) },
+                                onMarkPaid = { providerRef -> vm.markPayoutPaid(payout.id, providerRef) },
+                                onMarkFailed = { reason -> vm.markPayoutFailed(payout.id, reason) },
                             )
                         }
                     }
@@ -505,6 +528,112 @@ private fun AccountCard(
                     }
                 }
             }
+        }
+    }
+}
+
+/** One card, three different action shapes depending on status --
+ *  REQUESTED/UNDER_REVIEW are still a review/approve decision (DecisionRow
+ *  fits), but APPROVED becomes "pay or fail", which isn't an approve/reject
+ *  choice at all, so it gets its own row instead of forcing DecisionRow's
+ *  labels to mean something they don't. */
+@Composable
+private fun PayoutCard(
+    payout: AdminPayout,
+    isDeciding: Boolean,
+    onReview: (Boolean, String?) -> Unit,
+    onApprove: (Boolean, String?) -> Unit,
+    onMarkPaid: (String?) -> Unit,
+    onMarkFailed: (String) -> Unit,
+) {
+    var failing by remember(payout.id) { mutableStateOf(false) }
+    var reason by remember(payout.id) { mutableStateOf("") }
+    var providerRef by remember(payout.id) { mutableStateOf("") }
+
+    AppCard {
+        Row(verticalAlignment = Alignment.Top) {
+            Text(
+                payout.payeeLabel ?: payout.payeeType,
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.weight(1f),
+            )
+            StatusBadge(payout.status.labelMs, tone = BadgeTone.WARNING)
+        }
+        Spacer(Modifier.height(4.dp))
+        Text(payout.amountSen.format(), style = MaterialTheme.typography.bodyMedium)
+        Text(
+            "${payout.bankCode} •••• ${payout.accountNoLast4} (${payout.holderName})",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        when (payout.status) {
+            PayoutStatus.REQUESTED -> DecisionRow(
+                isDeciding = isDeciding,
+                approveLabel = stringResource(R.string.admin_payout_send_to_review),
+                rejectLabel = stringResource(R.string.admin_reject),
+                onApprove = { onReview(true, null) },
+                onReject = { r -> onReview(false, r) },
+            )
+
+            PayoutStatus.UNDER_REVIEW -> DecisionRow(
+                isDeciding = isDeciding,
+                approveLabel = stringResource(R.string.admin_approve),
+                rejectLabel = stringResource(R.string.admin_reject),
+                onApprove = { onApprove(true, null) },
+                onReject = { r -> onApprove(false, r) },
+            )
+
+            PayoutStatus.APPROVED -> {
+                Spacer(Modifier.height(10.dp))
+                if (failing) {
+                    OutlinedTextField(
+                        value = reason,
+                        onValueChange = { reason = it },
+                        label = { Text(stringResource(R.string.admin_payout_fail_reason)) },
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 2,
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = { onMarkFailed(reason.trim()); failing = false },
+                            enabled = !isDeciding && reason.isNotBlank(),
+                            shape = MaterialTheme.shapes.medium,
+                        ) { Text(stringResource(R.string.admin_confirm_reject)) }
+                        TextButton(onClick = { failing = false }) { Text(stringResource(R.string.admin_cancel)) }
+                    }
+                } else {
+                    OutlinedTextField(
+                        value = providerRef,
+                        onValueChange = { providerRef = it },
+                        label = { Text(stringResource(R.string.admin_payout_provider_ref)) },
+                        singleLine = true,
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Button(
+                            onClick = { onMarkPaid(providerRef.trim().takeIf { it.isNotEmpty() }) },
+                            enabled = !isDeciding,
+                            shape = MaterialTheme.shapes.medium,
+                        ) {
+                            if (isDeciding) {
+                                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                            } else {
+                                Text(stringResource(R.string.admin_payout_mark_paid))
+                            }
+                        }
+                        TextButton(onClick = { failing = true }, enabled = !isDeciding) {
+                            Text(stringResource(R.string.admin_payout_mark_failed))
+                        }
+                    }
+                }
+            }
+
+            else -> Unit
         }
     }
 }

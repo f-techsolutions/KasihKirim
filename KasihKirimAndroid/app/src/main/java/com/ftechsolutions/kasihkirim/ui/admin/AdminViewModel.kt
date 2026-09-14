@@ -7,6 +7,7 @@ import com.ftechsolutions.kasihkirim.core.result.AppError
 import com.ftechsolutions.kasihkirim.core.result.AppResult
 import com.ftechsolutions.kasihkirim.domain.model.AccountStatus
 import com.ftechsolutions.kasihkirim.domain.model.AdminAccount
+import com.ftechsolutions.kasihkirim.domain.model.AdminPayout
 import com.ftechsolutions.kasihkirim.domain.model.CarrierApplication
 import com.ftechsolutions.kasihkirim.domain.model.Dispute
 import com.ftechsolutions.kasihkirim.domain.model.DisputeStatus
@@ -21,7 +22,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-enum class AdminQueue { SELLERS, CARRIERS, PRODUCTS, DISPUTES, ACCOUNTS }
+enum class AdminQueue { SELLERS, CARRIERS, PRODUCTS, DISPUTES, ACCOUNTS, PAYOUTS }
 
 data class AdminUiState(
     val isLoading: Boolean = true,
@@ -30,6 +31,7 @@ data class AdminUiState(
     val carriers: List<CarrierApplication> = emptyList(),
     val products: List<ProductReview> = emptyList(),
     val disputes: List<Dispute> = emptyList(),
+    val payouts: List<AdminPayout> = emptyList(),
     /** Not a queue loaded by [load] -- populated only once [searchAccounts]
      *  runs, since an empty query intentionally returns nothing. */
     val accountQuery: String = "",
@@ -59,6 +61,7 @@ class AdminViewModel(private val repo: AdminRepository) : ViewModel() {
             val carriers = repo.listCarrierApplications()
             val products = repo.listProductReviews()
             val disputes = repo.listOpenDisputes()
+            val payouts = repo.listPayouts()
             // One failure is reported, but whatever did load still renders --
             // a broken dispute read shouldn't hide a seller waiting on approval.
             _state.update {
@@ -68,7 +71,8 @@ class AdminViewModel(private val repo: AdminRepository) : ViewModel() {
                     carriers = (carriers as? AppResult.Success)?.data ?: it.carriers,
                     products = (products as? AppResult.Success)?.data ?: it.products,
                     disputes = (disputes as? AppResult.Success)?.data ?: it.disputes,
-                    error = listOf(sellers, carriers, products, disputes)
+                    payouts = (payouts as? AppResult.Success)?.data ?: it.payouts,
+                    error = listOf(sellers, carriers, products, disputes, payouts)
                         .filterIsInstance<AppResult.Failure>()
                         .firstOrNull()?.error,
                 )
@@ -150,6 +154,28 @@ class AdminViewModel(private val repo: AdminRepository) : ViewModel() {
                     _state.update { it.copy(decidingId = null, error = result.error) }
             }
         }
+    }
+
+    /** First look: REQUESTED -> UNDER_REVIEW or REJECTED. */
+    fun reviewPayout(payoutId: String, approve: Boolean, reason: String? = null) {
+        decide(payoutId) { repo.reviewPayout(payoutId, approve, reason) }
+    }
+
+    /** Second look, by someone else: UNDER_REVIEW -> APPROVED or REJECTED.
+     *  The server refuses the same admin who reviewed it -- this call can
+     *  surface that as an ordinary error, same as any other rejection. */
+    fun approvePayout(payoutId: String, approve: Boolean, reason: String? = null) {
+        decide(payoutId) { repo.approvePayout(payoutId, approve, reason) }
+    }
+
+    /** The only step that posts to the ledger -- see AdminRepository's own
+     *  doc comment. providerRef is a stub reference, never a real transfer. */
+    fun markPayoutPaid(payoutId: String, providerRef: String? = null) {
+        decide(payoutId) { repo.markPayoutPaid(payoutId, providerRef) }
+    }
+
+    fun markPayoutFailed(payoutId: String, reason: String) {
+        decide(payoutId) { repo.markPayoutFailed(payoutId, reason) }
     }
 
     /** Every decision follows the same shape: mark the row busy, call the
