@@ -8,10 +8,12 @@ import com.ftechsolutions.kasihkirim.data.remote.dto.DeliveryDto
 import com.ftechsolutions.kasihkirim.domain.model.Delivery
 import com.ftechsolutions.kasihkirim.domain.model.KirimStatus
 import com.ftechsolutions.kasihkirim.domain.repository.DeliveryRepository
+import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
 import io.github.jan.supabase.postgrest.query.Order
 import io.github.jan.supabase.storage.storage
+import io.ktor.client.request.header
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -66,7 +68,21 @@ class DeliveryRepositoryImpl : DeliveryRepository {
         // (pod_insert_assigned_carrier) checks exactly that:
         // (storage.foldername(objects.name))[1] = d.id::text.
         val path = "$deliveryId/${leg}_${System.currentTimeMillis()}.jpg"
-        SupabaseClientProvider.client.storage.from(POD_BUCKET).upload(path, photoBytes)
+
+        // TEMPORARY DIAGNOSTIC for the anon-role upload bug -- read via the
+        // Supabase Storage Logs dashboard on req.headers, not device logcat.
+        // Remove once the root cause of the Storage 400s is confirmed.
+        val authPlugin = SupabaseClientProvider.client.auth
+        val debugSession = authPlugin.currentSessionOrNull()
+        val debugExpiresInSec = debugSession?.let {
+            (it.expiresAt - kotlinx.datetime.Clock.System.now()).inWholeSeconds
+        }
+        SupabaseClientProvider.client.storage.from(POD_BUCKET).upload(path, photoBytes) {
+            httpOverride {
+                header("x-debug-token-present", (debugSession != null).toString())
+                header("x-debug-token-expires-in-sec", debugExpiresInSec?.toString() ?: "no-session")
+            }
+        }
 
         SupabaseClientProvider.client.postgrest.rpc(
             "rpc_submit_proof",
