@@ -3,7 +3,9 @@ package com.ftechsolutions.kasihkirim.domain.repository
 import com.ftechsolutions.kasihkirim.core.result.AppResult
 import com.ftechsolutions.kasihkirim.domain.model.AccountStatus
 import com.ftechsolutions.kasihkirim.domain.model.AdminAccount
+import com.ftechsolutions.kasihkirim.domain.model.AdminOrderSearchResult
 import com.ftechsolutions.kasihkirim.domain.model.AdminPayout
+import com.ftechsolutions.kasihkirim.domain.model.AdminPaymentRecord
 import com.ftechsolutions.kasihkirim.domain.model.CarrierApplication
 import com.ftechsolutions.kasihkirim.domain.model.Dispute
 import com.ftechsolutions.kasihkirim.domain.model.DisputeStatus
@@ -93,4 +95,15 @@ interface AdminRepository {
 
     /** rpc_admin_mark_payout_failed. No ledger effect: money never moved. */
     suspend fun markPayoutFailed(payoutId: String, reason: String): AppResult<Unit>
+
+    /** rpc_admin_search_order (0043). Not a queue -- one search box, one
+     *  result: reference codes are UNIQUE on both kirim_requests and orders.
+     *  Returns null on no match or a blank query rather than an empty list,
+     *  so the UI can tell "nothing typed yet" from "typed, found nothing". */
+    suspend fun searchOrder(query: String): AppResult<AdminOrderSearchResult?>
+
+    /** rpc_admin_recent_payments (0043). The platform's most recent payment
+     *  activity, newest first -- deliberately basic per the completion
+     *  roadmap's own wording, not a double-entry ledger browser. */
+    suspend fun listRecentPayments(limit: Int = 50): AppResult<List<AdminPaymentRecord>>
 }

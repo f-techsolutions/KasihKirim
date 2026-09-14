@@ -4,10 +4,14 @@ import com.ftechsolutions.kasihkirim.core.result.AppError
 import com.ftechsolutions.kasihkirim.core.result.AppResult
 import com.ftechsolutions.kasihkirim.domain.model.AccountStatus
 import com.ftechsolutions.kasihkirim.domain.model.AdminAccount
+import com.ftechsolutions.kasihkirim.domain.model.AdminOrderSearchResult
 import com.ftechsolutions.kasihkirim.domain.model.AdminPayout
+import com.ftechsolutions.kasihkirim.domain.model.AdminPaymentRecord
 import com.ftechsolutions.kasihkirim.domain.model.CarrierApplication
 import com.ftechsolutions.kasihkirim.domain.model.Dispute
 import com.ftechsolutions.kasihkirim.domain.model.DisputeStatus
+import com.ftechsolutions.kasihkirim.domain.model.KirimStatus
+import com.ftechsolutions.kasihkirim.domain.model.KirimType
 import com.ftechsolutions.kasihkirim.domain.model.PayoutStatus
 import com.ftechsolutions.kasihkirim.domain.model.ProductReview
 import com.ftechsolutions.kasihkirim.domain.model.ProductStatus
@@ -55,6 +59,20 @@ private val REQUESTED_PAYOUT = AdminPayout(
     reviewedBy = null, approvedBy = null, requestedAt = "2026-09-10T00:00:00Z",
 )
 
+private val ORDER_PAYMENT = AdminPaymentRecord(
+    id = "pay-1", referenceType = "order", referenceId = "order-1", payerName = "Aisyah Rahman",
+    payerPhone = "+60128880001", provider = "cod", method = "COD", amountSen = Sen(3000),
+    status = "COD_PENDING", failureCode = null, createdAt = "2026-09-14T00:00:00Z",
+)
+
+private val FOUND_KIRIM = AdminOrderSearchResult(
+    kirimId = "kirim-1", referenceCode = "KK-2609-000001", kirimType = KirimType.BELI,
+    status = KirimStatus.POSTED, itemDescription = "Udang Galah", estWeightGrams = 2000,
+    budgetCapSen = Sen(3500), deliveryFeeSen = null, commissionSen = null, totalEscrowSen = Sen(5000),
+    paymentMethod = null, createdAt = "2026-09-14T00:00:00Z", requesterName = "Aisyah Rahman",
+    requesterPhone = "+60128880001", order = null, payment = null, deliveries = emptyList(),
+)
+
 private class FakeAdminRepository(
     var sellers: List<SellerApplication> = emptyList(),
     var carriers: List<CarrierApplication> = emptyList(),
@@ -69,6 +87,8 @@ private class FakeAdminRepository(
     var approvePayoutResult: AppResult<Unit> = AppResult.Success(Unit),
     var markPayoutPaidResult: AppResult<Unit> = AppResult.Success(Unit),
     var markPayoutFailedResult: AppResult<Unit> = AppResult.Success(Unit),
+    var orderSearchResult: AppResult<AdminOrderSearchResult?> = AppResult.Success(null),
+    var recentPayments: List<AdminPaymentRecord> = emptyList(),
 ) : AdminRepository {
     var sellerCalls = mutableListOf<Triple<String, SellerStatus, String?>>()
     var carrierCalls = mutableListOf<Triple<String, SellerStatus, String?>>()
@@ -80,6 +100,7 @@ private class FakeAdminRepository(
     var approvePayoutCalls = mutableListOf<Triple<String, Boolean, String?>>()
     var markPayoutPaidCalls = mutableListOf<Pair<String, String?>>()
     var markPayoutFailedCalls = mutableListOf<Pair<String, String>>()
+    var orderSearchCalls = mutableListOf<String>()
     var listCalls = 0
 
     override suspend fun listSellerApplications(): AppResult<List<SellerApplication>> {
@@ -153,6 +174,14 @@ private class FakeAdminRepository(
         markPayoutFailedCalls += payoutId to reason
         return markPayoutFailedResult
     }
+
+    override suspend fun searchOrder(query: String): AppResult<AdminOrderSearchResult?> {
+        orderSearchCalls += query
+        return orderSearchResult
+    }
+
+    override suspend fun listRecentPayments(limit: Int): AppResult<List<AdminPaymentRecord>> =
+        AppResult.Success(recentPayments)
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -426,6 +455,51 @@ class AdminViewModelTest {
         vm.markPayoutFailed("pay1", "bank rejected the account details"); advanceUntilIdle()
 
         assertEquals(listOf("pay1" to "bank rejected the account details"), repo.markPayoutFailedCalls)
+    }
+
+    @Test fun `recent payments load alongside the other queues`() = runTest(dispatcher) {
+        val vm = AdminViewModel(FakeAdminRepository(recentPayments = listOf(ORDER_PAYMENT)))
+        advanceUntilIdle()
+
+        assertEquals(1, vm.state.value.recentPayments.size)
+    }
+
+    @Test fun `a blank order query is refused client-side, same as account search`() = runTest(dispatcher) {
+        val repo = FakeAdminRepository()
+        val vm = AdminViewModel(repo)
+        advanceUntilIdle()
+
+        vm.searchOrder(); advanceUntilIdle()
+
+        assertTrue("an empty query never reaches the repository", repo.orderSearchCalls.isEmpty())
+        assertNull(vm.state.value.orderResult)
+        assertFalse(vm.state.value.searchedOrder)
+    }
+
+    @Test fun `searching an order carries the query through and stores the result`() = runTest(dispatcher) {
+        val repo = FakeAdminRepository(orderSearchResult = AppResult.Success(FOUND_KIRIM))
+        val vm = AdminViewModel(repo)
+        advanceUntilIdle()
+
+        vm.onOrderQueryChange("KK-2609-000001")
+        vm.searchOrder(); advanceUntilIdle()
+
+        assertEquals(listOf("KK-2609-000001"), repo.orderSearchCalls)
+        assertEquals(FOUND_KIRIM, vm.state.value.orderResult)
+        assertTrue(vm.state.value.searchedOrder)
+        assertFalse(vm.state.value.isSearchingOrder)
+    }
+
+    @Test fun `a search that finds nothing is distinct from one that never ran`() = runTest(dispatcher) {
+        val repo = FakeAdminRepository(orderSearchResult = AppResult.Success(null))
+        val vm = AdminViewModel(repo)
+        advanceUntilIdle()
+
+        vm.onOrderQueryChange("no-such-reference")
+        vm.searchOrder(); advanceUntilIdle()
+
+        assertNull(vm.state.value.orderResult)
+        assertTrue("a search that ran and found nothing is still marked as searched", vm.state.value.searchedOrder)
     }
 
     @Test fun `only final dispute statuses are treated as resolving`() {

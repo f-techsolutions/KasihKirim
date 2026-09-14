@@ -11,10 +11,17 @@ import com.ftechsolutions.kasihkirim.data.remote.dto.ProductReviewDto
 import com.ftechsolutions.kasihkirim.data.remote.dto.SellerApplicationDto
 import com.ftechsolutions.kasihkirim.domain.model.AccountStatus
 import com.ftechsolutions.kasihkirim.domain.model.AdminAccount
+import com.ftechsolutions.kasihkirim.domain.model.AdminDeliveryAttempt
+import com.ftechsolutions.kasihkirim.domain.model.AdminOrderSearchResult
+import com.ftechsolutions.kasihkirim.domain.model.AdminOrderSummary
+import com.ftechsolutions.kasihkirim.domain.model.AdminPaymentRecord
+import com.ftechsolutions.kasihkirim.domain.model.AdminPaymentSummary
 import com.ftechsolutions.kasihkirim.domain.model.AdminPayout
 import com.ftechsolutions.kasihkirim.domain.model.CarrierApplication
 import com.ftechsolutions.kasihkirim.domain.model.Dispute
 import com.ftechsolutions.kasihkirim.domain.model.DisputeStatus
+import com.ftechsolutions.kasihkirim.domain.model.KirimStatus
+import com.ftechsolutions.kasihkirim.domain.model.KirimType
 import com.ftechsolutions.kasihkirim.domain.model.PayoutStatus
 import com.ftechsolutions.kasihkirim.domain.model.ProductReview
 import com.ftechsolutions.kasihkirim.domain.model.ProductStatus
@@ -30,7 +37,9 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.long
 import kotlinx.serialization.json.put
@@ -272,6 +281,21 @@ class AdminRepositoryImpl : AdminRepository {
         Unit
     }
 
+    override suspend fun searchOrder(query: String): AppResult<AdminOrderSearchResult?> = runCatchingResult {
+        if (query.isBlank()) return@runCatchingResult null
+        val body = SupabaseClientProvider.client.postgrest
+            .rpc("rpc_admin_search_order", buildJsonObject { put("p_query", query) })
+            .decodeAs<JsonObject>()
+        if (body["found"]?.jsonPrimitive?.booleanOrNull != true) null else body.toAdminOrderSearchResult()
+    }
+
+    override suspend fun listRecentPayments(limit: Int): AppResult<List<AdminPaymentRecord>> = runCatchingResult {
+        SupabaseClientProvider.client.postgrest
+            .rpc("rpc_admin_recent_payments", buildJsonObject { put("p_limit", limit) })
+            .decodeAs<JsonArray>()
+            .map { (it as JsonObject).toAdminPaymentRecord() }
+    }
+
     private inline fun <T> runCatchingResult(block: () -> T): AppResult<T> =
         try {
             AppResult.Success(block())
@@ -302,6 +326,89 @@ private fun JsonObject.toAdminPayout() = AdminPayout(
 // the literal string "null" here.
 private fun JsonElement.stringOrNull(): String? =
     (this as? JsonPrimitive)?.takeIf { it !is JsonNull }?.content
+
+private fun JsonElement.longOrNull(): Long? =
+    (this as? JsonPrimitive)?.takeIf { it !is JsonNull }?.long
+
+/** rpc_admin_search_order's own JSONB shape (0043) -- jsonb_build_object
+ *  calls, so a genuinely absent value is a missing key here, not a JSON
+ *  null the way rpc_admin_recent_payments's RETURNS TABLE(...) shape is. */
+private fun JsonObject.toAdminOrderSearchResult() = AdminOrderSearchResult(
+    kirimId = getValue("kirim_id").jsonPrimitive.content,
+    referenceCode = getValue("reference_code").jsonPrimitive.content,
+    kirimType = KirimType.fromWire(getValue("kirim_type").jsonPrimitive.content) ?: KirimType.HANTAR,
+    status = KirimStatus.fromWire(getValue("status").jsonPrimitive.content),
+    itemDescription = getValue("item_description").jsonPrimitive.content,
+    estWeightGrams = getValue("est_weight_grams").jsonPrimitive.int,
+    budgetCapSen = this["budget_cap_sen"]?.longOrNull()?.let(::Sen),
+    deliveryFeeSen = this["delivery_fee_sen"]?.longOrNull()?.let(::Sen),
+    commissionSen = this["commission_sen"]?.longOrNull()?.let(::Sen),
+    totalEscrowSen = this["total_escrow_sen"]?.longOrNull()?.let(::Sen),
+    paymentMethod = this["payment_method"]?.stringOrNull(),
+    createdAt = getValue("created_at").jsonPrimitive.content,
+    requesterName = (this["requester"] as? JsonObject)?.let {
+        it["full_name"]?.stringOrNull() ?: it["display_name"]?.stringOrNull()
+    },
+    requesterPhone = (this["requester"] as? JsonObject)?.get("phone")?.stringOrNull(),
+    order = (this["order"] as? JsonObject)?.toAdminOrderSummary(),
+    payment = (this["payment"] as? JsonObject)?.toAdminPaymentSummary(),
+    deliveries = (this["deliveries"] as? JsonArray).orEmpty()
+        .map { (it as JsonObject).toAdminDeliveryAttempt() },
+)
+
+private fun JsonObject.toAdminOrderSummary() = AdminOrderSummary(
+    id = getValue("id").jsonPrimitive.content,
+    referenceCode = getValue("reference_code").jsonPrimitive.content,
+    status = getValue("status").jsonPrimitive.content,
+    goodsSubtotalSen = Sen(getValue("goods_subtotal_sen").jsonPrimitive.long),
+    deliveryFeeSen = Sen(getValue("delivery_fee_sen").jsonPrimitive.long),
+    discountSen = Sen(getValue("discount_sen").jsonPrimitive.long),
+    commissionSen = Sen(getValue("commission_sen").jsonPrimitive.long),
+    totalSen = Sen(getValue("total_sen").jsonPrimitive.long),
+    createdAt = getValue("created_at").jsonPrimitive.content,
+)
+
+private fun JsonObject.toAdminPaymentSummary() = AdminPaymentSummary(
+    id = getValue("id").jsonPrimitive.content,
+    provider = getValue("provider").jsonPrimitive.content,
+    method = getValue("method").jsonPrimitive.content,
+    amountSen = Sen(getValue("amount_sen").jsonPrimitive.long),
+    status = getValue("status").jsonPrimitive.content,
+    failureCode = this["failure_code"]?.stringOrNull(),
+    createdAt = getValue("created_at").jsonPrimitive.content,
+)
+
+private fun JsonObject.toAdminDeliveryAttempt() = AdminDeliveryAttempt(
+    id = getValue("id").jsonPrimitive.content,
+    attemptNo = getValue("attempt_no").jsonPrimitive.int,
+    status = KirimStatus.fromWire(getValue("status").jsonPrimitive.content),
+    carrierName = this["carrier_name"]?.stringOrNull(),
+    carrierPhone = this["carrier_phone"]?.stringOrNull(),
+    codAmountSen = Sen(getValue("cod_amount_sen").jsonPrimitive.long),
+    carrierEarningSen = this["carrier_earning_sen"]?.longOrNull()?.let(::Sen),
+    failureReason = this["failure_reason"]?.stringOrNull(),
+    matchedAt = this["matched_at"]?.stringOrNull(),
+    pickedUpAt = this["picked_up_at"]?.stringOrNull(),
+    deliveredAt = this["delivered_at"]?.stringOrNull(),
+    completedAt = this["completed_at"]?.stringOrNull(),
+    hasOpenDispute = getValue("has_open_dispute").jsonPrimitive.booleanOrNull == true,
+)
+
+// rpc_admin_recent_payments is a RETURNS TABLE(...) -- every column is a key
+// even when NULL, so stringOrNull() (not a missing-key check) is required.
+private fun JsonObject.toAdminPaymentRecord() = AdminPaymentRecord(
+    id = getValue("id").jsonPrimitive.content,
+    referenceType = getValue("reference_type").jsonPrimitive.content,
+    referenceId = getValue("reference_id").jsonPrimitive.content,
+    payerName = this["payer_name"]?.stringOrNull(),
+    payerPhone = this["payer_phone"]?.stringOrNull(),
+    provider = getValue("provider").jsonPrimitive.content,
+    method = getValue("method").jsonPrimitive.content,
+    amountSen = Sen(getValue("amount_sen").jsonPrimitive.long),
+    status = getValue("status").jsonPrimitive.content,
+    failureCode = this["failure_code"]?.stringOrNull(),
+    createdAt = getValue("created_at").jsonPrimitive.content,
+)
 
 private fun Throwable.toAdminAppError(): AppError = when {
     // The server's own name for "you are not an admin" -- raised by every
