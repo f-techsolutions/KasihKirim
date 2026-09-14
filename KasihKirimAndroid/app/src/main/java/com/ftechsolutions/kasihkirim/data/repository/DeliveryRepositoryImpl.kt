@@ -72,6 +72,22 @@ class DeliveryRepositoryImpl : DeliveryRepository {
             KirimStatus.fromWire(json.getValue("status").jsonPrimitive.content) ?: KirimStatus.AWAITING_PICKUP
         }
 
+    override suspend fun openDispute(
+        deliveryId: String,
+        category: String,
+        description: String,
+    ): AppResult<Unit> = runCatchingResult {
+        SupabaseClientProvider.client.postgrest.rpc(
+            "rpc_open_carrier_dispute",
+            buildJsonObject {
+                put("p_delivery", deliveryId)
+                put("p_category", category)
+                put("p_description", description)
+            },
+        )
+        Unit
+    }
+
     override suspend fun submitProofAndTransition(
         deliveryId: String,
         leg: String,
@@ -139,6 +155,10 @@ private fun Throwable.toDeliveryAppError(): AppError = when {
     message?.contains("BUDGET_EXCEEDED_NEEDS_VARIANCE", true) == true ->
         AppError.Server("BUDGET_EXCEEDED_NEEDS_VARIANCE")
     message?.contains("INVALID_AMOUNT", true) == true -> AppError.Server("INVALID_AMOUNT")
+    // rpc_open_carrier_dispute (0039).
+    message?.contains("INVALID_CATEGORY", true) == true -> AppError.Server("INVALID_CATEGORY")
+    message?.contains("DESCRIPTION_TOO_SHORT", true) == true -> AppError.Server("DESCRIPTION_TOO_SHORT")
+    message?.contains("DISPUTE_ALREADY_OPEN", true) == true -> AppError.Server("DISPUTE_ALREADY_OPEN")
     // rpc_submit_proof / internal.fn_delivery_transition (proof leg).
     message?.contains("NOT_ASSIGNED_CARRIER", true) == true -> AppError.NotAuthorized
     message?.contains("PHOTO_PATH_REQUIRED", true) == true -> AppError.Server("PHOTO_PATH_REQUIRED")

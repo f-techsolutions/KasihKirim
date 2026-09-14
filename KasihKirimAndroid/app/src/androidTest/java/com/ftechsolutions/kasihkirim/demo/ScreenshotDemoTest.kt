@@ -155,6 +155,8 @@ private class FakeDeliveryRepository : DeliveryRepository {
     ) = AppResult.Success(KirimStatus.PICKED_UP)
     override suspend fun recordPurchase(deliveryId: String, actualGoodsSen: Long) =
         AppResult.Success(KirimStatus.AWAITING_PICKUP)
+    override suspend fun openDispute(deliveryId: String, category: String, description: String) =
+        AppResult.Success(Unit)
 }
 
 private class FakeMuatanJualRepository : MuatanJualRepository {

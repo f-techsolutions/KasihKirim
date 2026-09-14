@@ -31,4 +31,12 @@ interface DeliveryRepository {
      *  Carrier-only, BELI-only, PROCURING-only; the server rejects anything
      *  else with a named error, never a silent no-op. */
     suspend fun recordPurchase(deliveryId: String, actualGoodsSen: Long): AppResult<KirimStatus>
+
+    /** rpc_open_carrier_dispute (0039) -- a carrier-facing counterpart to
+     *  rpc_open_dispute/rpc_open_seller_dispute (customer/seller), authorized
+     *  the same way rpc_delivery_transition (0030) already authorizes a
+     *  carrier's own delivery: d.carrier_id must match the caller's own
+     *  carrier id, not role membership alone. Applies to every kirim_type,
+     *  unlike the seller path which is PASARAN-only. */
+    suspend fun openDispute(deliveryId: String, category: String, description: String): AppResult<Unit>
 }

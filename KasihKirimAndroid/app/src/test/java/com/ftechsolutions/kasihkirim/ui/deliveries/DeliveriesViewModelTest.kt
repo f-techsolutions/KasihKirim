@@ -3,6 +3,7 @@ package com.ftechsolutions.kasihkirim.ui.deliveries
 import com.ftechsolutions.kasihkirim.core.result.AppError
 import com.ftechsolutions.kasihkirim.core.result.AppResult
 import com.ftechsolutions.kasihkirim.domain.model.Delivery
+import com.ftechsolutions.kasihkirim.domain.model.DisputeCategory
 import com.ftechsolutions.kasihkirim.domain.model.KirimStatus
 import com.ftechsolutions.kasihkirim.domain.model.KirimType
 import com.ftechsolutions.kasihkirim.domain.model.Sen
@@ -28,6 +29,7 @@ private class FakeDeliveryRepository(
     var transitionResult: AppResult<KirimStatus> = AppResult.Success(KirimStatus.AWAITING_PICKUP),
     var proofResult: AppResult<KirimStatus> = AppResult.Success(KirimStatus.PICKED_UP),
     var recordPurchaseResult: AppResult<KirimStatus> = AppResult.Success(KirimStatus.AWAITING_PICKUP),
+    var openDisputeResult: AppResult<Unit> = AppResult.Success(Unit),
 ) : DeliveryRepository {
     var transitionCalls = 0
     var lastDeliveryId: String? = null
@@ -37,6 +39,9 @@ private class FakeDeliveryRepository(
     var lastProofBytes: ByteArray? = null
     var recordPurchaseCalls = 0
     var lastActualGoodsSen: Long? = null
+    var openDisputeCalls = 0
+    var lastDisputeCategory: String? = null
+    var lastDisputeDescription: String? = null
 
     override suspend fun listMyDeliveries(): AppResult<List<Delivery>> = AppResult.Success(deliveries)
 
@@ -66,6 +71,14 @@ private class FakeDeliveryRepository(
         lastDeliveryId = deliveryId
         lastActualGoodsSen = actualGoodsSen
         return recordPurchaseResult
+    }
+
+    override suspend fun openDispute(deliveryId: String, category: String, description: String): AppResult<Unit> {
+        openDisputeCalls++
+        lastDeliveryId = deliveryId
+        lastDisputeCategory = category
+        lastDisputeDescription = description
+        return openDisputeResult
     }
 }
 
@@ -232,5 +245,74 @@ class DeliveriesViewModelTest {
         assertNull(vm.state.value.recordPurchaseDeliveryId)
         assertNull(vm.state.value.transitioningId)
         assertEquals(AppError.Server("BUDGET_EXCEEDED_NEEDS_VARIANCE"), vm.state.value.error)
+    }
+
+    @Test fun `requestOpenDispute opens the dialog for the right delivery and resets its fields`() = runTest(dispatcher) {
+        val vm = DeliveriesViewModel(FakeDeliveryRepository())
+        advanceUntilIdle()
+
+        vm.onDisputeCategorySelected(DisputeCategory.DAMAGED)
+        vm.onDisputeDescriptionChange("stale text from a previous delivery")
+        vm.requestOpenDispute("d1")
+
+        assertEquals("d1", vm.state.value.openDisputeDeliveryId)
+        assertEquals(DisputeCategory.OTHER, vm.state.value.disputeCategory)
+        assertEquals("", vm.state.value.disputeDescription)
+    }
+
+    @Test fun `cancelOpenDispute closes the dialog without calling the backend`() = runTest(dispatcher) {
+        val repo = FakeDeliveryRepository()
+        val vm = DeliveriesViewModel(repo)
+        advanceUntilIdle()
+
+        vm.requestOpenDispute("d1")
+        vm.cancelOpenDispute()
+
+        assertNull(vm.state.value.openDisputeDeliveryId)
+        assertEquals(0, repo.openDisputeCalls)
+    }
+
+    @Test fun `submitDispute sends the delivery id, category and description, then reloads`() = runTest(dispatcher) {
+        val repo = FakeDeliveryRepository()
+        val vm = DeliveriesViewModel(repo)
+        advanceUntilIdle()
+
+        vm.requestOpenDispute("d1")
+        vm.onDisputeCategorySelected(DisputeCategory.PAYMENT)
+        vm.onDisputeDescriptionChange("  Bayaran tunai tidak mencukupi  ")
+        vm.submitDispute(); advanceUntilIdle()
+
+        assertEquals(1, repo.openDisputeCalls)
+        assertEquals("d1", repo.lastDeliveryId)
+        assertEquals("payment", repo.lastDisputeCategory)
+        assertEquals("Bayaran tunai tidak mencukupi", repo.lastDisputeDescription)
+        assertNull(vm.state.value.openDisputeDeliveryId)
+        assertNull(vm.state.value.transitioningId)
+    }
+
+    @Test fun `submitDispute with no delivery pending is a no-op`() = runTest(dispatcher) {
+        val repo = FakeDeliveryRepository()
+        val vm = DeliveriesViewModel(repo)
+        advanceUntilIdle()
+
+        vm.submitDispute(); advanceUntilIdle()
+
+        assertEquals(0, repo.openDisputeCalls)
+    }
+
+    @Test fun `a rejected dispute filing surfaces DISPUTE_ALREADY_OPEN and clears the dialog`() = runTest(dispatcher) {
+        val repo = FakeDeliveryRepository(
+            openDisputeResult = AppResult.Failure(AppError.Server("DISPUTE_ALREADY_OPEN")),
+        )
+        val vm = DeliveriesViewModel(repo)
+        advanceUntilIdle()
+
+        vm.requestOpenDispute("d1")
+        vm.onDisputeDescriptionChange("Barang sampai dalam keadaan rosak")
+        vm.submitDispute(); advanceUntilIdle()
+
+        assertNull(vm.state.value.openDisputeDeliveryId)
+        assertNull(vm.state.value.transitioningId)
+        assertEquals(AppError.Server("DISPUTE_ALREADY_OPEN"), vm.state.value.error)
     }
 }

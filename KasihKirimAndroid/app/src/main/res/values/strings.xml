@@ -244,6 +244,11 @@
     <string name="deliveries_record_purchase_amount_label">Jumlah dibelanjakan (RM)</string>
     <string name="deliveries_record_purchase_submit">Rekod &amp; Teruskan</string>
     <string name="deliveries_record_purchase_cancel">Batal</string>
+    <string name="deliveries_report_problem">Lapor Masalah</string>
+    <string name="deliveries_open_dispute_title">Laporkan Masalah Penghantaran</string>
+    <string name="deliveries_open_dispute_category">Kategori</string>
+    <string name="deliveries_open_dispute_description">Terangkan masalah anda</string>
+    <string name="deliveries_open_dispute_submit">Hantar Laporan</string>
 
     <string name="earnings_title">Pendapatan Saya</string>
     <string name="earnings_available">Boleh dikeluarkan</string>

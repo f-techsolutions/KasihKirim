@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.ftechsolutions.kasihkirim.core.result.AppError
 import com.ftechsolutions.kasihkirim.core.result.AppResult
 import com.ftechsolutions.kasihkirim.domain.model.Delivery
+import com.ftechsolutions.kasihkirim.domain.model.DisputeCategory
 import com.ftechsolutions.kasihkirim.domain.repository.DeliveryRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -27,6 +28,11 @@ data class DeliveriesUiState(
     /** Non-null while the "record purchase" amount dialog is open for this
      *  BELI delivery. */
     val recordPurchaseDeliveryId: String? = null,
+    /** Non-null while the carrier's "report a problem" dialog is open for
+     *  this DELIVERED delivery (rpc_open_carrier_dispute, 0039). */
+    val openDisputeDeliveryId: String? = null,
+    val disputeCategory: DisputeCategory = DisputeCategory.OTHER,
+    val disputeDescription: String = "",
 )
 
 data class PendingProof(val deliveryId: String, val leg: String, val event: String)
@@ -109,6 +115,38 @@ class DeliveriesViewModel(private val repo: DeliveryRepository) : ViewModel() {
         viewModelScope.launch {
             _state.update { it.copy(transitioningId = deliveryId, recordPurchaseDeliveryId = null, error = null) }
             when (val result = repo.recordPurchase(deliveryId, actualGoodsSen)) {
+                is AppResult.Success -> {
+                    _state.update { it.copy(transitioningId = null) }
+                    load()
+                }
+                is AppResult.Failure -> _state.update { it.copy(transitioningId = null, error = result.error) }
+            }
+        }
+    }
+
+    /** Opens the "report a problem" dialog for a DELIVERED delivery. */
+    fun requestOpenDispute(deliveryId: String) {
+        _state.update {
+            it.copy(
+                openDisputeDeliveryId = deliveryId, error = null,
+                disputeCategory = DisputeCategory.OTHER, disputeDescription = "",
+            )
+        }
+    }
+
+    fun cancelOpenDispute() = _state.update { it.copy(openDisputeDeliveryId = null) }
+
+    fun onDisputeCategorySelected(category: DisputeCategory) = _state.update { it.copy(disputeCategory = category) }
+    fun onDisputeDescriptionChange(text: String) = _state.update { it.copy(disputeDescription = text) }
+
+    /** rpc_open_carrier_dispute (0039). */
+    fun submitDispute() {
+        val deliveryId = _state.value.openDisputeDeliveryId ?: return
+        val category = _state.value.disputeCategory
+        val description = _state.value.disputeDescription.trim()
+        viewModelScope.launch {
+            _state.update { it.copy(transitioningId = deliveryId, openDisputeDeliveryId = null, error = null) }
+            when (val result = repo.openDispute(deliveryId, category.wire, description)) {
                 is AppResult.Success -> {
                     _state.update { it.copy(transitioningId = null) }
                     load()
