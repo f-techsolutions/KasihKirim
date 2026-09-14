@@ -7,7 +7,11 @@
 -- the schema ever read it). Every assertion below that calls the hook
 -- directly is exercising the exact function the real Supabase Auth Hook
 -- invokes at token-mint time (same pattern 11_profile_on_signup.test.sql
--- already uses for the pre-existing parts of this hook).
+-- already uses for the pre-existing parts of this hook) -- which is also
+-- why every such call is made only after tests.clear_auth(): 0003 REVOKEs
+-- EXECUTE on this function from authenticated/anon/PUBLIC and grants it only
+-- to supabase_auth_admin, so calling it while still tests.authenticate_as()
+-- would fail on a permission error rather than exercise the hook's own logic.
 -- ============================================================================
 BEGIN;
 SELECT plan(15);
@@ -40,6 +44,7 @@ SELECT is((SELECT status::text FROM public.profiles WHERE id = tests.uid('aisyah
   'suspended', 'the suspension is actually persisted');
 SELECT is((SELECT suspended_reason FROM public.profiles WHERE id = tests.uid('aisyah')),
   'reported by another user', 'the reason is recorded');
+SELECT tests.clear_auth();
 
 SELECT throws_ok(
   format($$SELECT public.custom_access_token_hook(
@@ -49,10 +54,12 @@ SELECT throws_ok(
   'THE ACTUAL POINT: the token-mint hook now refuses a suspended account, not just a status label');
 
 -- ── restoring to active undoes both the record and the block ───────────────
+SELECT tests.authenticate_as('admin');
 SELECT is((public.rpc_admin_set_account_status(tests.uid('aisyah'),'active'))->>'status',
   'active', 'admin can restore a suspended account');
 SELECT is((SELECT suspended_reason FROM public.profiles WHERE id = tests.uid('aisyah')),
   NULL, 'restoring to active clears the old suspension reason');
+SELECT tests.clear_auth();
 SELECT lives_ok(
   format($$SELECT public.custom_access_token_hook(
             jsonb_build_object('user_id',%L,'claims',jsonb_build_object('sub',%L)))$$,
@@ -60,8 +67,10 @@ SELECT lives_ok(
   'restoring to active lets the hook mint a token again');
 
 -- ── banning is enforced the same way as suspension ──────────────────────────
+SELECT tests.authenticate_as('admin');
 SELECT is((public.rpc_admin_set_account_status(tests.uid('rahman'),'banned','fraud'))->>'status',
   'banned', 'admin can ban an account');
+SELECT tests.clear_auth();
 SELECT throws_ok(
   format($$SELECT public.custom_access_token_hook(
             jsonb_build_object('user_id',%L,'claims',jsonb_build_object('sub',%L)))$$,
