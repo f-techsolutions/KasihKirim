@@ -1,51 +1,84 @@
 import { cors } from '../_shared/http.ts';
 import { adminClient } from '../_shared/clients.ts';
+import { verifyXSignature, normalizeBillplzEvent } from '../_shared/billplz.ts';
+import { logRejectedWebhook, tryExtractId, safeParse } from '../_shared/webhook_audit.ts';
 
 /**
- * No JWT. Authenticated by HMAC over the RAW body.
+ * No JWT. Authenticated per-provider (see below).
  * Deploy with --no-verify-jwt.
  *
  * Idempotency is a UNIQUE constraint, not application logic, so two Edge
  * instances handed the same event cannot both process it. See API.md §4.12.
+ *
+ * Two providers, two schemes, because that is what each actually sends:
+ *   - generic: JSON body, `x-signature` HEADER, whole-body HMAC-SHA256.
+ *   - billplz: form-encoded body, `x_signature` FIELD inside the body,
+ *     computed over the other fields (see _shared/billplz.ts for the exact
+ *     algorithm and its verification caveat). Every provider normalises to
+ *     the same {id, status} shape before it reaches rpc_record_webhook, so
+ *     nothing past this file needs to know which provider sent the event.
  */
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
 
-  // 1. Raw body FIRST. Re-serialising a parsed body breaks the signature.
-  const raw = await req.text();
-  const sig = req.headers.get('x-signature') ?? '';
   const provider = new URL(req.url).searchParams.get('provider') ?? 'unknown';
-
-  // 2. Verify before parsing anything.
-  if (!(await validSignature(raw, sig))) {
-    return new Response('invalid signature', { status: 401 });
-  }
-
-  const event = JSON.parse(raw);
+  const raw = await req.text();   // raw FIRST -- re-serialising breaks any signature scheme
   const admin = adminClient();
 
-  // 3. Insert-first. Returns false when already seen — idempotency is a
-  //    UNIQUE constraint, not application logic.
+  let eventId: string;
+  let normalizedPayload: Record<string, unknown>;
+
+  if (provider === 'billplz') {
+    const secret = Deno.env.get('BILLPLZ_X_SIGNATURE_KEY');
+    if (!secret) return new Response('billplz not configured', { status: 401 });
+
+    const { valid, fields } = await verifyXSignature(raw, secret);
+    if (!valid) {
+      // Recorded with signature_valid=false so a forged/corrupted callback
+      // leaves an audit trail instead of vanishing at a bare 401 -- fields
+      // is populated regardless of validity (parsing happens before the
+      // HMAC check), so the bill id is still available when present.
+      await logRejectedWebhook(admin, provider, fields.id, fields);
+      return new Response('invalid signature', { status: 401 });
+    }
+
+    const event = normalizeBillplzEvent(fields);
+    if (!event.id) return new Response('missing bill id', { status: 400 });
+    eventId = event.id;
+    normalizedPayload = event;
+  } else {
+    const sig = req.headers.get('x-signature') ?? '';
+    if (!(await validGenericSignature(raw, sig))) {
+      await logRejectedWebhook(admin, provider, tryExtractId(raw), safeParse(raw));
+      return new Response('invalid signature', { status: 401 });
+    }
+    const event = JSON.parse(raw);
+    eventId = event.id;
+    normalizedPayload = event;
+  }
+
+  // Insert-first. Returns false when already seen -- idempotency is a
+  // UNIQUE constraint, not application logic.
   const { data: isNew } = await admin.rpc('rpc_record_webhook', {
-    p_provider: provider, p_event_id: event.id,
-    p_signature_valid: true, p_payload: event,
+    p_provider: provider, p_event_id: eventId,
+    p_signature_valid: true, p_payload: normalizedPayload,
   });
   if (isNew !== true) return new Response('ok (duplicate)', { status: 200 });
 
-  // 4. Apply under a row lock, guarding against out-of-order delivery.
-  //    Marking PROCESSED/FAILED happens inside the function.
+  // Apply under a row lock, guarding against out-of-order delivery.
+  // Marking PROCESSED/FAILED happens inside the function.
   const { error: procErr } = await admin.rpc('rpc_apply_payment_event', {
-    p_provider: provider, p_event_id: event.id,
+    p_provider: provider, p_event_id: eventId,
   });
-  if (procErr) console.error('payment apply failed', provider, event.id, procErr.message);
+  if (procErr) console.error('payment apply failed', provider, eventId, procErr.message);
 
-  // 5. Always 200 on a verified, well-formed event. Provider retries are for
-  //    genuine failures, not for events we have already handled. Failures are
-  //    stored and replayed from the admin console; nothing is dropped.
+  // Always 200 on a verified, well-formed event. Provider retries are for
+  // genuine failures, not for events we have already handled. Failures are
+  // stored and replayed from the admin console; nothing is dropped.
   return new Response('ok', { status: 200 });
 });
 
-async function validSignature(raw: string, provided: string): Promise<boolean> {
+async function validGenericSignature(raw: string, provided: string): Promise<boolean> {
   const secret = Deno.env.get('PAYMENT_WEBHOOK_SECRET');
   if (!secret || !provided) return false;
   const key = await crypto.subtle.importKey(

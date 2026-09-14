@@ -3,16 +3,19 @@ package com.ftechsolutions.kasihkirim.ui.buy
 import com.ftechsolutions.kasihkirim.core.result.AppError
 import com.ftechsolutions.kasihkirim.core.result.AppResult
 import com.ftechsolutions.kasihkirim.domain.model.Address
+import com.ftechsolutions.kasihkirim.domain.model.BuyOrder
 import com.ftechsolutions.kasihkirim.domain.model.CartLine
 import com.ftechsolutions.kasihkirim.domain.model.CheckoutOrderSummary
 import com.ftechsolutions.kasihkirim.domain.model.CheckoutResult
 import com.ftechsolutions.kasihkirim.domain.model.Community
 import com.ftechsolutions.kasihkirim.domain.model.NewAddress
 import com.ftechsolutions.kasihkirim.domain.model.BuyListing
+import com.ftechsolutions.kasihkirim.domain.model.PaymentStatusInfo
 import com.ftechsolutions.kasihkirim.domain.model.Sen
 import com.ftechsolutions.kasihkirim.domain.model.Serviceability
 import com.ftechsolutions.kasihkirim.domain.repository.AddressRepository
 import com.ftechsolutions.kasihkirim.domain.repository.BuyRepository
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.*
@@ -38,8 +41,11 @@ private val CART_LINE = CartLine(
     unit = "kg", sellerId = "s1", quantity = 2,
 )
 
-private class FakeAddressRepository(var addresses: List<Address> = listOf(ADDRESS)) : AddressRepository {
-    override suspend fun listAddresses(): AppResult<List<Address>> = AppResult.Success(addresses)
+private class FakeAddressRepository(
+    var addresses: List<Address> = listOf(ADDRESS),
+    var listResult: AppResult<List<Address>>? = null,
+) : AddressRepository {
+    override suspend fun listAddresses(): AppResult<List<Address>> = listResult ?: AppResult.Success(addresses)
     override suspend fun createAddress(draft: NewAddress) = throw NotImplementedError()
     override suspend fun updateAddress(id: String, draft: NewAddress) = throw NotImplementedError()
     override suspend fun setDefaultAddress(id: String) = throw NotImplementedError()
@@ -52,16 +58,24 @@ private class FakeBuyRepository(
     var listings: List<BuyListing> = listOf(LISTING),
     var cart: List<CartLine> = emptyList(),
     var checkoutResult: AppResult<CheckoutResult>? = null,
+    /** When set, addToCart suspends here until the test completes it -- lets
+     *  a test observe the in-flight addingToCartProductId state deterministically,
+     *  the same way a real network call would still be pending on a second tap. */
+    var addToCartGate: CompletableDeferred<Unit>? = null,
 ) : BuyRepository {
     var addToCartCalls = 0
     var checkoutCalls = 0
     var lastCheckoutVoucher: String? = null
+    var lastCheckoutMethod: String? = null
+    var paymentIntentUrl: AppResult<String> = AppResult.Success("https://www.billplz-sandbox.com/bills/test")
+    var paymentStatus: AppResult<PaymentStatusInfo>? = null
 
     override suspend fun browseProducts(query: String): AppResult<List<BuyListing>> = AppResult.Success(listings)
     override suspend fun getCart(): AppResult<List<CartLine>> = AppResult.Success(cart)
 
     override suspend fun addToCart(productId: String, quantity: Int): AppResult<Unit> {
         addToCartCalls++
+        addToCartGate?.await()
         cart = listOf(CART_LINE)
         return AppResult.Success(Unit)
     }
@@ -76,16 +90,22 @@ private class FakeBuyRepository(
         return AppResult.Success(Unit)
     }
 
-    override suspend fun checkout(destAddressId: String, voucherCode: String?): AppResult<CheckoutResult> {
+    override suspend fun checkout(
+        destAddressId: String,
+        voucherCode: String?,
+        paymentMethod: String,
+    ): AppResult<CheckoutResult> {
         checkoutCalls++
         lastCheckoutVoucher = voucherCode
+        lastCheckoutMethod = paymentMethod
         return checkoutResult ?: AppResult.Success(
             CheckoutResult(
                 orderGroupId = "g1",
                 orders = listOf(
                     CheckoutOrderSummary(
                         orderId = "o1", referenceCode = "ORD-1", sellerId = "s1",
-                        goodsSubtotalSen = Sen(3000), discountSen = Sen.ZERO, totalSen = Sen(3000),
+                        goodsSubtotalSen = Sen(3000), deliveryFeeSen = Sen(500), discountSen = Sen.ZERO, totalSen = Sen(3500),
+                        paymentId = "pay1", paymentStatus = "COD_PENDING", paymentMethod = paymentMethod,
                     ),
                 ),
             ),
@@ -93,6 +113,23 @@ private class FakeBuyRepository(
     }
 
     override suspend fun claimVoucher(campaignId: String) = throw NotImplementedError()
+
+    override suspend fun createPaymentIntent(orderId: String): AppResult<String> = paymentIntentUrl
+
+    override suspend fun getPaymentStatus(orderId: String): AppResult<PaymentStatusInfo> =
+        paymentStatus ?: AppResult.Success(
+            PaymentStatusInfo(
+                paymentId = "pay1", status = "PENDING", method = "FPX",
+                amountSen = Sen(3000), checkoutUrl = null, orderStatus = "PENDING_PAYMENT",
+            ),
+        )
+
+    override suspend fun listMyOrders(): AppResult<List<BuyOrder>> = throw NotImplementedError()
+
+    override suspend fun getDeliveryStatus(orderId: String) = throw NotImplementedError()
+
+    override suspend fun fileDispute(orderId: String, category: String, description: String) =
+        throw NotImplementedError()
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -162,5 +199,142 @@ class BuyViewModelTest {
         assertEquals(AppError.Server("INSUFFICIENT_STOCK"), vm.state.value.error)
         assertNull(vm.state.value.checkoutResult)
         assertEquals(1, vm.state.value.cart.size)
+    }
+
+    @Test fun `checkout forces COD when the cart spans multiple sellers even if online was selected`() = runTest(dispatcher) {
+        val secondSellerLine = CART_LINE.copy(cartItemId = "ci2", sellerId = "s2", quantity = 1)
+        val repo = FakeBuyRepository(cart = listOf(CART_LINE, secondSellerLine))
+        val vm = BuyViewModel(repo, FakeAddressRepository())
+        advanceUntilIdle()
+
+        vm.onPaymentMethodSelected("FPX")
+        vm.checkout(); advanceUntilIdle()
+
+        assertEquals("COD", repo.lastCheckoutMethod)
+    }
+
+    @Test fun `checkout passes the selected online method for a single-seller cart`() = runTest(dispatcher) {
+        val repo = FakeBuyRepository(cart = listOf(CART_LINE))
+        val vm = BuyViewModel(repo, FakeAddressRepository())
+        advanceUntilIdle()
+
+        vm.onPaymentMethodSelected("FPX")
+        vm.checkout(); advanceUntilIdle()
+
+        assertEquals("FPX", repo.lastCheckoutMethod)
+        assertEquals("FPX", vm.state.value.checkoutResult?.orders?.single()?.paymentMethod)
+    }
+
+    @Test fun `payNow opens the hosted page and stops polling once the payment reaches a terminal status`() = runTest(dispatcher) {
+        val repo = FakeBuyRepository(cart = listOf(CART_LINE)).apply {
+            paymentStatus = AppResult.Success(
+                PaymentStatusInfo(
+                    paymentId = "pay1", status = "SUCCEEDED", method = "FPX",
+                    amountSen = Sen(3000), checkoutUrl = "https://www.billplz-sandbox.com/bills/test",
+                    orderStatus = "PAID",
+                ),
+            )
+        }
+        val vm = BuyViewModel(repo, FakeAddressRepository())
+        advanceUntilIdle()
+
+        vm.payNow("o1"); advanceUntilIdle()
+
+        assertEquals("https://www.billplz-sandbox.com/bills/test", vm.state.value.pendingPaymentUrl)
+        assertEquals("SUCCEEDED", vm.state.value.paymentStatus?.status)
+        assertFalse(vm.state.value.isPollingPayment)
+    }
+
+    @Test fun `onPaymentUrlLaunched consumes the one-shot Custom Tab event`() = runTest(dispatcher) {
+        val repo = FakeBuyRepository(cart = listOf(CART_LINE))
+        val vm = BuyViewModel(repo, FakeAddressRepository())
+        advanceUntilIdle()
+
+        vm.payNow("o1"); advanceUntilIdle()
+        assertNotNull(vm.state.value.pendingPaymentUrl)
+
+        vm.onPaymentUrlLaunched()
+        assertNull(vm.state.value.pendingPaymentUrl)
+    }
+
+    @Test fun `addToCart ignores a second call for the same product while the first is still in flight`() = runTest(dispatcher) {
+        val gate = CompletableDeferred<Unit>()
+        val repo = FakeBuyRepository(addToCartGate = gate)
+        val vm = BuyViewModel(repo, FakeAddressRepository())
+        advanceUntilIdle()
+
+        vm.addToCart("p1")
+        runCurrent()
+        assertEquals("p1", vm.state.value.addingToCartProductId)
+
+        vm.addToCart("p1")
+        runCurrent()
+        assertEquals("only the first tap's call should reach the repository", 1, repo.addToCartCalls)
+
+        gate.complete(Unit)
+        advanceUntilIdle()
+        assertNull(vm.state.value.addingToCartProductId)
+        assertEquals(1, repo.addToCartCalls)
+    }
+
+    @Test fun `a failed addToCart clears the in-flight flag and surfaces the error`() = runTest(dispatcher) {
+        val repo = object : BuyRepository by FakeBuyRepository() {
+            override suspend fun addToCart(productId: String, quantity: Int): AppResult<Unit> =
+                AppResult.Failure(AppError.Server("PRODUCT_NOT_FOUND"))
+        }
+        val vm = BuyViewModel(repo, FakeAddressRepository())
+        advanceUntilIdle()
+
+        vm.addToCart("p1"); advanceUntilIdle()
+
+        assertNull(vm.state.value.addingToCartProductId)
+        assertEquals(AppError.Server("PRODUCT_NOT_FOUND"), vm.state.value.error)
+    }
+
+    @Test fun `requestCheckout opens a confirmation step rather than checking out immediately`() = runTest(dispatcher) {
+        val repo = FakeBuyRepository(cart = listOf(CART_LINE))
+        val vm = BuyViewModel(repo, FakeAddressRepository())
+        advanceUntilIdle()
+
+        vm.requestCheckout()
+
+        assertTrue(vm.state.value.showCheckoutConfirm)
+        assertEquals("requestCheckout must not itself place the order", 0, repo.checkoutCalls)
+
+        vm.dismissCheckoutConfirm()
+        assertFalse(vm.state.value.showCheckoutConfirm)
+        assertEquals(0, repo.checkoutCalls)
+    }
+
+    @Test fun `requestCheckout does nothing without a selected address`() = runTest(dispatcher) {
+        val vm = BuyViewModel(FakeBuyRepository(), FakeAddressRepository(addresses = emptyList()))
+        advanceUntilIdle()
+
+        vm.requestCheckout()
+
+        assertFalse(vm.state.value.showCheckoutConfirm)
+    }
+
+    @Test fun `checkout clears the confirmation step once it actually runs`() = runTest(dispatcher) {
+        val repo = FakeBuyRepository(cart = listOf(CART_LINE))
+        val vm = BuyViewModel(repo, FakeAddressRepository())
+        advanceUntilIdle()
+
+        vm.requestCheckout()
+        vm.checkout(); advanceUntilIdle()
+
+        assertFalse(vm.state.value.showCheckoutConfirm)
+        assertEquals(1, repo.checkoutCalls)
+    }
+
+    @Test fun `a failed address load surfaces the error instead of failing silently`() = runTest(dispatcher) {
+        val vm = BuyViewModel(
+            FakeBuyRepository(),
+            FakeAddressRepository(listResult = AppResult.Failure(AppError.Network)),
+        )
+        advanceUntilIdle()
+
+        assertEquals(AppError.Network, vm.state.value.error)
+        assertTrue(vm.state.value.addresses.isEmpty())
     }
 }

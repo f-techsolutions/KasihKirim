@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Photo
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -36,6 +37,7 @@ import com.ftechsolutions.kasihkirim.domain.model.ProductStatus
 import com.ftechsolutions.kasihkirim.domain.model.Seller
 import com.ftechsolutions.kasihkirim.domain.model.SellerOrder
 import com.ftechsolutions.kasihkirim.domain.model.SellerStatus
+import com.ftechsolutions.kasihkirim.domain.model.Sen
 import com.ftechsolutions.kasihkirim.ui.auth.messageRes
 import com.ftechsolutions.kasihkirim.ui.common.AppCard
 import com.ftechsolutions.kasihkirim.ui.common.BadgeTone
@@ -47,6 +49,11 @@ import java.io.ByteArrayOutputStream
 @Composable
 fun SalesScreen(vm: SalesViewModel, onBack: () -> Unit) {
     val state by vm.state.collectAsState()
+
+    // See BoardScreen's identical comment: init{}'s one-shot load() doesn't
+    // refire when this tab is re-entered without this. load() here refreshes
+    // seller status, products, orders and the dashboard summary together.
+    LaunchedEffect(Unit) { vm.load() }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -71,6 +78,7 @@ fun SalesScreen(vm: SalesViewModel, onBack: () -> Unit) {
                     SalesTabRow(selected = state.selectedTab, onSelect = vm::selectTab)
                     Box(Modifier.weight(1f)) {
                         when (state.selectedTab) {
+                            SalesTab.DASHBOARD -> SellerDashboardScreen(vm)
                             SalesTab.PRODUCTS -> ProductCatalogScreen(vm)
                             SalesTab.ORDERS -> OrdersListScreen(vm)
                         }
@@ -185,6 +193,11 @@ private fun SellerStatusScreen(seller: Seller) {
 private fun SalesTabRow(selected: SalesTab, onSelect: (SalesTab) -> Unit) {
     TabRow(selectedTabIndex = selected.ordinal) {
         Tab(
+            selected = selected == SalesTab.DASHBOARD,
+            onClick = { onSelect(SalesTab.DASHBOARD) },
+            text = { Text(stringResource(R.string.sales_tab_dashboard)) },
+        )
+        Tab(
             selected = selected == SalesTab.PRODUCTS,
             onClick = { onSelect(SalesTab.PRODUCTS) },
             text = { Text(stringResource(R.string.sales_tab_products)) },
@@ -198,6 +211,110 @@ private fun SalesTabRow(selected: SalesTab, onSelect: (SalesTab) -> Unit) {
 }
 
 @Composable
+private fun SellerDashboardScreen(vm: SalesViewModel) {
+    val state by vm.state.collectAsState()
+    val dashboard = state.dashboard
+    val earnings = state.earnings
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        item { Spacer(Modifier.height(4.dp)) }
+
+        if (state.isLoadingDashboard && dashboard == null) {
+            item { Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
+        }
+
+        dashboard?.let { d ->
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                    DashboardStat(stringResource(R.string.sales_dashboard_product_count), d.productCount.toString(), Modifier.weight(1f))
+                    DashboardStat(stringResource(R.string.sales_dashboard_active_listings), d.activeListings.toString(), Modifier.weight(1f))
+                }
+            }
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                    DashboardStat(stringResource(R.string.sales_dashboard_pending_orders), d.pendingOrders.toString(), Modifier.weight(1f))
+                    DashboardStat(stringResource(R.string.sales_dashboard_completed_orders), d.completedOrders.toString(), Modifier.weight(1f))
+                }
+            }
+            item {
+                AppCard {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            stringResource(R.string.sales_dashboard_low_stock),
+                            style = MaterialTheme.typography.titleSmall,
+                            modifier = Modifier.weight(1f),
+                        )
+                        StatusBadge(
+                            d.lowStockCount.toString(),
+                            tone = if (d.lowStockCount > 0) BadgeTone.WARNING else BadgeTone.POSITIVE,
+                        )
+                    }
+                    if (d.lowStockCount == 0) {
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            stringResource(R.string.sales_dashboard_low_stock_none),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+        }
+
+        // Available/pending only -- see Earnings.kt's own comment on why
+        // there is no "COD held" figure for a seller: that cash sits with
+        // the carrier, not the seller, until it settles into sellerPendingSen.
+        if (earnings != null && (earnings.sellerAvailableSen != null || earnings.sellerPendingSen != null)) {
+            item {
+                AppCard {
+                    Text(stringResource(R.string.sales_dashboard_earnings_title), style = MaterialTheme.typography.titleSmall)
+                    Spacer(Modifier.height(10.dp))
+                    val available = earnings.sellerAvailableSen ?: Sen.ZERO
+                    val pending = earnings.sellerPendingSen ?: Sen.ZERO
+                    EarningsRow(stringResource(R.string.sales_dashboard_earnings_available), available.format())
+                    EarningsRow(stringResource(R.string.sales_dashboard_earnings_pending), pending.format())
+                    HorizontalDivider(Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                    EarningsRow(
+                        stringResource(R.string.sales_dashboard_earnings_total),
+                        (available + pending).format(),
+                        emphasize = true,
+                    )
+                }
+            }
+        }
+
+        state.error?.let { item { Text(stringResource(it.messageRes()), color = MaterialTheme.colorScheme.error) } }
+        item { Spacer(Modifier.height(24.dp)) }
+    }
+}
+
+@Composable
+private fun DashboardStat(label: String, value: String, modifier: Modifier = Modifier) {
+    AppCard(modifier = modifier) {
+        Text(value, style = MaterialTheme.typography.headlineSmall)
+        Spacer(Modifier.height(4.dp))
+        Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun EarningsRow(label: String, value: String, emphasize: Boolean = false) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(
+            label,
+            style = if (emphasize) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium,
+        )
+        Text(
+            value,
+            style = if (emphasize) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium,
+        )
+    }
+}
+
+@Composable
 private fun OrdersListScreen(vm: SalesViewModel) {
     val state by vm.state.collectAsState()
 
@@ -206,21 +323,29 @@ private fun OrdersListScreen(vm: SalesViewModel) {
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         item { Spacer(Modifier.height(4.dp)) }
-        if (state.orders.isEmpty() && !state.isLoadingOrders) {
+        if (state.isLoadingOrders && state.orders.isEmpty()) {
+            item { Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
+        } else if (state.orders.isEmpty() && state.error == null) {
             item {
                 AppCard {
                     Text(stringResource(R.string.sales_no_orders), style = MaterialTheme.typography.bodyMedium)
                 }
             }
         }
-        items(state.orders, key = { it.id }) { order -> SellerOrderCard(order) }
+        items(state.orders, key = { it.id }) { order ->
+            SellerOrderCard(order, onClick = { vm.selectOrder(order) })
+        }
         item { Spacer(Modifier.height(24.dp)) }
+    }
+
+    if (state.selectedOrder != null) {
+        OrderDetailSheet(vm)
     }
 }
 
 @Composable
-private fun SellerOrderCard(order: SellerOrder) {
-    AppCard {
+private fun SellerOrderCard(order: SellerOrder, onClick: () -> Unit) {
+    AppCard(modifier = Modifier.clickable(onClick = onClick)) {
         Row(verticalAlignment = Alignment.Top) {
             Text(order.referenceCode, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
             StatusBadge(order.status.labelMs, tone = order.status.tone())
@@ -248,6 +373,106 @@ private fun SellerOrderCard(order: SellerOrder) {
     }
 }
 
+@Composable
+private fun OrderDetailSheet(vm: SalesViewModel) {
+    val state by vm.state.collectAsState()
+    val order = state.selectedOrder ?: return
+    val status = state.selectedOrderStatus
+
+    ModalBottomSheet(onDismissRequest = vm::dismissOrderDetail) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            ScreenHeader(stringResource(R.string.sales_order_detail), subtitle = order.referenceCode)
+            StatusBadge(order.status.labelMs, tone = order.status.tone())
+
+            AppCard {
+                EarningsRow(stringResource(R.string.sales_order_goods_subtotal), order.goodsSubtotalSen.format())
+                EarningsRow("- ${stringResource(R.string.sales_order_commission)}", order.commissionSen.format())
+                HorizontalDivider(Modifier.padding(vertical = 6.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                EarningsRow(stringResource(R.string.sales_order_net_payable), order.netPayableSen.format(), emphasize = true)
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    "${stringResource(R.string.sales_order_delivery_fee)}: ${order.deliveryFeeSen.format()}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            if (state.isLoadingOrderStatus && status == null) {
+                Box(Modifier.fillMaxWidth().padding(12.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+            }
+
+            status?.let { s ->
+                AppCard {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(stringResource(R.string.sales_order_payment_status), style = MaterialTheme.typography.bodyMedium)
+                        Text(s.paymentStatus ?: "-", style = MaterialTheme.typography.bodyMedium)
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(stringResource(R.string.sales_order_delivery_status), style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            s.deliveryStatus
+                                ?: stringResource(R.string.sales_order_no_delivery_yet),
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    StatusBadge(
+                        stringResource(
+                            if (s.carrierAssigned) R.string.sales_order_carrier_assigned
+                            else R.string.sales_order_carrier_not_assigned,
+                        ),
+                        tone = if (s.carrierAssigned) BadgeTone.POSITIVE else BadgeTone.NEUTRAL,
+                    )
+                }
+            }
+
+            if (state.showDisputeConfirm) {
+                AppCard {
+                    Text(
+                        stringResource(R.string.sales_order_dispute_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Button(
+                        onClick = vm::confirmDispute,
+                        enabled = !state.isFilingDispute,
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                        shape = MaterialTheme.shapes.medium,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 46.dp),
+                    ) { Text(stringResource(R.string.sales_order_dispute_confirm)) }
+                    Spacer(Modifier.height(6.dp))
+                    TextButton(
+                        onClick = vm::dismissDisputeConfirm,
+                        enabled = !state.isFilingDispute,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text(stringResource(R.string.sales_cancel)) }
+                }
+            } else if (state.disputeSubmitted) {
+                Text(stringResource(R.string.sales_order_dispute_submitted), color = MaterialTheme.colorScheme.primary)
+            } else if (status?.deliveryId != null) {
+                OutlinedButton(
+                    onClick = vm::openDisputeConfirm,
+                    shape = MaterialTheme.shapes.medium,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 46.dp),
+                ) { Text(stringResource(R.string.sales_order_report_problem)) }
+            }
+
+            state.error?.let { Text(stringResource(it.messageRes()), color = MaterialTheme.colorScheme.error) }
+
+            Button(
+                onClick = vm::dismissOrderDetail,
+                shape = MaterialTheme.shapes.medium,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp),
+            ) { Text(stringResource(R.string.sales_close)) }
+        }
+    }
+}
+
 private fun OrderStatus.tone(): BadgeTone = when (this) {
     OrderStatus.SETTLED, OrderStatus.FULFILLED -> BadgeTone.POSITIVE
     OrderStatus.PAYMENT_FAILED, OrderStatus.EXPIRED, OrderStatus.REJECTED_BY_SELLER,
@@ -267,7 +492,9 @@ private fun ProductCatalogScreen(vm: SalesViewModel) {
     ) {
         item { Spacer(Modifier.height(4.dp)) }
 
-        if (state.products.isEmpty() && state.productForm == null) {
+        if (state.isLoading) {
+            item { Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
+        } else if (state.products.isEmpty() && state.productForm == null && state.error == null) {
             item {
                 AppCard {
                     Text(stringResource(R.string.sales_no_products), style = MaterialTheme.typography.bodyMedium)
@@ -279,6 +506,7 @@ private fun ProductCatalogScreen(vm: SalesViewModel) {
                 product = product,
                 isTransitioning = state.transitioningProductId == product.id,
                 isUploadingImage = state.uploadingImageForProductId == product.id,
+                deletingImageId = state.deletingImageId,
                 onEdit = { vm.openEditProductForm(product) },
                 onSubmitForReview = { vm.setProductStatus(product.id, ProductStatus.PENDING_REVIEW) },
                 onWithdraw = { vm.setProductStatus(product.id, ProductStatus.DRAFT) },
@@ -286,6 +514,8 @@ private fun ProductCatalogScreen(vm: SalesViewModel) {
                 onResume = { vm.setProductStatus(product.id, ProductStatus.ACTIVE) },
                 onPhotoTaken = { bytes -> vm.uploadProductImage(product.id, bytes) },
                 onDeleteImage = { imageId, path -> vm.deleteProductImage(product.id, imageId, path) },
+                onManageStock = { vm.openStockDialog(product) },
+                onArchive = { vm.openArchiveConfirm(product.id) },
             )
         }
 
@@ -308,6 +538,137 @@ private fun ProductCatalogScreen(vm: SalesViewModel) {
         state.error?.let { item { Text(stringResource(it.messageRes()), color = MaterialTheme.colorScheme.error) } }
         item { Spacer(Modifier.height(24.dp)) }
     }
+
+    if (state.stockDialog != null) {
+        StockDialogSheet(vm)
+    }
+    if (state.archiveConfirmProductId != null) {
+        ArchiveConfirmDialog(vm)
+    }
+}
+
+@Composable
+private fun ArchiveConfirmDialog(vm: SalesViewModel) {
+    val state by vm.state.collectAsState()
+    if (state.archiveConfirmProductId == null) return
+
+    AlertDialog(
+        onDismissRequest = vm::dismissArchiveConfirm,
+        title = { Text(stringResource(R.string.sales_archive_confirm_title)) },
+        text = { Text(stringResource(R.string.sales_archive_confirm_body)) },
+        confirmButton = {
+            TextButton(onClick = vm::confirmArchiveProduct, enabled = !state.isArchivingProduct) {
+                Text(stringResource(R.string.sales_archive_confirm_ok), color = MaterialTheme.colorScheme.error)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = vm::dismissArchiveConfirm) { Text(stringResource(R.string.sales_cancel)) }
+        },
+    )
+}
+
+@Composable
+private fun StockDialogSheet(vm: SalesViewModel) {
+    val state by vm.state.collectAsState()
+    val dialog = state.stockDialog ?: return
+
+    ModalBottomSheet(onDismissRequest = vm::closeStockDialog) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            ScreenHeader(stringResource(R.string.sales_stock_title))
+
+            dialog.current?.let { inv ->
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                    DashboardStat(stringResource(R.string.sales_stock_reserved), inv.reserved.toString(), Modifier.weight(1f))
+                    DashboardStat(stringResource(R.string.sales_stock_available), inv.available.toString(), Modifier.weight(1f))
+                }
+                if (inv.isLowStock) {
+                    Text(
+                        stringResource(R.string.sales_stock_low_warning),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+
+            OutlinedTextField(
+                value = dialog.onHandInput,
+                onValueChange = vm::onStockOnHandChange,
+                label = { Text(stringResource(R.string.sales_stock_on_hand)) },
+                singleLine = true,
+                shape = MaterialTheme.shapes.small,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            OutlinedTextField(
+                value = dialog.safetyStockInput,
+                onValueChange = vm::onStockSafetyChange,
+                label = { Text(stringResource(R.string.sales_stock_safety)) },
+                singleLine = true,
+                shape = MaterialTheme.shapes.small,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Button(
+                onClick = vm::saveStockAbsolute,
+                enabled = !dialog.isSaving && dialog.onHandOrNull != null,
+                shape = MaterialTheme.shapes.medium,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 46.dp),
+            ) { Text(stringResource(R.string.sales_stock_save)) }
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+            Text(stringResource(R.string.sales_stock_adjust), style = MaterialTheme.typography.titleSmall)
+            Text(
+                stringResource(R.string.sales_stock_adjust_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                OutlinedTextField(
+                    value = dialog.adjustDeltaInput,
+                    onValueChange = vm::onStockAdjustDeltaChange,
+                    label = { Text("+/-") },
+                    singleLine = true,
+                    shape = MaterialTheme.shapes.small,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.weight(1f),
+                )
+                Button(
+                    onClick = vm::applyStockAdjustment,
+                    enabled = !dialog.isSaving && dialog.adjustDeltaOrNull != null,
+                    shape = MaterialTheme.shapes.medium,
+                ) { Text(stringResource(R.string.sales_stock_adjust)) }
+            }
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Text(stringResource(R.string.sales_stock_history), style = MaterialTheme.typography.titleSmall)
+            if (dialog.movements.isEmpty() && !dialog.isLoadingMovements) {
+                Text(
+                    stringResource(R.string.sales_stock_history_empty),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            dialog.movements.forEach { movement ->
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(movement.reason, style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        if (movement.delta >= 0) "+${movement.delta}" else movement.delta.toString(),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (movement.delta >= 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+
+            state.error?.let { Text(stringResource(it.messageRes()), color = MaterialTheme.colorScheme.error) }
+            TextButton(onClick = vm::closeStockDialog, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.sales_close))
+            }
+        }
+    }
 }
 
 @Composable
@@ -315,6 +676,7 @@ private fun ProductCard(
     product: Product,
     isTransitioning: Boolean,
     isUploadingImage: Boolean,
+    deletingImageId: String?,
     onEdit: () -> Unit,
     onSubmitForReview: () -> Unit,
     onWithdraw: () -> Unit,
@@ -322,6 +684,8 @@ private fun ProductCard(
     onResume: () -> Unit,
     onPhotoTaken: (ByteArray) -> Unit,
     onDeleteImage: (imageId: String, storagePath: String) -> Unit,
+    onManageStock: () -> Unit,
+    onArchive: () -> Unit,
 ) {
     val cameraLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.TakePicturePreview(),
@@ -348,6 +712,20 @@ private fun ProductCard(
             Spacer(Modifier.height(2.dp))
             Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
         }
+        product.inventory?.let { inv ->
+            Spacer(Modifier.height(4.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "${stringResource(R.string.sales_stock_available)}: ${inv.available}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (inv.isLowStock) {
+                    Spacer(Modifier.width(8.dp))
+                    StatusBadge(stringResource(R.string.sales_dashboard_low_stock), tone = BadgeTone.WARNING)
+                }
+            }
+        }
 
         Spacer(Modifier.height(10.dp))
         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -368,14 +746,21 @@ private fun ProductCard(
                             Icon(Icons.Filled.Photo, contentDescription = null)
                         }
                     }
+                    val isDeletingThisImage = deletingImageId == image.id
                     Surface(
                         shape = CircleShape,
                         color = MaterialTheme.colorScheme.surface,
                         modifier = Modifier
                             .size(18.dp)
-                            .clickable { onDeleteImage(image.id, image.storagePath) },
+                            .clickable(enabled = deletingImageId == null) { onDeleteImage(image.id, image.storagePath) },
                     ) {
-                        Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.sales_remove_photo), modifier = Modifier.padding(2.dp))
+                        if (isDeletingThisImage) {
+                            Box(Modifier.padding(2.dp), contentAlignment = Alignment.Center) {
+                                CircularProgressIndicator(modifier = Modifier.size(10.dp), strokeWidth = 1.dp)
+                            }
+                        } else {
+                            Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.sales_remove_photo), modifier = Modifier.padding(2.dp))
+                        }
                     }
                 }
             }
@@ -404,6 +789,7 @@ private fun ProductCard(
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             TextButton(onClick = onEdit, enabled = !isTransitioning) { Text(stringResource(R.string.sales_edit)) }
+            TextButton(onClick = onManageStock, enabled = !isTransitioning) { Text(stringResource(R.string.sales_stock_title)) }
             when (product.status) {
                 ProductStatus.DRAFT -> TextButton(onClick = onSubmitForReview, enabled = !isTransitioning) {
                     Text(stringResource(R.string.sales_submit_for_review))
@@ -422,6 +808,11 @@ private fun ProductCard(
                 }
                 ProductStatus.DELISTED -> Unit
             }
+            TextButton(
+                onClick = onArchive,
+                enabled = !isTransitioning,
+                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+            ) { Text(stringResource(R.string.sales_archive_product)) }
         }
     }
 }

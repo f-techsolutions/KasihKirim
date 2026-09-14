@@ -22,6 +22,7 @@ import com.ftechsolutions.kasihkirim.domain.model.Delivery
 import com.ftechsolutions.kasihkirim.domain.model.KirimStatus
 import com.ftechsolutions.kasihkirim.domain.model.NON_PROOF_DELIVERY_TRANSITIONS
 import com.ftechsolutions.kasihkirim.domain.model.PROOF_DELIVERY_TRANSITIONS
+import com.ftechsolutions.kasihkirim.domain.model.Sen
 import com.ftechsolutions.kasihkirim.domain.model.UserRole
 import com.ftechsolutions.kasihkirim.ui.auth.messageRes
 import com.ftechsolutions.kasihkirim.ui.common.AppCard
@@ -72,7 +73,7 @@ fun DeliveriesScreen(vm: DeliveriesViewModel, roles: Set<UserRole>, onBack: () -
         ) {
             item { Spacer(Modifier.height(4.dp)) }
 
-            if (state.deliveries.isEmpty() && !state.isLoading) {
+            if (state.deliveries.isEmpty() && !state.isLoading && state.error == null) {
                 item { EmptyStateCard(stringResource(R.string.deliveries_empty)) }
             }
             items(state.deliveries, key = { it.id }) { delivery ->
@@ -127,6 +128,20 @@ private fun DeliveryCard(
         delivery.carrierEarningSen?.let {
             Spacer(Modifier.height(2.dp))
             Text(stringResource(R.string.deliveries_carrier_earning, it.format()), style = MaterialTheme.typography.bodySmall)
+        }
+        // cod_amount_sen is 0 (not null) for a delivery with nothing to
+        // collect -- a prepaid order, or a non-COD kirim -- so only a
+        // strictly positive amount is worth a carrier's attention here.
+        // Especially load-bearing for a PASARAN job, where this is the whole
+        // order (goods + carriage) rpc_accept_offer already charged them to
+        // collect, not just their own delivery_fee-sized earning above.
+        if (delivery.codAmountSen > Sen.ZERO) {
+            Spacer(Modifier.height(2.dp))
+            Text(
+                stringResource(R.string.deliveries_cod_amount, delivery.codAmountSen.format()),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
         }
         delivery.failureReason?.let {
             Spacer(Modifier.height(2.dp))
@@ -192,6 +207,7 @@ private fun String.labelMs(): String = when (this) {
     "CANCEL" -> "Batal"
     "PROCUREMENT_FAILED" -> "Belian Gagal"
     "REPORT_FAILURE" -> "Lapor Gagal"
+    "RETURN" -> "Pulangkan Barang"
     "DEPART" -> "Berlepas"
     "ARRIVE_HUB" -> "Sampai Hab"
     "LEAVE_HUB" -> "Tinggalkan Hab"

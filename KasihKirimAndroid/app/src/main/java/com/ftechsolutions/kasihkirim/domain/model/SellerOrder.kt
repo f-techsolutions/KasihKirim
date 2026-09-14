@@ -57,9 +57,32 @@ data class SellerOrder(
     val goodsSubtotalSen: Sen,
     val deliveryFeeSen: Sen,
     val discountSen: Sen,
+    val commissionSen: Sen,
     val totalSen: Sen,
     val createdAt: String,
     val items: List<SellerOrderItem>,
+) {
+    /** What actually reaches this seller: the goods price the buyer paid,
+     *  net of KasihKirim's commission -- never the delivery fee (the
+     *  carrier's own earning) and never the raw total (which also includes
+     *  that delivery fee). Matches the same split fn_split_order_capture /
+     *  fn_settle_delivery (0024) apply server-side; this is presentation of
+     *  the same numbers already on the row, not a new calculation. */
+    val netPayableSen: Sen get() = Sen(goodsSubtotalSen.value - commissionSen.value)
+}
+
+/** rpc_seller_order_status (0035) -- the delivery/payment side of an order
+ *  the seller has no general table read for (kirim_select/deliveries_select
+ *  scope to the buyer and the assigned carrier, never the seller). Null
+ *  delivery fields mean the order hasn't been matched to a carrier yet --
+ *  a normal state, not a missing one. */
+data class SellerOrderStatus(
+    val orderStatus: OrderStatus,
+    val paymentStatus: String?,
+    val paymentMethod: String?,
+    val deliveryId: String?,
+    val deliveryStatus: String?,
+    val carrierAssigned: Boolean,
 )
 
 /** public.order_items -- title/price are snapshots taken at checkout, not

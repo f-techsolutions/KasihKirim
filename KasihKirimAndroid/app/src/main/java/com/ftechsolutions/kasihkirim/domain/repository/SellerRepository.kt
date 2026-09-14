@@ -1,20 +1,28 @@
 package com.ftechsolutions.kasihkirim.domain.repository
 
 import com.ftechsolutions.kasihkirim.core.result.AppResult
+import com.ftechsolutions.kasihkirim.domain.model.Inventory
+import com.ftechsolutions.kasihkirim.domain.model.InventoryMovement
 import com.ftechsolutions.kasihkirim.domain.model.NewProduct
 import com.ftechsolutions.kasihkirim.domain.model.NewSeller
 import com.ftechsolutions.kasihkirim.domain.model.Product
 import com.ftechsolutions.kasihkirim.domain.model.ProductImage
 import com.ftechsolutions.kasihkirim.domain.model.ProductStatus
 import com.ftechsolutions.kasihkirim.domain.model.Seller
+import com.ftechsolutions.kasihkirim.domain.model.SellerDashboard
 import com.ftechsolutions.kasihkirim.domain.model.SellerOrder
+import com.ftechsolutions.kasihkirim.domain.model.SellerOrderStatus
 
 /**
  * Jualan (Sales) Phase A -- seller onboarding and product catalog.
  * listMyOrders (Phase B, 0020_jualan_checkout_and_growth.sql) is read-only:
  * a buyer's rpc_checkout is the only writer of public.orders/order_items,
  * and no seller fulfillment RPC exists yet -- there is nothing for a seller
- * to change on an order here, only to see it.
+ * to change on an order here, only to see it. getOrderStatus/openOrderDispute
+ * (P2, 0035) are the two things a seller CAN do/see beyond that: read the
+ * delivery/payment side of their own order, and raise a dispute on it the
+ * same way rpc_delivery_transition already lets a seller do (0030) --
+ * neither is a new fulfillment capability, both existed server-side already.
  */
 interface SellerRepository {
     /** null means the caller has never applied. Reads the sellers table
@@ -54,4 +62,44 @@ interface SellerRepository {
 
     /** Orders placed against this seller's products, newest first. */
     suspend fun listMyOrders(sellerId: String): AppResult<List<SellerOrder>>
+
+    /** rpc_seller_dashboard (0035) -- product/listing/order/low-stock counts,
+     *  scoped to the caller's own seller row server-side. */
+    suspend fun getDashboard(): AppResult<SellerDashboard>
+
+    /** rpc_set_stock (0025) -- sets on_hand to an absolute figure; refuses to
+     *  cut below what's already reserved by live orders. p_safety_stock is
+     *  left unchanged when null. */
+    suspend fun setStock(productId: String, onHand: Int, safetyStock: Int? = null): AppResult<Inventory>
+
+    /** rpc_adjust_stock (0025) -- a signed delta (a restock, a spoilage
+     *  write-off, a correction), recorded as an inventory_movements row
+     *  under the given reason label. */
+    suspend fun adjustStock(productId: String, delta: Int, reason: String = "seller_adjust"): AppResult<Inventory>
+
+    /** public.inventory_movements, own-product read (inventory_moves_own's
+     *  RLS, 0006) -- newest first. */
+    suspend fun listStockMovements(productId: String): AppResult<List<InventoryMovement>>
+
+    /** Soft-delete: a direct Postgrest UPDATE of products.deleted_at, the
+     *  same class of write setProductStatus already uses for status. Not an
+     *  RPC -- no SECURITY DEFINER logic is needed, RLS (products_write) and
+     *  ownership already gate it, and the moderation trigger (0016/0017)
+     *  never touches this column. Once set, the product drops out of
+     *  listMyProducts (its own deleted_at IS NULL filter) permanently --
+     *  there is no matching "unarchive". */
+    suspend fun archiveProduct(id: String): AppResult<Unit>
+
+    /** rpc_seller_order_status (0035) -- the delivery/payment status of the
+     *  seller's own order. kirim_select/deliveries_select never grant a
+     *  seller a general read on those two tables; this is a narrow,
+     *  ownership-checked substitute, not a policy change. */
+    suspend fun getOrderStatus(orderId: String): AppResult<SellerOrderStatus>
+
+    /** rpc_delivery_transition(delivery, 'OPEN_DISPUTE') -- the same generic
+     *  transition RPC 0030 already authorizes a seller to call on their own
+     *  order's delivery. Unlike rpc_open_dispute (customer-only), this path
+     *  carries no category/description: the resulting dispute record gets a
+     *  truthful default (0032's own documented limitation), not free text. */
+    suspend fun openOrderDispute(deliveryId: String): AppResult<Unit>
 }

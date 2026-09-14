@@ -46,7 +46,7 @@ fun AddressesScreen(vm: AddressesViewModel, onBack: () -> Unit) {
         ) {
             item { Spacer(Modifier.height(4.dp)) }
 
-            if (state.addresses.isEmpty() && !state.isLoading) {
+            if (state.addresses.isEmpty() && !state.isLoading && state.error == null) {
                 item { EmptyAddressesCard() }
             }
             items(state.addresses, key = { it.id }) { address ->

@@ -4,19 +4,26 @@ import com.ftechsolutions.kasihkirim.core.result.AppError
 import com.ftechsolutions.kasihkirim.core.result.AppResult
 import com.ftechsolutions.kasihkirim.core.security.SafeLog
 import com.ftechsolutions.kasihkirim.data.remote.SupabaseClientProvider
+import com.ftechsolutions.kasihkirim.data.remote.dto.InventoryMovementDto
 import com.ftechsolutions.kasihkirim.data.remote.dto.NewProductImageDto
+import com.ftechsolutions.kasihkirim.data.remote.dto.ProductArchiveDto
 import com.ftechsolutions.kasihkirim.data.remote.dto.ProductDto
 import com.ftechsolutions.kasihkirim.data.remote.dto.ProductImageDto
 import com.ftechsolutions.kasihkirim.data.remote.dto.ProductStatusUpdateDto
 import com.ftechsolutions.kasihkirim.data.remote.dto.SellerDto
 import com.ftechsolutions.kasihkirim.data.remote.dto.SellerOrderDto
+import com.ftechsolutions.kasihkirim.domain.model.Inventory
+import com.ftechsolutions.kasihkirim.domain.model.InventoryMovement
 import com.ftechsolutions.kasihkirim.domain.model.NewProduct
 import com.ftechsolutions.kasihkirim.domain.model.NewSeller
+import com.ftechsolutions.kasihkirim.domain.model.OrderStatus
 import com.ftechsolutions.kasihkirim.domain.model.Product
 import com.ftechsolutions.kasihkirim.domain.model.ProductImage
 import com.ftechsolutions.kasihkirim.domain.model.ProductStatus
 import com.ftechsolutions.kasihkirim.domain.model.Seller
+import com.ftechsolutions.kasihkirim.domain.model.SellerDashboard
 import com.ftechsolutions.kasihkirim.domain.model.SellerOrder
+import com.ftechsolutions.kasihkirim.domain.model.SellerOrderStatus
 import com.ftechsolutions.kasihkirim.domain.model.Sen
 import com.ftechsolutions.kasihkirim.domain.model.SellerStatus
 import com.ftechsolutions.kasihkirim.domain.repository.SellerRepository
@@ -25,24 +32,30 @@ import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
 import io.github.jan.supabase.postgrest.query.Order
 import io.github.jan.supabase.storage.storage
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import java.io.IOException
+import java.time.Instant
 import java.util.UUID
 
 private const val PRODUCT_COLUMNS =
     "id,title,description,status,price_sen,unit,weight_grams,volume_cm3,handling_flags," +
-        "min_order_qty,rejection_reason,product_images(id,storage_path,sort_order)"
+        "min_order_qty,rejection_reason,product_images(id,storage_path,sort_order)," +
+        "inventory(on_hand,reserved,safety_stock)"
 
 private const val PRODUCT_IMAGES_BUCKET = "product-images"
 
 private const val SELLER_ORDER_COLUMNS =
-    "id,reference_code,status,goods_subtotal_sen,delivery_fee_sen,discount_sen,total_sen,created_at," +
-        "order_items(title_snapshot,price_sen,quantity,line_total_sen)"
+    "id,reference_code,status,goods_subtotal_sen,delivery_fee_sen,discount_sen,commission_sen," +
+        "total_sen,created_at,order_items(title_snapshot,price_sen,quantity,line_total_sen)"
 
 class SellerRepositoryImpl : SellerRepository {
 
@@ -155,6 +168,91 @@ class SellerRepositoryImpl : SellerRepository {
             .map { it.toDomain() }
     }
 
+    override suspend fun getDashboard(): AppResult<SellerDashboard> = runCatchingResult {
+        val json = SupabaseClientProvider.client.postgrest
+            .rpc("rpc_seller_dashboard", buildJsonObject {})
+            .decodeAs<JsonObject>()
+        SellerDashboard(
+            productCount = json.getValue("product_count").jsonPrimitive.int,
+            activeListings = json.getValue("active_listings").jsonPrimitive.int,
+            lowStockCount = json.getValue("low_stock_count").jsonPrimitive.int,
+            pendingOrders = json.getValue("pending_orders").jsonPrimitive.int,
+            completedOrders = json.getValue("completed_orders").jsonPrimitive.int,
+        )
+    }
+
+    override suspend fun setStock(productId: String, onHand: Int, safetyStock: Int?): AppResult<Inventory> =
+        runCatchingResult {
+            SupabaseClientProvider.client.postgrest
+                .rpc(
+                    "rpc_set_stock",
+                    buildJsonObject {
+                        put("p_product_id", productId)
+                        put("p_on_hand", onHand)
+                        put("p_safety_stock", safetyStock)
+                    },
+                )
+                .decodeAs<JsonObject>()
+                .toInventory()
+        }
+
+    override suspend fun adjustStock(productId: String, delta: Int, reason: String): AppResult<Inventory> =
+        runCatchingResult {
+            SupabaseClientProvider.client.postgrest
+                .rpc(
+                    "rpc_adjust_stock",
+                    buildJsonObject {
+                        put("p_product_id", productId)
+                        put("p_delta", delta)
+                        put("p_reason", reason)
+                    },
+                )
+                .decodeAs<JsonObject>()
+                .toInventory()
+        }
+
+    override suspend fun listStockMovements(productId: String): AppResult<List<InventoryMovement>> = runCatchingResult {
+        SupabaseClientProvider.client.postgrest.from("inventory_movements")
+            .select(columns = Columns.raw("id,delta,reason,created_at")) {
+                filter { eq("product_id", productId) }
+                order("created_at", Order.DESCENDING)
+                limit(20)
+            }
+            .decodeList<InventoryMovementDto>()
+            .map { it.toDomain() }
+    }
+
+    override suspend fun archiveProduct(id: String): AppResult<Unit> = runCatchingResult {
+        SupabaseClientProvider.client.postgrest.from("products")
+            .update(ProductArchiveDto(deletedAt = Instant.now().toString())) { filter { eq("id", id) } }
+        Unit
+    }
+
+    override suspend fun getOrderStatus(orderId: String): AppResult<SellerOrderStatus> = runCatchingResult {
+        val json = SupabaseClientProvider.client.postgrest
+            .rpc("rpc_seller_order_status", buildJsonObject { put("p_order", orderId) })
+            .decodeAs<JsonObject>()
+        SellerOrderStatus(
+            orderStatus = OrderStatus.fromWire(json.getValue("order_status").jsonPrimitive.content) ?: OrderStatus.CREATED,
+            paymentStatus = json["payment_status"]?.stringOrNull(),
+            paymentMethod = json["payment_method"]?.stringOrNull(),
+            deliveryId = json["delivery_id"]?.stringOrNull(),
+            deliveryStatus = json["delivery_status"]?.stringOrNull(),
+            carrierAssigned = json.getValue("carrier_assigned").jsonPrimitive.boolean,
+        )
+    }
+
+    override suspend fun openOrderDispute(deliveryId: String): AppResult<Unit> = runCatchingResult {
+        SupabaseClientProvider.client.postgrest.rpc(
+            "rpc_delivery_transition",
+            buildJsonObject {
+                put("p_delivery", deliveryId)
+                put("p_event", "OPEN_DISPUTE")
+            },
+        )
+        Unit
+    }
+
     private inline fun <T> runCatchingResult(block: () -> T): AppResult<T> =
         try {
             AppResult.Success(block())
@@ -194,6 +292,20 @@ private fun NewProduct.toDomain(id: String) = Product(
     images = emptyList(),
 )
 
+/** rpc_set_stock/rpc_adjust_stock's shared JSONB response shape
+ *  (0025_seller_product_stock.sql): {product_id, on_hand, reserved,
+ *  safety_stock, available} -- available is server-computed here, unlike
+ *  InventoryDto's plain-read shape which has to derive it client-side. */
+private fun JsonObject.toInventory() = Inventory(
+    onHand = getValue("on_hand").jsonPrimitive.int,
+    reserved = getValue("reserved").jsonPrimitive.int,
+    safetyStock = getValue("safety_stock").jsonPrimitive.int,
+    available = getValue("available").jsonPrimitive.int,
+)
+
+private fun JsonElement.stringOrNull(): String? =
+    (this as? JsonPrimitive)?.takeIf { it !is JsonNull }?.content
+
 private fun Throwable.toSellerAppError(): AppError = when {
     message?.contains("SESSION_EXPIRED", true) == true -> AppError.SessionExpired
     message?.contains("SELLER_APPLICATION_EXISTS", true) == true -> AppError.Server("SELLER_APPLICATION_EXISTS")
@@ -203,6 +315,16 @@ private fun Throwable.toSellerAppError(): AppError = when {
     message?.contains("CATEGORY_NOT_FOUND", true) == true -> AppError.Server("CATEGORY_NOT_FOUND")
     message?.contains("PRODUCT_NOT_FOUND", true) == true -> AppError.Server("PRODUCT_NOT_FOUND")
     message?.contains("PRODUCT_IMAGE_LIMIT", true) == true -> AppError.Server("PRODUCT_IMAGE_LIMIT")
+    // Stock RPCs (0025).
+    message?.contains("INVENTORY_NOT_FOUND", true) == true -> AppError.Server("INVENTORY_NOT_FOUND")
+    message?.contains("STOCK_NEGATIVE", true) == true -> AppError.Server("STOCK_NEGATIVE")
+    message?.contains("STOCK_BELOW_RESERVED", true) == true -> AppError.Server("STOCK_BELOW_RESERVED")
+    message?.contains("STOCK_DELTA_ZERO", true) == true -> AppError.Server("STOCK_DELTA_ZERO")
+    // Seller order/dispute visibility (0035, 0030).
+    message?.contains("ORDER_NOT_FOUND", true) == true -> AppError.Server("ORDER_NOT_FOUND")
+    message?.contains("STATE_ACTOR_NOT_PERMITTED", true) == true -> AppError.Server("STATE_ACTOR_NOT_PERMITTED")
+    message?.contains("STATE_INVALID_TRANSITION", true) == true -> AppError.Server("STATE_INVALID_TRANSITION")
+    message?.contains("DELIVERY_NOT_FOUND", true) == true -> AppError.Server("DELIVERY_NOT_FOUND")
     this is IOException -> AppError.Network
     message?.contains("timeout", true) == true -> AppError.Timeout
     message?.contains("JWT", true) == true -> AppError.SessionExpired

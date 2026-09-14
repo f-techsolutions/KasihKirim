@@ -12,6 +12,7 @@ import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -40,6 +41,10 @@ import java.time.format.DateTimeFormatter
 fun TripsScreen(vm: TripsViewModel, onOpenVehicles: () -> Unit, onOpenDeliveries: () -> Unit) {
     val state by vm.state.collectAsState()
 
+    // See BoardScreen's identical comment: init{}'s one-shot load() doesn't
+    // refire when this tab is re-entered without this.
+    LaunchedEffect(Unit) { vm.load() }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
@@ -49,7 +54,7 @@ fun TripsScreen(vm: TripsViewModel, onOpenVehicles: () -> Unit, onOpenDeliveries
             ScreenHeader(stringResource(R.string.trips_title))
         }
 
-        if (state.trips.isEmpty() && !state.isLoading) {
+        if (state.trips.isEmpty() && !state.isLoading && state.error == null) {
             item { EmptyStateCard(stringResource(R.string.trips_empty)) }
         }
         items(state.trips, key = { it.id }) { trip ->
@@ -77,7 +82,7 @@ fun TripsScreen(vm: TripsViewModel, onOpenVehicles: () -> Unit, onOpenDeliveries
             }
         }
 
-        if (state.vehicles.isEmpty() && !state.isLoading) {
+        if (state.vehicles.isEmpty() && !state.isLoading && state.error == null) {
             item { EmptyStateCard(stringResource(R.string.trips_no_vehicles)) }
         } else {
             item {

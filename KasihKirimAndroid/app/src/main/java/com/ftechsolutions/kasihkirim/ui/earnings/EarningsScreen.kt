@@ -5,6 +5,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -21,6 +22,14 @@ import com.ftechsolutions.kasihkirim.ui.common.ScreenHeader
 @Composable
 fun EarningsScreen(vm: EarningsViewModel) {
     val state by vm.state.collectAsState()
+
+    // The bottom NavigationBar keeps this destination's ViewModel alive
+    // across tab switches (saveState/restoreState in AppNavHost), but the
+    // composable itself is disposed and re-entered -- without this, a
+    // carrier who completes a delivery and switches Trips -> Earnings sees
+    // the pre-completion figures until the process is killed and relaunched,
+    // since init{}'s one-shot load() never re-fires on its own.
+    LaunchedEffect(Unit) { vm.load() }
 
     Column(
         modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp),

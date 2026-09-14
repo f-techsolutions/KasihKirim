@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -35,6 +36,10 @@ import com.ftechsolutions.kasihkirim.ui.common.StatusBadge
 @Composable
 fun AdminScreen(vm: AdminViewModel) {
     val state by vm.state.collectAsState()
+
+    // See BoardScreen's identical comment: init{}'s one-shot load() doesn't
+    // refire when this tab is re-entered without this.
+    LaunchedEffect(Unit) { vm.load() }
 
     Column(Modifier.fillMaxSize()) {
         Column(Modifier.padding(horizontal = 20.dp)) {
@@ -88,7 +93,7 @@ fun AdminScreen(vm: AdminViewModel) {
 
                 when (state.queue) {
                     AdminQueue.SELLERS -> {
-                        if (state.sellers.isEmpty() && !state.isLoading) {
+                        if (state.sellers.isEmpty() && !state.isLoading && state.error == null) {
                             item { EmptyStateCard(stringResource(R.string.admin_no_sellers)) }
                         }
                         items(state.sellers, key = { it.id }) { application ->
@@ -104,7 +109,7 @@ fun AdminScreen(vm: AdminViewModel) {
                     }
 
                     AdminQueue.PRODUCTS -> {
-                        if (state.products.isEmpty() && !state.isLoading) {
+                        if (state.products.isEmpty() && !state.isLoading && state.error == null) {
                             item { EmptyStateCard(stringResource(R.string.admin_no_products)) }
                         }
                         items(state.products, key = { it.id }) { product ->
@@ -120,7 +125,7 @@ fun AdminScreen(vm: AdminViewModel) {
                     }
 
                     AdminQueue.DISPUTES -> {
-                        if (state.disputes.isEmpty() && !state.isLoading) {
+                        if (state.disputes.isEmpty() && !state.isLoading && state.error == null) {
                             item { EmptyStateCard(stringResource(R.string.admin_no_disputes)) }
                         }
                         items(state.disputes, key = { it.id }) { dispute ->

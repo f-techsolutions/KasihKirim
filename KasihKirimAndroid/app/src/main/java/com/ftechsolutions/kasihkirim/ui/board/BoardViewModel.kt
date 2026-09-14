@@ -33,6 +33,7 @@ data class BoardUiState(
      *  one they sent. */
     val invites: List<CapacityInvite> = emptyList(),
     val respondedInviteIds: Set<String> = emptySet(),
+    val respondingInviteId: String? = null,
     val error: AppError? = null,
 )
 
@@ -58,19 +59,28 @@ class BoardViewModel(
                 ?.mapNotNull { c -> c.nodeId?.let { it to c.name } }
                 ?.toMap()
                 .orEmpty()
-            when {
-                boardResult is AppResult.Failure ->
+            when (boardResult) {
+                is AppResult.Failure ->
                     _state.update { it.copy(isLoading = false, error = boardResult.error) }
-                tripsResult is AppResult.Failure ->
-                    _state.update { it.copy(isLoading = false, error = tripsResult.error) }
-                boardResult is AppResult.Success && tripsResult is AppResult.Success ->
+                is AppResult.Success ->
+                    // Found on-device: a tripsResult failure (e.g. a carrier
+                    // whose 'carrier' role is granted but has no
+                    // public.carriers row yet, so requireCarrierId() throws
+                    // NOT_A_CARRIER) used to wipe out a perfectly successful
+                    // board load and show a bare error instead -- a carrier
+                    // could see zero board listings for a reason entirely
+                    // unrelated to the board itself. eligibleTrips only
+                    // gates the accept-offer UI on each card, so a failure to
+                    // load "my trips" should leave it empty, never block the
+                    // board the same way a failed invites load already
+                    // doesn't (see invites below).
                     _state.update {
                         it.copy(
                             isLoading = false,
                             items = boardResult.data,
-                            eligibleTrips = tripsResult.data.filter { t ->
-                                t.status == TripStatus.ANNOUNCED || t.status == TripStatus.BOARDING
-                            },
+                            eligibleTrips = (tripsResult as? AppResult.Success)?.data
+                                ?.filter { t -> t.status == TripStatus.ANNOUNCED || t.status == TripStatus.BOARDING }
+                                ?: emptyList(),
                             nodeNames = nodeNames,
                             invites = (invitesResult as? AppResult.Success)?.data ?: it.invites,
                         )
@@ -80,10 +90,14 @@ class BoardViewModel(
     }
 
     fun respondToInvite(inviteId: String) {
+        if (_state.value.respondingInviteId != null) return
         viewModelScope.launch {
+            _state.update { it.copy(respondingInviteId = inviteId, error = null) }
             when (val result = kirimRepo.respondToInvite(inviteId)) {
-                is AppResult.Success -> _state.update { it.copy(respondedInviteIds = it.respondedInviteIds + inviteId) }
-                is AppResult.Failure -> _state.update { it.copy(error = result.error) }
+                is AppResult.Success -> _state.update {
+                    it.copy(respondingInviteId = null, respondedInviteIds = it.respondedInviteIds + inviteId)
+                }
+                is AppResult.Failure -> _state.update { it.copy(respondingInviteId = null, error = result.error) }
             }
         }
     }

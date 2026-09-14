@@ -109,6 +109,28 @@ fun AuthScreen(vm: AuthViewModel) {
                 modifier = Modifier.fillMaxWidth(),
             )
 
+            if (!isSignUp) {
+                TextButton(
+                    onClick = vm::sendPasswordReset,
+                    enabled = form.canSendReset,
+                    modifier = Modifier.align(Alignment.End),
+                ) {
+                    if (form.isSendingReset) {
+                        CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
+                    } else {
+                        Text(stringResource(R.string.auth_forgot_password), style = MaterialTheme.typography.labelMedium)
+                    }
+                }
+            }
+
+            if (form.resetEmailSent) {
+                Text(
+                    text = stringResource(R.string.auth_reset_email_sent),
+                    color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+
             form.error?.let { err ->
                 Spacer(Modifier.height(12.dp))
                 Text(
@@ -204,6 +226,21 @@ internal fun AppError.messageRes(): Int = when (this) {
         "VOUCHER_LIMIT_REACHED" -> R.string.err_voucher_limit_reached
         "CAMPAIGN_NOT_ACTIVE" -> R.string.err_campaign_not_active
         "CAMPAIGN_BUDGET_EXHAUSTED" -> R.string.err_campaign_budget_exhausted
+        "ORDER_NOT_FOUND" -> R.string.err_order_not_found
+        "PAYMENT_METHOD_NOT_ENABLED" -> R.string.err_payment_method_not_enabled
+        "PAYMENT_METHOD_UNKNOWN" -> R.string.err_payment_method_unknown
+        "PAYMENT_METHOD_IS_COD" -> R.string.err_payment_method_is_cod
+        "PAYMENT_NOT_PENDING" -> R.string.err_payment_not_pending
+        "PAYMENT_MISSING" -> R.string.err_payment_missing
+        "BILLPLZ_CREATE_BILL_FAILED" -> R.string.err_billplz_create_bill_failed
+        "INVALID_CATEGORY" -> R.string.err_invalid_category
+        "DESCRIPTION_TOO_SHORT" -> R.string.err_description_too_short
+        "DISPUTE_ALREADY_OPEN" -> R.string.err_dispute_already_open
+        "STATE_ACTOR_NOT_PERMITTED" -> R.string.err_state_actor_not_permitted
+        "INVENTORY_NOT_FOUND" -> R.string.err_inventory_not_found
+        "STOCK_NEGATIVE" -> R.string.err_stock_negative
+        "STOCK_BELOW_RESERVED" -> R.string.err_stock_below_reserved
+        "STOCK_DELTA_ZERO" -> R.string.err_stock_delta_zero
         else -> R.string.err_unexpected
     }
     else -> R.string.err_unexpected

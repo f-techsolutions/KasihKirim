@@ -22,4 +22,10 @@ interface AuthRepository {
     suspend fun signUpWithEmail(email: String, password: String): AppResult<AuthUser>
     suspend fun signInWithEmail(email: String, password: String): AppResult<AuthUser>
     suspend fun signOut(): AppResult<Unit>
+
+    /** Sends a password-recovery email. Never touches authState: this is a
+     *  fire-and-forget request against an email address, not a session
+     *  change -- whether it succeeds or fails, the caller's sign-in state is
+     *  whatever it already was. */
+    suspend fun sendPasswordReset(email: String): AppResult<Unit>
 }

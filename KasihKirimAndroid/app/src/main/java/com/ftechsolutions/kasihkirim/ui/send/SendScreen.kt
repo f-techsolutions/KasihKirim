@@ -17,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.ftechsolutions.kasihkirim.R
 import com.ftechsolutions.kasihkirim.domain.model.Address
@@ -58,12 +59,26 @@ private fun KirimForm(vm: KirimQuoteViewModel, state: KirimUiState) {
 
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         AppCard {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                // Found on-device: without fillMaxWidth()+weight(1f), a plain
+                // Row hands each chip a shrinking remaining-width budget, so
+                // whichever chip is measured second (Hantar) was squeezed
+                // into a few pixels and its unbounded-wrap label text
+                // rendered one character per line down the whole screen.
+                // maxLines/overflow is a second safeguard against the same
+                // failure mode for any future longer translation.
                 KirimType.entries.filter { it != KirimType.PASARAN }.forEach { type ->
                     FilterChip(
                         selected = form.kirimType == type,
                         onClick = { vm.onKirimTypeChange(type) },
-                        label = { Text(stringResource(if (type == KirimType.BELI) R.string.kirim_type_beli else R.string.kirim_type_hantar)) },
+                        modifier = Modifier.weight(1f),
+                        label = {
+                            Text(
+                                stringResource(if (type == KirimType.BELI) R.string.kirim_type_beli else R.string.kirim_type_hantar),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        },
                     )
                 }
             }

@@ -31,6 +31,8 @@ import com.ftechsolutions.kasihkirim.ui.admin.AdminViewModel
 import com.ftechsolutions.kasihkirim.ui.auth.AuthViewModel
 import com.ftechsolutions.kasihkirim.ui.board.BoardScreen
 import com.ftechsolutions.kasihkirim.ui.board.BoardViewModel
+import com.ftechsolutions.kasihkirim.ui.buy.BuyOrdersScreen
+import com.ftechsolutions.kasihkirim.ui.buy.BuyOrdersViewModel
 import com.ftechsolutions.kasihkirim.ui.buy.BuyScreen
 import com.ftechsolutions.kasihkirim.ui.buy.BuyViewModel
 import com.ftechsolutions.kasihkirim.ui.deliveries.DeliveriesScreen
@@ -60,6 +62,7 @@ private const val SERVICEABILITY_ROUTE = "serviceability"
 private const val VEHICLES_ROUTE = "vehicles"
 private const val DELIVERIES_ROUTE = "deliveries"
 private const val BUY_ROUTE = "buy"
+private const val BUY_ORDERS_ROUTE = "buy_orders"
 
 @Composable
 fun AppNavHost(
@@ -128,7 +131,11 @@ fun AppNavHost(
             // ADDRESSES_ROUTE/VEHICLES_ROUTE living off Profile/Trips.
             composable(BUY_ROUTE) {
                 val vm: BuyViewModel = viewModel(factory = BuyViewModel.Factory(buyRepository, addressRepository))
-                BuyScreen(vm, onBack = { nav.popBackStack() })
+                BuyScreen(vm, onBack = { nav.popBackStack() }, onOpenOrders = { nav.navigate(BUY_ORDERS_ROUTE) })
+            }
+            composable(BUY_ORDERS_ROUTE) {
+                val vm: BuyOrdersViewModel = viewModel(factory = BuyOrdersViewModel.Factory(buyRepository))
+                BuyOrdersScreen(vm, onBack = { nav.popBackStack() })
             }
             composable(ADDRESSES_ROUTE) {
                 val vm: AddressesViewModel = viewModel(factory = AddressesViewModel.Factory(addressRepository))
@@ -198,7 +205,9 @@ fun AppNavHost(
             // a different feature (carrier-as-trader, ADDENDUM-COMMERCE.md),
             // not this one.
             composable(Destination.SALES.route) {
-                val vm: SalesViewModel = viewModel(factory = SalesViewModel.Factory(sellerRepository, addressRepository))
+                val vm: SalesViewModel = viewModel(
+                    factory = SalesViewModel.Factory(sellerRepository, addressRepository, earningsRepository),
+                )
                 SalesScreen(vm, onBack = { nav.popBackStack() })
             }
         }

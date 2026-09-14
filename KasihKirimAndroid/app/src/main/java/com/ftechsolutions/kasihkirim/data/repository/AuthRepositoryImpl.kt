@@ -10,6 +10,7 @@ import com.ftechsolutions.kasihkirim.domain.model.UserRole
 import com.ftechsolutions.kasihkirim.domain.repository.AuthRepository
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.providers.builtin.Email
+import io.github.jan.supabase.auth.status.SessionStatus
 import io.github.jan.supabase.auth.user.UserInfo
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -30,24 +31,54 @@ class AuthRepositoryImpl : AuthRepository {
             _authState.value = AuthState.Error(AppError.NotConfigured); return
         }
         _authState.value = AuthState.Initializing
-        _authState.value = try {
+        try {
             SupabaseClientProvider.client.auth.awaitInitialization()
-            val user = SupabaseClientProvider.client.auth.currentUserOrNull()
-            if (user != null) AuthState.Authenticated(user.toAuthUser()) else AuthState.Unauthenticated
         } catch (t: Throwable) {
             SafeLog.e(tag, "session restore failed", t)
-            AuthState.Error(t.toAppError())
+            _authState.value = AuthState.Error(t.toAppError())
+            return
+        }
+
+        // Keeps reacting for the rest of this call's lifetime (called once
+        // from AuthViewModel.init via viewModelScope, which is Activity-
+        // scoped and gates every screen in App.kt) -- not just this initial
+        // restore. Found on-device: a session that goes bad mid-visit (a
+        // background refresh-token failure) previously left _authState
+        // frozen at Authenticated forever, since nothing after this one-shot
+        // check ever touched it again -- the UI kept rendering the full
+        // authenticated app while every call underneath silently started
+        // failing with no live token (confirmed via a Storage upload
+        // reaching the server as role=anon), with no way back to the
+        // sign-in screen short of restarting the app.
+        SupabaseClientProvider.client.auth.sessionStatus.collect { status ->
+            _authState.value = when (status) {
+                is SessionStatus.Authenticated ->
+                    status.session.user?.toAuthUser()?.let(AuthState::Authenticated)
+                        ?: AuthState.Unauthenticated
+                is SessionStatus.NotAuthenticated, is SessionStatus.RefreshFailure ->
+                    AuthState.Unauthenticated
+                SessionStatus.Initializing -> AuthState.Initializing
+            }
         }
     }
 
     override suspend fun signUpWithEmail(email: String, password: String): AppResult<AuthUser> =
-        runAuth {
+        runAuth(noSessionError = AppError.EmailNotConfirmed) {
             SupabaseClientProvider.client.auth.signUpWith(Email) {
                 this.email = email; this.password = password
             }
             // Depending on project settings sign-up may not create a session
             // (email confirmation). Treat "no session" as unauthenticated
-            // rather than pretending the user is signed in.
+            // rather than pretending the user is signed in. Found on-device:
+            // this is the ordinary, successful outcome of a real sign-up on
+            // a project with email confirmation enabled -- signUpWith()
+            // returns without throwing, the account genuinely exists, there
+            // is just no session yet. runAuth's default (SessionExpired,
+            // which AuthScreen.messageRes() has no specific copy for and
+            // falls back to a generic "Ada masalah. Sila cuba lagi.") made a
+            // successful sign-up look like a random failure. EmailNotConfirmed
+            // already has the exactly right string: "check your inbox for the
+            // confirmation link."
             SupabaseClientProvider.client.auth.currentUserOrNull()
         }
 
@@ -74,12 +105,27 @@ class AuthRepositoryImpl : AuthRepository {
         }
     }
 
-    private inline fun runAuth(block: () -> UserInfo?): AppResult<AuthUser> =
+    override suspend fun sendPasswordReset(email: String): AppResult<Unit> =
+        try {
+            SupabaseClientProvider.client.auth.resetPasswordForEmail(email)
+            AppResult.Success(Unit)
+        } catch (t: Throwable) {
+            // Never log the email as part of a broader payload dump, only
+            // the exception itself (matches runAuth's own credential-safety
+            // comment above).
+            SafeLog.e(tag, "password reset request failed: ${t::class.simpleName}", t)
+            AppResult.Failure(t.toAppError())
+        }
+
+    private inline fun runAuth(
+        noSessionError: AppError = AppError.SessionExpired,
+        block: () -> UserInfo?,
+    ): AppResult<AuthUser> =
         try {
             val info = block()
             if (info == null) {
                 _authState.value = AuthState.Unauthenticated
-                AppResult.Failure(AppError.SessionExpired)
+                AppResult.Failure(noSessionError)
             } else {
                 val user = info.toAuthUser()
                 _authState.value = AuthState.Authenticated(user)
@@ -88,9 +134,18 @@ class AuthRepositoryImpl : AuthRepository {
         } catch (t: Throwable) {
             // Never log the credentials or the raw body.
             SafeLog.e(tag, "auth call failed: ${t::class.simpleName}", t)
-            val err = t.toAppError()
-            _authState.value = AuthState.Error(err)
-            AppResult.Failure(err)
+            // Deliberately does NOT touch _authState. A wrong password (or any
+            // other sign-in/sign-up failure) is a routine, expected outcome of
+            // an attempt made while already Unauthenticated -- returning the
+            // Failure below is enough for AuthViewModel to surface it as a
+            // local form.error the user can read and correct. Setting
+            // AuthState.Error here (found on-device: App.kt's root `when`
+            // renders AuthState.Error as a bare, buttonless error screen with
+            // no sign-in form at all) used to strand the user with no way to
+            // retry short of restarting the app. AuthState.Error stays
+            // reserved for restoreSession()'s own catch, where there really
+            // is no form to fall back to.
+            AppResult.Failure(t.toAppError())
         }
 }
 

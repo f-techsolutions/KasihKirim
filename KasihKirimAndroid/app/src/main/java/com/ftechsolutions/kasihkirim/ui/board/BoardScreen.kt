@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -32,6 +33,12 @@ import com.ftechsolutions.kasihkirim.ui.common.StatusBadge
 fun BoardScreen(vm: BoardViewModel, isCarrier: Boolean) {
     val state by vm.state.collectAsState()
 
+    // The bottom nav's saveState/restoreState keeps this ViewModel alive
+    // across tab switches, but disposes/recreates this Composable, so
+    // init{}'s one-shot load() never refires on re-entry (same bug already
+    // found and fixed on EarningsScreen).
+    LaunchedEffect(Unit) { vm.load() }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
@@ -48,13 +55,14 @@ fun BoardScreen(vm: BoardViewModel, isCarrier: Boolean) {
                     invite = invite,
                     nodeNames = state.nodeNames,
                     hasResponded = invite.id in state.respondedInviteIds,
+                    isResponding = state.respondingInviteId == invite.id,
                     onRespond = { vm.respondToInvite(invite.id) },
                 )
             }
             item { Spacer(Modifier.height(4.dp)) }
         }
 
-        if (state.items.isEmpty() && !state.isLoading) {
+        if (state.items.isEmpty() && !state.isLoading && state.error == null) {
             item { EmptyStateCard(stringResource(R.string.board_empty)) }
         }
         items(state.items, key = { it.id }) { kirim ->
@@ -107,6 +115,17 @@ private fun BoardCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+        // A PASARAN listing's real cash-handling commitment: rpc_accept_offer
+        // charges the whole order (goods + carriage) as COD the instant this
+        // carrier accepts, not just the delivery_fee_sen shown above.
+        kirim.codTotalSen?.let {
+            Spacer(Modifier.height(2.dp))
+            Text(
+                stringResource(R.string.board_cod_total, it.format()),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
 
         if (isCarrier) {
             if (eligibleTrips.isEmpty()) {
@@ -149,6 +168,7 @@ private fun InviteCard(
     invite: CapacityInvite,
     nodeNames: Map<String, String>,
     hasResponded: Boolean,
+    isResponding: Boolean,
     onRespond: () -> Unit,
 ) {
     AppCard {
@@ -169,8 +189,17 @@ private fun InviteCard(
                 color = MaterialTheme.colorScheme.primary,
             )
         } else {
-            OutlinedButton(onClick = onRespond, shape = MaterialTheme.shapes.small, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.board_invite_respond))
+            OutlinedButton(
+                onClick = onRespond,
+                enabled = !isResponding,
+                shape = MaterialTheme.shapes.small,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                if (isResponding) {
+                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                } else {
+                    Text(stringResource(R.string.board_invite_respond))
+                }
             }
         }
     }
