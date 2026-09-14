@@ -2,9 +2,12 @@ package com.ftechsolutions.kasihkirim.ui.sales
 
 import com.ftechsolutions.kasihkirim.core.result.AppError
 import com.ftechsolutions.kasihkirim.core.result.AppResult
+import com.ftechsolutions.kasihkirim.domain.model.BankAccount
 import com.ftechsolutions.kasihkirim.domain.model.Community
 import com.ftechsolutions.kasihkirim.domain.model.DisputeCategory
 import com.ftechsolutions.kasihkirim.domain.model.Earnings
+import com.ftechsolutions.kasihkirim.domain.model.PayeeType
+import com.ftechsolutions.kasihkirim.domain.model.PayoutRequest
 import com.ftechsolutions.kasihkirim.domain.model.Inventory
 import com.ftechsolutions.kasihkirim.domain.model.InventoryMovement
 import com.ftechsolutions.kasihkirim.domain.model.KirimCategory
@@ -158,6 +161,12 @@ private class FakeSellerRepository(
 private class FakeEarningsRepository(var result: AppResult<Earnings> = AppResult.Success(Earnings(Sen.ZERO, Sen.ZERO, null, null))) :
     EarningsRepository {
     override suspend fun myEarnings(): AppResult<Earnings> = result
+    override suspend fun myBankAccounts(): AppResult<List<BankAccount>> = AppResult.Success(emptyList())
+    override suspend fun addBankAccount(bankCode: String, accountNo: String, holderName: String): AppResult<BankAccount> =
+        AppResult.Failure(AppError.Unexpected)
+    override suspend fun requestWithdrawal(payeeType: PayeeType, bankAccountId: String, amountSen: Long): AppResult<Unit> =
+        AppResult.Failure(AppError.Unexpected)
+    override suspend fun myPayouts(): AppResult<List<PayoutRequest>> = AppResult.Success(emptyList())
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
