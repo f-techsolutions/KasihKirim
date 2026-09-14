@@ -5,6 +5,7 @@ package com.ftechsolutions.kasihkirim.ui.admin
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -17,9 +18,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.ftechsolutions.kasihkirim.R
+import com.ftechsolutions.kasihkirim.domain.model.AccountStatus
+import com.ftechsolutions.kasihkirim.domain.model.AdminAccount
 import com.ftechsolutions.kasihkirim.domain.model.CarrierApplication
 import com.ftechsolutions.kasihkirim.domain.model.Dispute
 import com.ftechsolutions.kasihkirim.domain.model.DisputeStatus
@@ -69,6 +73,28 @@ fun AdminScreen(vm: AdminViewModel) {
                 onClick = { vm.selectQueue(AdminQueue.DISPUTES) },
                 text = { Text(tabLabel(R.string.admin_tab_disputes, state.disputes.size)) },
             )
+            Tab(
+                selected = state.queue == AdminQueue.ACCOUNTS,
+                onClick = { vm.selectQueue(AdminQueue.ACCOUNTS) },
+                text = { Text(stringResource(R.string.admin_tab_accounts)) },
+            )
+        }
+
+        if (state.queue == AdminQueue.ACCOUNTS) {
+            Column(Modifier.padding(horizontal = 20.dp)) {
+                Spacer(Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = state.accountQuery,
+                    onValueChange = vm::onAccountQueryChange,
+                    label = { Text(stringResource(R.string.admin_account_search_label)) },
+                    placeholder = { Text(stringResource(R.string.admin_account_search_hint)) },
+                    singleLine = true,
+                    shape = MaterialTheme.shapes.small,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(onSearch = { vm.searchAccounts() }),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
         }
 
         Box(Modifier.weight(1f)) {
@@ -159,6 +185,21 @@ fun AdminScreen(vm: AdminViewModel) {
                                 onResolve = { status, note, refundSen ->
                                     vm.resolveDispute(dispute.id, status, note, refundSen)
                                 },
+                            )
+                        }
+                    }
+
+                    AdminQueue.ACCOUNTS -> {
+                        if (state.accounts.isEmpty() && !state.isSearchingAccounts && state.error == null &&
+                            state.accountQuery.isNotBlank()
+                        ) {
+                            item { EmptyStateCard(stringResource(R.string.admin_no_accounts)) }
+                        }
+                        items(state.accounts, key = { it.id }) { account ->
+                            AccountCard(
+                                account = account,
+                                isDeciding = state.decidingId == account.id,
+                                onSetStatus = { status, reason -> vm.setAccountStatus(account.id, status, reason) },
                             )
                         }
                     }
@@ -364,6 +405,104 @@ private fun DisputeCard(
                 ) { Text(stringResource(R.string.admin_dispute_mark_reviewing)) }
                 TextButton(onClick = { open = false }, modifier = Modifier.fillMaxWidth()) {
                     Text(stringResource(R.string.admin_cancel))
+                }
+            }
+        }
+    }
+}
+
+/** Unlike the review queues above, this isn't a binary approve/reject decision
+ *  and the row never leaves the list on its own -- a search result stays
+ *  visible after a status change, just re-labelled, since the admin may act
+ *  on it again (e.g. restore right after a mistaken suspend). */
+@Composable
+private fun AccountCard(
+    account: AdminAccount,
+    isDeciding: Boolean,
+    onSetStatus: (AccountStatus, String?) -> Unit,
+) {
+    var pendingAction by remember(account.id) { mutableStateOf<AccountStatus?>(null) }
+    var reason by remember(account.id) { mutableStateOf("") }
+
+    AppCard {
+        Row(verticalAlignment = Alignment.Top) {
+            Text(
+                account.displayName ?: account.fullName ?: account.phone,
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.weight(1f),
+            )
+            StatusBadge(
+                account.status.labelMs,
+                tone = when (account.status) {
+                    AccountStatus.ACTIVE -> BadgeTone.POSITIVE
+                    AccountStatus.SUSPENDED, AccountStatus.BANNED -> BadgeTone.ERROR
+                    AccountStatus.PENDING, AccountStatus.DELETED -> BadgeTone.WARNING
+                },
+            )
+        }
+        Spacer(Modifier.height(4.dp))
+        Text(account.phone, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        account.suspendedReason?.let {
+            Spacer(Modifier.height(4.dp))
+            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+
+        Spacer(Modifier.height(10.dp))
+        val action = pendingAction
+        if (action != null) {
+            OutlinedTextField(
+                value = reason,
+                onValueChange = { reason = it },
+                label = {
+                    Text(
+                        stringResource(
+                            if (action == AccountStatus.BANNED) R.string.admin_account_ban_reason
+                            else R.string.admin_account_suspend_reason,
+                        ),
+                    )
+                },
+                shape = MaterialTheme.shapes.small,
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 2,
+            )
+            Spacer(Modifier.height(6.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = {
+                        onSetStatus(action, reason.trim().takeIf { it.isNotEmpty() })
+                        pendingAction = null
+                        reason = ""
+                    },
+                    enabled = !isDeciding,
+                    shape = MaterialTheme.shapes.medium,
+                ) { Text(stringResource(R.string.admin_account_confirm)) }
+                TextButton(onClick = { pendingAction = null; reason = "" }) {
+                    Text(stringResource(R.string.admin_cancel))
+                }
+            }
+        } else {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (account.status == AccountStatus.SUSPENDED || account.status == AccountStatus.BANNED) {
+                    Button(
+                        onClick = { onSetStatus(AccountStatus.ACTIVE, null) },
+                        enabled = !isDeciding,
+                        shape = MaterialTheme.shapes.medium,
+                    ) {
+                        if (isDeciding) {
+                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                        } else {
+                            Text(stringResource(R.string.admin_account_restore))
+                        }
+                    }
+                } else {
+                    OutlinedButton(
+                        onClick = { pendingAction = AccountStatus.SUSPENDED },
+                        enabled = !isDeciding,
+                        shape = MaterialTheme.shapes.medium,
+                    ) { Text(stringResource(R.string.admin_account_suspend)) }
+                    TextButton(onClick = { pendingAction = AccountStatus.BANNED }, enabled = !isDeciding) {
+                        Text(stringResource(R.string.admin_account_ban))
+                    }
                 }
             }
         }

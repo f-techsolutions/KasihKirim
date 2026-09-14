@@ -154,6 +154,16 @@
     <string name="admin_ssm_prefix">SSM: %1$s</string>
     <string name="admin_notice_seller_must_resign">Penjual diluluskan. Mereka perlu log keluar dan log masuk semula sebelum skrin penjual muncul.</string>
     <string name="admin_notice_carrier_must_resign">Penghantar diluluskan. Mereka perlu log keluar dan log masuk semula sebelum skrin penghantar muncul.</string>
+    <string name="admin_tab_accounts">Akaun</string>
+    <string name="admin_account_search_label">Cari nombor telefon atau nama</string>
+    <string name="admin_account_search_hint">Taip untuk mencari akaun</string>
+    <string name="admin_no_accounts">Tiada akaun sepadan.</string>
+    <string name="admin_account_suspend">Gantung</string>
+    <string name="admin_account_ban">Sekat</string>
+    <string name="admin_account_restore">Pulihkan</string>
+    <string name="admin_account_suspend_reason">Sebab digantung</string>
+    <string name="admin_account_ban_reason">Sebab disekat</string>
+    <string name="admin_account_confirm">Sahkan</string>
     <string name="sales_title">Jualan Saya</string>
     <string name="sales_tab_products">Produk</string>
     <string name="sales_tab_orders">Pesanan</string>

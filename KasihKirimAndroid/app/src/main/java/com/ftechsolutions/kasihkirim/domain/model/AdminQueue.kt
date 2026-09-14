@@ -85,3 +85,43 @@ data class Dispute(
     val slaDueAt: String,
     val createdAt: String,
 )
+
+/** Mirrors ref.account_status exactly (0001_schema.sql / public.profiles.status).
+ *  Unlike [SellerStatus], this has never had any server-side effect beyond
+ *  display until 0041_account_management.sql made custom_access_token_hook
+ *  actually refuse to mint a token for SUSPENDED/BANNED/DELETED -- setting
+ *  it before that migration was cosmetic record-keeping only. */
+enum class AccountStatus(val wire: String) {
+    PENDING("pending"),
+    ACTIVE("active"),
+    SUSPENDED("suspended"),
+    BANNED("banned"),
+    DELETED("deleted");
+
+    val labelMs: String
+        get() = when (this) {
+            PENDING -> "Menunggu"
+            ACTIVE -> "Aktif"
+            SUSPENDED -> "Digantung"
+            BANNED -> "Disekat"
+            DELETED -> "Dipadam"
+        }
+
+    companion object {
+        fun fromWire(value: String): AccountStatus? = entries.firstOrNull { it.wire == value }
+    }
+}
+
+/** A search result row in the admin account-management screen -- not a
+ *  queue (nothing about "search" narrows to a pending count the way the
+ *  seller/carrier/product/dispute tabs do), just profiles read as a
+ *  reviewer, per profiles_select's own is_admin() clause (0003). */
+data class AdminAccount(
+    val id: String,
+    val phone: String,
+    val fullName: String?,
+    val displayName: String?,
+    val status: AccountStatus,
+    val suspendedReason: String?,
+    val createdAt: String,
+)

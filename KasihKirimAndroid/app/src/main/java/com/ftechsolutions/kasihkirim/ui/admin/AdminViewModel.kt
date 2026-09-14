@@ -5,6 +5,8 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.ftechsolutions.kasihkirim.core.result.AppError
 import com.ftechsolutions.kasihkirim.core.result.AppResult
+import com.ftechsolutions.kasihkirim.domain.model.AccountStatus
+import com.ftechsolutions.kasihkirim.domain.model.AdminAccount
 import com.ftechsolutions.kasihkirim.domain.model.CarrierApplication
 import com.ftechsolutions.kasihkirim.domain.model.Dispute
 import com.ftechsolutions.kasihkirim.domain.model.DisputeStatus
@@ -19,7 +21,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-enum class AdminQueue { SELLERS, CARRIERS, PRODUCTS, DISPUTES }
+enum class AdminQueue { SELLERS, CARRIERS, PRODUCTS, DISPUTES, ACCOUNTS }
 
 data class AdminUiState(
     val isLoading: Boolean = true,
@@ -28,6 +30,11 @@ data class AdminUiState(
     val carriers: List<CarrierApplication> = emptyList(),
     val products: List<ProductReview> = emptyList(),
     val disputes: List<Dispute> = emptyList(),
+    /** Not a queue loaded by [load] -- populated only once [searchAccounts]
+     *  runs, since an empty query intentionally returns nothing. */
+    val accountQuery: String = "",
+    val accounts: List<AdminAccount> = emptyList(),
+    val isSearchingAccounts: Boolean = false,
     /** The row currently being decided, so only its own buttons disable. */
     val decidingId: String? = null,
     /** Set after an approval that grants a role, since the grant only reaches
@@ -104,6 +111,45 @@ class AdminViewModel(private val repo: AdminRepository) : ViewModel() {
         refundSen: Long = 0,
     ) {
         decide(disputeId) { repo.resolveDispute(disputeId, status, note, refundSen) }
+    }
+
+    fun onAccountQueryChange(query: String) = _state.update { it.copy(accountQuery = query) }
+
+    /** Not part of [load] -- runs only when the admin actually searches, and
+     *  an empty query is refused client-side same as the repository refuses
+     *  it server-side (the whole user base is never an acceptable result). */
+    fun searchAccounts() {
+        val query = _state.value.accountQuery
+        if (query.isBlank()) {
+            _state.update { it.copy(accounts = emptyList()) }
+            return
+        }
+        viewModelScope.launch {
+            _state.update { it.copy(isSearchingAccounts = true, error = null) }
+            when (val result = repo.searchAccounts(query)) {
+                is AppResult.Success ->
+                    _state.update { it.copy(isSearchingAccounts = false, accounts = result.data) }
+                is AppResult.Failure ->
+                    _state.update { it.copy(isSearchingAccounts = false, error = result.error) }
+            }
+        }
+    }
+
+    /** Not routed through [decide]: accounts are search results, not a
+     *  shrinking queue, so success re-runs the same search instead of
+     *  reloading the four review queues. */
+    fun setAccountStatus(userId: String, status: AccountStatus, reason: String? = null) {
+        viewModelScope.launch {
+            _state.update { it.copy(decidingId = userId, error = null) }
+            when (val result = repo.setAccountStatus(userId, status, reason)) {
+                is AppResult.Success -> {
+                    _state.update { it.copy(decidingId = null) }
+                    searchAccounts()
+                }
+                is AppResult.Failure ->
+                    _state.update { it.copy(decidingId = null, error = result.error) }
+            }
+        }
     }
 
     /** Every decision follows the same shape: mark the row busy, call the
