@@ -11,18 +11,28 @@ import com.ftechsolutions.kasihkirim.data.remote.dto.ProductReviewDto
 import com.ftechsolutions.kasihkirim.data.remote.dto.SellerApplicationDto
 import com.ftechsolutions.kasihkirim.domain.model.AccountStatus
 import com.ftechsolutions.kasihkirim.domain.model.AdminAccount
+import com.ftechsolutions.kasihkirim.domain.model.AdminPayout
 import com.ftechsolutions.kasihkirim.domain.model.CarrierApplication
 import com.ftechsolutions.kasihkirim.domain.model.Dispute
 import com.ftechsolutions.kasihkirim.domain.model.DisputeStatus
+import com.ftechsolutions.kasihkirim.domain.model.PayoutStatus
 import com.ftechsolutions.kasihkirim.domain.model.ProductReview
 import com.ftechsolutions.kasihkirim.domain.model.ProductStatus
+import com.ftechsolutions.kasihkirim.domain.model.Sen
 import com.ftechsolutions.kasihkirim.domain.model.SellerApplication
 import com.ftechsolutions.kasihkirim.domain.model.SellerStatus
 import com.ftechsolutions.kasihkirim.domain.repository.AdminRepository
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
 import io.github.jan.supabase.postgrest.query.Order
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.long
 import kotlinx.serialization.json.put
 import java.io.IOException
 
@@ -209,6 +219,59 @@ class AdminRepositoryImpl : AdminRepository {
         Unit
     }
 
+    override suspend fun listPayouts(): AppResult<List<AdminPayout>> = runCatchingResult {
+        SupabaseClientProvider.client.postgrest
+            .rpc("rpc_admin_list_payouts", buildJsonObject {})
+            .decodeAs<JsonArray>()
+            .map { (it as JsonObject).toAdminPayout() }
+    }
+
+    override suspend fun reviewPayout(payoutId: String, approve: Boolean, reason: String?): AppResult<Unit> = runCatchingResult {
+        SupabaseClientProvider.client.postgrest.rpc(
+            "rpc_admin_review_payout",
+            buildJsonObject {
+                put("p_payout_id", payoutId)
+                put("p_approve", approve)
+                put("p_reason", reason)
+            },
+        )
+        Unit
+    }
+
+    override suspend fun approvePayout(payoutId: String, approve: Boolean, reason: String?): AppResult<Unit> = runCatchingResult {
+        SupabaseClientProvider.client.postgrest.rpc(
+            "rpc_admin_approve_payout",
+            buildJsonObject {
+                put("p_payout_id", payoutId)
+                put("p_approve", approve)
+                put("p_reason", reason)
+            },
+        )
+        Unit
+    }
+
+    override suspend fun markPayoutPaid(payoutId: String, providerRef: String?): AppResult<Unit> = runCatchingResult {
+        SupabaseClientProvider.client.postgrest.rpc(
+            "rpc_admin_mark_payout_paid",
+            buildJsonObject {
+                put("p_payout_id", payoutId)
+                put("p_provider_ref", providerRef)
+            },
+        )
+        Unit
+    }
+
+    override suspend fun markPayoutFailed(payoutId: String, reason: String): AppResult<Unit> = runCatchingResult {
+        SupabaseClientProvider.client.postgrest.rpc(
+            "rpc_admin_mark_payout_failed",
+            buildJsonObject {
+                put("p_payout_id", payoutId)
+                put("p_reason", reason)
+            },
+        )
+        Unit
+    }
+
     private inline fun <T> runCatchingResult(block: () -> T): AppResult<T> =
         try {
             AppResult.Success(block())
@@ -217,6 +280,28 @@ class AdminRepositoryImpl : AdminRepository {
             AppResult.Failure(t.toAdminAppError())
         }
 }
+
+private fun JsonObject.toAdminPayout() = AdminPayout(
+    id = getValue("id").jsonPrimitive.content,
+    payeeType = getValue("payee_type").jsonPrimitive.content,
+    payeeLabel = this["payee_label"]?.stringOrNull(),
+    amountSen = Sen(getValue("amount_sen").jsonPrimitive.long),
+    status = PayoutStatus.fromWire(getValue("status").jsonPrimitive.content) ?: PayoutStatus.REQUESTED,
+    bankCode = getValue("bank_code").jsonPrimitive.content,
+    accountNoLast4 = getValue("account_no_last4").jsonPrimitive.content,
+    holderName = getValue("holder_name").jsonPrimitive.content,
+    reviewedBy = this["reviewed_by"]?.stringOrNull(),
+    approvedBy = this["approved_by"]?.stringOrNull(),
+    requestedAt = getValue("requested_at").jsonPrimitive.content,
+)
+
+// RETURNS TABLE(...) always includes every column as a key, even when its
+// value is SQL NULL, unlike the jsonb_build_object calls elsewhere in this
+// file's own RPCs -- see EarningsRepositoryImpl's identical helper for why
+// a bare `?.jsonPrimitive?.content` would silently turn a real NULL into
+// the literal string "null" here.
+private fun JsonElement.stringOrNull(): String? =
+    (this as? JsonPrimitive)?.takeIf { it !is JsonNull }?.content
 
 private fun Throwable.toAdminAppError(): AppError = when {
     // The server's own name for "you are not an admin" -- raised by every
@@ -228,6 +313,12 @@ private fun Throwable.toAdminAppError(): AppError = when {
     message?.contains("DISPUTE_NOT_FOUND", true) == true -> AppError.Server("DISPUTE_NOT_FOUND")
     message?.contains("USER_NOT_FOUND", true) == true -> AppError.Server("USER_NOT_FOUND")
     message?.contains("CANNOT_ACT_ON_SELF", true) == true -> AppError.Server("CANNOT_ACT_ON_SELF")
+    message?.contains("CANNOT_APPROVE_OWN_REVIEW", true) == true -> AppError.Server("CANNOT_APPROVE_OWN_REVIEW")
+    message?.contains("INVALID_PAYOUT_STATE", true) == true -> AppError.Server("INVALID_PAYOUT_STATE")
+    message?.contains("ALREADY_PAID", true) == true -> AppError.Server("ALREADY_PAID")
+    message?.contains("INSUFFICIENT_BALANCE_AT_SETTLEMENT", true) == true ->
+        AppError.Server("INSUFFICIENT_BALANCE_AT_SETTLEMENT")
+    message?.contains("PAYOUT_NOT_FOUND", true) == true -> AppError.Server("PAYOUT_NOT_FOUND")
     message?.contains("INVALID_STATUS", true) == true -> AppError.Server("INVALID_STATUS")
     message?.contains("INVALID_REFUND", true) == true -> AppError.Server("INVALID_REFUND")
     this is IOException -> AppError.Network

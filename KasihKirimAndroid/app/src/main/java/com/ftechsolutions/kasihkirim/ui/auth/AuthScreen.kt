@@ -244,6 +244,22 @@ internal fun AppError.messageRes(): Int = when (this) {
         "STOCK_DELTA_ZERO" -> R.string.err_stock_delta_zero
         "BUDGET_EXCEEDED_NEEDS_VARIANCE" -> R.string.err_budget_exceeded_needs_variance
         "INVALID_AMOUNT" -> R.string.err_invalid_amount
+        "CANNOT_ACT_ON_SELF" -> R.string.err_cannot_act_on_self
+        "USER_NOT_FOUND" -> R.string.err_user_not_found
+        "NOT_A_PAYEE" -> R.string.err_not_a_payee
+        "INVALID_BANK_CODE" -> R.string.err_invalid_bank_code
+        "INVALID_HOLDER_NAME" -> R.string.err_invalid_holder_name
+        "INVALID_ACCOUNT_NO" -> R.string.err_invalid_account_no
+        "BANK_ACCOUNT_ENC_KEY_NOT_CONFIGURED" -> R.string.err_bank_account_enc_key_not_configured
+        "BANK_ACCOUNT_NOT_FOUND" -> R.string.err_bank_account_not_found
+        "INSUFFICIENT_BALANCE" -> R.string.err_insufficient_balance
+        "NOT_A_CARRIER" -> R.string.err_not_a_carrier
+        "NOT_A_SELLER" -> R.string.err_not_a_seller
+        "CANNOT_APPROVE_OWN_REVIEW" -> R.string.err_cannot_approve_own_review
+        "INVALID_PAYOUT_STATE" -> R.string.err_invalid_payout_state
+        "ALREADY_PAID" -> R.string.err_already_paid
+        "INSUFFICIENT_BALANCE_AT_SETTLEMENT" -> R.string.err_insufficient_balance_at_settlement
+        "PAYOUT_NOT_FOUND" -> R.string.err_payout_not_found
         else -> R.string.err_unexpected
     }
     else -> R.string.err_unexpected

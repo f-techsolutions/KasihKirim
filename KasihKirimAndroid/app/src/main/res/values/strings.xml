@@ -164,6 +164,13 @@
     <string name="admin_account_suspend_reason">Sebab digantung</string>
     <string name="admin_account_ban_reason">Sebab disekat</string>
     <string name="admin_account_confirm">Sahkan</string>
+    <string name="admin_tab_payouts">Pengeluaran</string>
+    <string name="admin_no_payouts">Tiada permintaan pengeluaran menunggu tindakan.</string>
+    <string name="admin_payout_send_to_review">Hantar untuk Semakan</string>
+    <string name="admin_payout_fail_reason">Sebab kegagalan</string>
+    <string name="admin_payout_provider_ref">Rujukan pemindahan (pilihan)</string>
+    <string name="admin_payout_mark_paid">Tanda Selesai</string>
+    <string name="admin_payout_mark_failed">Tanda Gagal</string>
     <string name="sales_title">Jualan Saya</string>
     <string name="sales_tab_products">Produk</string>
     <string name="sales_tab_orders">Pesanan</string>
@@ -276,6 +283,23 @@
     <string name="earnings_pending">Belum selesai</string>
     <string name="earnings_cod_held">COD dipegang</string>
     <string name="earnings_float_limit">Had float</string>
+    <string name="earnings_seller_section_title">Sebagai Penjual</string>
+    <string name="earnings_seller_available">Boleh dikeluarkan (penjual)</string>
+    <string name="earnings_seller_pending">Belum selesai (penjual)</string>
+    <string name="earnings_withdraw">Keluarkan Wang</string>
+    <string name="earnings_bank_accounts_title">Akaun Bank</string>
+    <string name="earnings_add_bank_account">Tambah Akaun Bank</string>
+    <string name="earnings_no_bank_account">Belum ada akaun bank didaftarkan.</string>
+    <string name="earnings_bank_code_label">Nama bank</string>
+    <string name="earnings_account_no_label">Nombor akaun</string>
+    <string name="earnings_holder_name_label">Nama pemegang akaun</string>
+    <string name="earnings_add_bank_submit">Simpan</string>
+    <string name="earnings_withdraw_amount_label">Jumlah pengeluaran (RM)</string>
+    <string name="earnings_withdraw_submit">Hantar Permintaan</string>
+    <string name="earnings_withdraw_needs_bank_account">Tambah akaun bank dahulu sebelum mengeluarkan wang.</string>
+    <string name="earnings_payout_history_title">Sejarah Pengeluaran</string>
+    <string name="earnings_no_payouts">Tiada permintaan pengeluaran lagi.</string>
+    <string name="earnings_cancel">Batal</string>
 
     <string name="muatan_jual_title">Muatan Jual</string>
     <string name="muatan_jual_empty">Tiada muatan dijual buat masa ini.</string>
@@ -416,6 +440,22 @@
     <string name="err_stock_delta_zero">Sila masukkan perubahan stok yang bukan sifar.</string>
     <string name="err_budget_exceeded_needs_variance">Jumlah melebihi bajet yang diluluskan. Hubungi sokongan untuk kelulusan tambahan.</string>
     <string name="err_invalid_amount">Sila masukkan jumlah yang sah.</string>
+    <string name="err_not_a_payee">Ciri ini hanya untuk penjual atau penghantar berdaftar.</string>
+    <string name="err_invalid_bank_code">Sila pilih bank.</string>
+    <string name="err_invalid_holder_name">Sila masukkan nama pemegang akaun.</string>
+    <string name="err_invalid_account_no">Sila masukkan nombor akaun yang sah.</string>
+    <string name="err_bank_account_enc_key_not_configured">Ciri ini belum tersedia. Sila cuba sebentar lagi.</string>
+    <string name="err_bank_account_not_found">Akaun bank tidak dijumpai.</string>
+    <string name="err_insufficient_balance">Baki tidak mencukupi untuk pengeluaran ini.</string>
+    <string name="err_not_a_carrier">Awak bukan penghantar berdaftar.</string>
+    <string name="err_not_a_seller">Awak bukan penjual berdaftar.</string>
+    <string name="err_cannot_approve_own_review">Pentadbir yang menyemak tidak boleh meluluskan permintaan yang sama.</string>
+    <string name="err_invalid_payout_state">Permintaan ini sudah berubah status.</string>
+    <string name="err_already_paid">Pembayaran ini sudah selesai.</string>
+    <string name="err_insufficient_balance_at_settlement">Baki tidak lagi mencukupi untuk membayar jumlah ini.</string>
+    <string name="err_payout_not_found">Permintaan pengeluaran tidak dijumpai.</string>
+    <string name="err_cannot_act_on_self">Tindakan ini tidak boleh dikenakan pada akaun sendiri.</string>
+    <string name="err_user_not_found">Pengguna tidak dijumpai.</string>
 
     <string name="profile_badges_title">Lencana</string>
 </resources>
