@@ -12,7 +12,7 @@ import androidx.compose.material3.*
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.outlined.Star as StarOutline
+import androidx.compose.material.icons.outlined.Star
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -402,7 +402,7 @@ private fun RateDeliveryDialog(
                     (1..5).forEach { star ->
                         IconButton(onClick = { onRatingChange(star) }) {
                             Icon(
-                                imageVector = if (star <= rating) Icons.Filled.Star else StarOutline,
+                                imageVector = if (star <= rating) Icons.Filled.Star else Icons.Outlined.Star,
                                 contentDescription = stringResource(R.string.deliveries_rate_star, star),
                                 tint = if (star <= rating) MaterialTheme.colorScheme.primary
                                        else MaterialTheme.colorScheme.onSurfaceVariant,

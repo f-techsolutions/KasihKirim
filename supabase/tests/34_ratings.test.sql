@@ -16,23 +16,34 @@ SELECT tests.seed_fixture();
 
 DO $$
 DECLARE
-  v_cat UUID; v_beluran UUID; v_kk UUID; v_kirim UUID; v_delivery UUID; r JSONB;
+  v_beluran UUID; v_kk UUID; v_kepayan UUID; v_addr2 UUID;
+  v_quote JSONB; v_kirim_created JSONB; v_kirim UUID; v_delivery UUID; r JSONB;
 BEGIN
-  SELECT id INTO v_cat     FROM ref.categories  WHERE slug='hasil-laut';
   SELECT id INTO v_beluran FROM ref.route_nodes WHERE name='Beluran';
   SELECT id INTO v_kk      FROM ref.route_nodes WHERE name='Kota Kinabalu';
+  SELECT id INTO v_kepayan FROM public.communities WHERE name='Kg Kepayan Baru';
 
-  -- Inserted directly as postgres, same as tests.seed_fixture's own kirim
-  -- row -- kirim_insert (0030) only allows a client to insert status='DRAFT',
-  -- and this needs to start life already POSTED to be accept_offer-able.
-  INSERT INTO public.kirim_requests (
-    reference_code,requester_id,kirim_type,status,item_description,category_id,
-    est_weight_grams,origin_address_id,dest_address_id,origin_node_id,dest_node_id,
-    total_escrow_sen)
-  VALUES (
-    'KK-RATE01',tests.uid('aisyah'),'HANTAR','POSTED','Sekotak barang',v_cat,
-    1000,tests.uid('_addr'),tests.uid('_addr'),v_beluran,v_kk,3000)
-  RETURNING id INTO v_kirim;
+  -- A second address for aisyah, same reason 08_kirim_trip_creation.test.sql
+  -- creates one: HANTAR needs a distinct pickup address from the single one
+  -- seed_fixture provides (which is used as the dest for its own kirim).
+  INSERT INTO public.addresses (user_id,label,recipient_name,recipient_phone,
+    community_id,landmark_note,nearest_node_id)
+  VALUES (tests.uid('aisyah'),'Pejabat','Aisyah','+60128880001',
+    v_kepayan,'Sebelah pasar', v_kk)
+  RETURNING id INTO v_addr2;
+
+  -- rpc_quote_kirim + rpc_create_kirim (0012), not a hand-rolled INSERT: a
+  -- kirim needs a real internal.quotes row (quote_id) for
+  -- internal.fn_settle_delivery to read delivery_fee_sen/commission_sen from
+  -- at CONFIRM_RECEIPT -- a kirim inserted directly with no quote_id left
+  -- fn_settle_delivery's own `q` NULL and its ledger post NULL, tripping
+  -- ledger_entries' NOT NULL constraint the first time this file ran.
+  PERFORM tests.authenticate_as('aisyah');
+  v_quote := public.rpc_quote_kirim('HANTAR','hasil-laut',1000,v_beluran,v_kk);
+  v_kirim_created := public.rpc_create_kirim(
+    (v_quote->>'quote_id')::uuid, 'Sekotak barang', tests.uid('_addr'), v_addr2);
+  v_kirim := (v_kirim_created->>'kirim_id')::uuid;
+  PERFORM tests.clear_auth();
 
   PERFORM tests.authenticate_as('rahman');
   r := public.rpc_accept_offer(tests.uid('_trip'), v_kirim);
