@@ -29,6 +29,7 @@ import com.ftechsolutions.kasihkirim.domain.model.NON_PROOF_DELIVERY_TRANSITIONS
 import com.ftechsolutions.kasihkirim.domain.model.PROOF_DELIVERY_TRANSITIONS
 import com.ftechsolutions.kasihkirim.domain.model.Sen
 import com.ftechsolutions.kasihkirim.domain.model.UserRole
+import com.ftechsolutions.kasihkirim.domain.model.appliesTo
 import com.ftechsolutions.kasihkirim.ui.auth.messageRes
 import com.ftechsolutions.kasihkirim.ui.common.AppCard
 import com.ftechsolutions.kasihkirim.ui.common.BadgeTone
@@ -37,7 +38,13 @@ import com.ftechsolutions.kasihkirim.ui.common.StatusBadge
 import java.io.ByteArrayOutputStream
 
 @Composable
-fun DeliveriesScreen(vm: DeliveriesViewModel, roles: Set<UserRole>, onBack: () -> Unit) {
+fun DeliveriesScreen(
+    vm: DeliveriesViewModel,
+    currentUserId: String,
+    myCarrierId: String?,
+    roles: Set<UserRole>,
+    onBack: () -> Unit,
+) {
     val state by vm.state.collectAsState()
 
     // MediaStore's own camera app writes and returns a downscaled preview
@@ -91,6 +98,8 @@ fun DeliveriesScreen(vm: DeliveriesViewModel, roles: Set<UserRole>, onBack: () -
             items(state.deliveries, key = { it.id }) { delivery ->
                 DeliveryCard(
                     delivery = delivery,
+                    currentUserId = currentUserId,
+                    myCarrierId = myCarrierId,
                     roles = roles,
                     isTransitioning = state.transitioningId == delivery.id,
                     onEvent = { event -> vm.transition(delivery.id, event) },
@@ -108,6 +117,8 @@ fun DeliveriesScreen(vm: DeliveriesViewModel, roles: Set<UserRole>, onBack: () -
 @Composable
 private fun DeliveryCard(
     delivery: Delivery,
+    currentUserId: String,
+    myCarrierId: String?,
     roles: Set<UserRole>,
     isTransitioning: Boolean,
     onEvent: (String) -> Unit,
@@ -118,7 +129,7 @@ private fun DeliveryCard(
         .filter {
             it.fromStatus == delivery.status &&
                 delivery.kirimType in it.applicableTypes &&
-                it.allowedRoles.any { role -> role in roles }
+                it.allowedRoles.any { role -> role.appliesTo(delivery, currentUserId, myCarrierId, roles) }
         }
         // REPORT_FAILURE appears twice (pickup and delivery legs) but is
         // never simultaneously available from the same status -- this is
@@ -126,12 +137,16 @@ private fun DeliveryCard(
         .distinctBy { it.event }
 
     val availableProofEvents = PROOF_DELIVERY_TRANSITIONS
-        .filter { it.fromStatus == delivery.status && it.allowedRoles.any { role -> role in roles } }
+        .filter {
+            it.fromStatus == delivery.status &&
+                it.allowedRoles.any { role -> role.appliesTo(delivery, currentUserId, myCarrierId, roles) }
+        }
 
     // RECORD_PURCHASE isn't in NON_PROOF_DELIVERY_TRANSITIONS: it needs an
     // amount from the carrier first, so it gets its own button + dialog
     // rather than firing an event directly like the plain status buttons.
-    val showRecordPurchase = delivery.status == KirimStatus.PROCURING && UserRole.CARRIER in roles
+    val showRecordPurchase = delivery.status == KirimStatus.PROCURING &&
+        UserRole.CARRIER.appliesTo(delivery, currentUserId, myCarrierId, roles)
 
     AppCard {
         Row(verticalAlignment = Alignment.Top) {

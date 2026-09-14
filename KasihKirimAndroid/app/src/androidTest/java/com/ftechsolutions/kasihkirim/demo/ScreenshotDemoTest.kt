@@ -130,15 +130,20 @@ private class FakeAddressRepository : AddressRepository {
         AppResult.Success<Serviceability>(Serviceability.Serviceable("Kota Kinabalu", "Kota Kinabalu", 12.4, 25, false, 1))
 }
 
+private const val DEMO_CARRIER_ID = "demo-carrier"
+
 private class FakeDeliveryRepository : DeliveryRepository {
     override suspend fun listMyDeliveries() = AppResult.Success(
         listOf(
             Delivery("d-1", KirimStatus.AWAITING_PICKUP, KirimType.HANTAR, "KJ-2609-104",
-                "Bungkusan pakaian kanak-kanak", Sen.ZERO, Sen.of(1200), null, "2026-09-09T05:00:00Z"),
+                "Bungkusan pakaian kanak-kanak", Sen.ZERO, Sen.of(1200), null, "2026-09-09T05:00:00Z",
+                carrierId = DEMO_CARRIER_ID, requesterId = "demo-customer"),
             Delivery("d-2", KirimStatus.OUT_FOR_DELIVERY, KirimType.BELI, "KJ-2609-098",
-                "Barangan runcit dari kedai Menggatal", Sen.of(4500), Sen.of(900), null, "2026-09-09T01:30:00Z"),
+                "Barangan runcit dari kedai Menggatal", Sen.of(4500), Sen.of(900), null, "2026-09-09T01:30:00Z",
+                carrierId = DEMO_CARRIER_ID, requesterId = "demo-customer"),
             Delivery("d-3", KirimStatus.DELIVERED, KirimType.HANTAR, "KJ-2608-071",
-                "Peralatan sekolah", Sen.ZERO, Sen.of(1000), null, "2026-09-08T08:00:00Z"),
+                "Peralatan sekolah", Sen.ZERO, Sen.of(1000), null, "2026-09-08T08:00:00Z",
+                carrierId = DEMO_CARRIER_ID, requesterId = "demo-customer"),
         )
     )
     override suspend fun transition(deliveryId: String, event: String) = AppResult.Success(KirimStatus.PICKED_UP)
@@ -217,7 +222,13 @@ class ScreenshotDemoTest {
     @Test fun deliveries() {
         composeRule.setContent {
             KasihKirimTheme {
-                DeliveriesScreen(DeliveriesViewModel(FakeDeliveryRepository()), roles = setOf(UserRole.CARRIER), onBack = {})
+                DeliveriesScreen(
+                    DeliveriesViewModel(FakeDeliveryRepository()),
+                    currentUserId = DEMO_CARRIER_ID,
+                    myCarrierId = DEMO_CARRIER_ID,
+                    roles = setOf(UserRole.CARRIER),
+                    onBack = {},
+                )
             }
         }
         capture("04-deliveries")

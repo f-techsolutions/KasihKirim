@@ -22,8 +22,8 @@ import java.time.Instant
 import java.util.UUID
 
 private const val DELIVERY_COLUMNS =
-    "id,status,cod_amount_sen,carrier_earning_sen,failure_reason,matched_at," +
-        "kirim:kirim_requests(reference_code,item_description,kirim_type)"
+    "id,status,carrier_id,cod_amount_sen,carrier_earning_sen,failure_reason,matched_at," +
+        "kirim:kirim_requests(reference_code,item_description,kirim_type,requester_id)"
 
 private const val POD_BUCKET = "pod"
 

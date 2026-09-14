@@ -20,6 +20,7 @@ private val MATCHED_DELIVERY = Delivery(
     referenceCode = "KK-2609-000001", itemDescription = "Ikan kering",
     codAmountSen = Sen(5000), carrierEarningSen = Sen(1350), failureReason = null,
     matchedAt = "2026-09-08T00:00:00Z",
+    carrierId = "carrier-1", requesterId = "customer-1",
 )
 
 private class FakeDeliveryRepository(
