@@ -25,4 +25,10 @@ interface DeliveryRepository {
         event: String,
         photoBytes: ByteArray,
     ): AppResult<KirimStatus>
+
+    /** rpc_record_purchase (0037). The only write path for a BELI delivery's
+     *  actual_goods_sen -- also advances PROCURING -> AWAITING_PICKUP.
+     *  Carrier-only, BELI-only, PROCURING-only; the server rejects anything
+     *  else with a named error, never a silent no-op. */
+    suspend fun recordPurchase(deliveryId: String, actualGoodsSen: Long): AppResult<KirimStatus>
 }

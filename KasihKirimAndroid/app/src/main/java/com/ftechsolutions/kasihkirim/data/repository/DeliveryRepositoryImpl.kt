@@ -57,6 +57,21 @@ class DeliveryRepositoryImpl : DeliveryRepository {
         KirimStatus.fromWire(json.getValue("status").jsonPrimitive.content) ?: KirimStatus.MATCHED
     }
 
+    override suspend fun recordPurchase(deliveryId: String, actualGoodsSen: Long): AppResult<KirimStatus> =
+        runCatchingResult {
+            val json = SupabaseClientProvider.client.postgrest
+                .rpc(
+                    "rpc_record_purchase",
+                    buildJsonObject {
+                        put("p_delivery", deliveryId)
+                        put("p_actual_goods_sen", actualGoodsSen)
+                        put("p_idempotency_key", UUID.randomUUID().toString())
+                    },
+                )
+                .decodeAs<JsonObject>()
+            KirimStatus.fromWire(json.getValue("status").jsonPrimitive.content) ?: KirimStatus.AWAITING_PICKUP
+        }
+
     override suspend fun submitProofAndTransition(
         deliveryId: String,
         leg: String,
@@ -120,6 +135,10 @@ class DeliveryRepositoryImpl : DeliveryRepository {
 private fun Throwable.toDeliveryAppError(): AppError = when {
     message?.contains("DELIVERY_NOT_FOUND", true) == true -> AppError.Server("DELIVERY_NOT_FOUND")
     message?.contains("STATE_INVALID_TRANSITION", true) == true -> AppError.Server("STATE_INVALID_TRANSITION")
+    // rpc_record_purchase (0037).
+    message?.contains("BUDGET_EXCEEDED_NEEDS_VARIANCE", true) == true ->
+        AppError.Server("BUDGET_EXCEEDED_NEEDS_VARIANCE")
+    message?.contains("INVALID_AMOUNT", true) == true -> AppError.Server("INVALID_AMOUNT")
     // rpc_submit_proof / internal.fn_delivery_transition (proof leg).
     message?.contains("NOT_ASSIGNED_CARRIER", true) == true -> AppError.NotAuthorized
     message?.contains("PHOTO_PATH_REQUIRED", true) == true -> AppError.Server("PHOTO_PATH_REQUIRED")

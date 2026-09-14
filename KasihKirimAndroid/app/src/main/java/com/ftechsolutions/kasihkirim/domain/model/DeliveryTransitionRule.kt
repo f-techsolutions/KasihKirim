@@ -14,12 +14,13 @@ package com.ftechsolutions.kasihkirim.domain.model
  *     no matching public.proofs row exists yet. The UI gap this comment
  *     describes was real regardless: no button meant no way to create that
  *     proofs row from the app at all.)
- *   - RECORD_PURCHASE. fn_delivery_transition never applies p_meta to
- *     kirim_requests.actual_goods_sen, so a form field for the actual
- *     purchase price would silently discard whatever the carrier typed.
  *   - RAISE_VARIANCE. Not proof-gated by this table, but
  *     public.price_variances.evidence_photo_path is NOT NULL -- it needs a
  *     photo through a different mechanism, same storage blocker.
+ *   - RECORD_PURCHASE is NOT absent -- it needs an amount from the carrier
+ *     first (rpc_record_purchase, 0037), so it isn't a plain fire-and-forget
+ *     button like the rows below. See DeliveriesScreen's own
+ *     showRecordPurchase / RecordPurchaseDialog instead of this list.
  *
  * Android never DECIDES a transition -- the server re-validates every one
  * of these against ref.delivery_transition_rules itself (Android is not

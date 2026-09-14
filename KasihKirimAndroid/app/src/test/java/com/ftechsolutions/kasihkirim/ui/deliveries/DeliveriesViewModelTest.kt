@@ -26,6 +26,7 @@ private class FakeDeliveryRepository(
     var deliveries: List<Delivery> = listOf(MATCHED_DELIVERY),
     var transitionResult: AppResult<KirimStatus> = AppResult.Success(KirimStatus.AWAITING_PICKUP),
     var proofResult: AppResult<KirimStatus> = AppResult.Success(KirimStatus.PICKED_UP),
+    var recordPurchaseResult: AppResult<KirimStatus> = AppResult.Success(KirimStatus.AWAITING_PICKUP),
 ) : DeliveryRepository {
     var transitionCalls = 0
     var lastDeliveryId: String? = null
@@ -33,6 +34,8 @@ private class FakeDeliveryRepository(
     var proofCalls = 0
     var lastProofLeg: String? = null
     var lastProofBytes: ByteArray? = null
+    var recordPurchaseCalls = 0
+    var lastActualGoodsSen: Long? = null
 
     override suspend fun listMyDeliveries(): AppResult<List<Delivery>> = AppResult.Success(deliveries)
 
@@ -55,6 +58,13 @@ private class FakeDeliveryRepository(
         lastEvent = event
         lastProofBytes = photoBytes
         return proofResult
+    }
+
+    override suspend fun recordPurchase(deliveryId: String, actualGoodsSen: Long): AppResult<KirimStatus> {
+        recordPurchaseCalls++
+        lastDeliveryId = deliveryId
+        lastActualGoodsSen = actualGoodsSen
+        return recordPurchaseResult
     }
 }
 
@@ -160,5 +170,66 @@ class DeliveriesViewModelTest {
         assertNull(vm.state.value.pendingProof)
         assertNull(vm.state.value.transitioningId)
         assertEquals(AppError.Server("PROOF_REQUIRED"), vm.state.value.error)
+    }
+
+    @Test fun `requestRecordPurchase opens the dialog for the right delivery`() = runTest(dispatcher) {
+        val vm = DeliveriesViewModel(FakeDeliveryRepository())
+        advanceUntilIdle()
+
+        vm.requestRecordPurchase("d1")
+
+        assertEquals("d1", vm.state.value.recordPurchaseDeliveryId)
+    }
+
+    @Test fun `cancelRecordPurchase closes the dialog without calling the backend`() = runTest(dispatcher) {
+        val repo = FakeDeliveryRepository()
+        val vm = DeliveriesViewModel(repo)
+        advanceUntilIdle()
+
+        vm.requestRecordPurchase("d1")
+        vm.cancelRecordPurchase()
+
+        assertNull(vm.state.value.recordPurchaseDeliveryId)
+        assertEquals(0, repo.recordPurchaseCalls)
+    }
+
+    @Test fun `recordPurchase sends the delivery id and amount, then reloads`() = runTest(dispatcher) {
+        val repo = FakeDeliveryRepository()
+        val vm = DeliveriesViewModel(repo)
+        advanceUntilIdle()
+
+        vm.requestRecordPurchase("d1")
+        vm.recordPurchase(3200L); advanceUntilIdle()
+
+        assertEquals(1, repo.recordPurchaseCalls)
+        assertEquals("d1", repo.lastDeliveryId)
+        assertEquals(3200L, repo.lastActualGoodsSen)
+        assertNull(vm.state.value.recordPurchaseDeliveryId)
+        assertNull(vm.state.value.transitioningId)
+    }
+
+    @Test fun `recordPurchase with no delivery pending is a no-op`() = runTest(dispatcher) {
+        val repo = FakeDeliveryRepository()
+        val vm = DeliveriesViewModel(repo)
+        advanceUntilIdle()
+
+        vm.recordPurchase(3200L); advanceUntilIdle()
+
+        assertEquals(0, repo.recordPurchaseCalls)
+    }
+
+    @Test fun `a rejected purchase surfaces BUDGET_EXCEEDED_NEEDS_VARIANCE and clears the dialog`() = runTest(dispatcher) {
+        val repo = FakeDeliveryRepository(
+            recordPurchaseResult = AppResult.Failure(AppError.Server("BUDGET_EXCEEDED_NEEDS_VARIANCE")),
+        )
+        val vm = DeliveriesViewModel(repo)
+        advanceUntilIdle()
+
+        vm.requestRecordPurchase("d1")
+        vm.recordPurchase(9999L); advanceUntilIdle()
+
+        assertNull(vm.state.value.recordPurchaseDeliveryId)
+        assertNull(vm.state.value.transitioningId)
+        assertEquals(AppError.Server("BUDGET_EXCEEDED_NEEDS_VARIANCE"), vm.state.value.error)
     }
 }

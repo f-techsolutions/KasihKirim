@@ -237,6 +237,11 @@
     <string name="deliveries_proof_cancel">Batal</string>
     <string name="deliveries_proof_title">Gambar Bukti</string>
     <string name="deliveries_proof_capture_failed">Gagal mengambil gambar. Sila cuba lagi.</string>
+    <string name="deliveries_record_purchase">Rekod Belian</string>
+    <string name="deliveries_record_purchase_title">Rekod Perbelanjaan Sebenar</string>
+    <string name="deliveries_record_purchase_amount_label">Jumlah dibelanjakan (RM)</string>
+    <string name="deliveries_record_purchase_submit">Rekod &amp; Teruskan</string>
+    <string name="deliveries_record_purchase_cancel">Batal</string>
 
     <string name="earnings_title">Pendapatan Saya</string>
     <string name="earnings_available">Boleh dikeluarkan</string>
@@ -381,6 +386,8 @@
     <string name="err_stock_negative">Kuantiti stok tidak boleh negatif.</string>
     <string name="err_stock_below_reserved">Stok tidak boleh dikurangkan bawah jumlah yang sudah ditempah.</string>
     <string name="err_stock_delta_zero">Sila masukkan perubahan stok yang bukan sifar.</string>
+    <string name="err_budget_exceeded_needs_variance">Jumlah melebihi bajet yang diluluskan. Hubungi sokongan untuk kelulusan tambahan.</string>
+    <string name="err_invalid_amount">Sila masukkan jumlah yang sah.</string>
 
     <string name="profile_badges_title">Lencana</string>
 </resources>
