@@ -260,6 +260,9 @@ internal fun AppError.messageRes(): Int = when (this) {
         "ALREADY_PAID" -> R.string.err_already_paid
         "INSUFFICIENT_BALANCE_AT_SETTLEMENT" -> R.string.err_insufficient_balance_at_settlement
         "PAYOUT_NOT_FOUND" -> R.string.err_payout_not_found
+        "INVALID_RATING" -> R.string.err_invalid_rating
+        "DELIVERY_NOT_COMPLETED" -> R.string.err_delivery_not_completed
+        "EDIT_WINDOW_CLOSED" -> R.string.err_edit_window_closed
         else -> R.string.err_unexpected
     }
     else -> R.string.err_unexpected

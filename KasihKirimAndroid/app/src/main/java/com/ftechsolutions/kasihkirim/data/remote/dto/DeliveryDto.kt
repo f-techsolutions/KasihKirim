@@ -44,3 +44,10 @@ data class DeliveryDto(
         requesterId = kirim.requesterId,
     )
 }
+
+/** Row shape for the delivery_id-only projection of public.reviews used to
+ *  find which of the caller's own deliveries they've already rated. */
+@Serializable
+data class ReviewDeliveryIdDto(
+    @SerialName("delivery_id") val deliveryId: String,
+)

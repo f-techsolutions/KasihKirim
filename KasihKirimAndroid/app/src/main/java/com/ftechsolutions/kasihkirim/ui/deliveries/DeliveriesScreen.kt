@@ -10,6 +10,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.Star
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -86,6 +89,17 @@ fun DeliveriesScreen(
         )
     }
 
+    state.rateDeliveryId?.let {
+        RateDeliveryDialog(
+            rating = state.ratingValue,
+            comment = state.ratingComment,
+            onRatingChange = vm::onRatingValueChange,
+            onCommentChange = vm::onRatingCommentChange,
+            onConfirm = vm::submitRating,
+            onDismiss = vm::cancelRate,
+        )
+    }
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
@@ -114,10 +128,12 @@ fun DeliveriesScreen(
                     myCarrierId = myCarrierId,
                     roles = roles,
                     isTransitioning = state.transitioningId == delivery.id,
+                    alreadyReviewed = delivery.id in state.reviewedDeliveryIds,
                     onEvent = { event -> vm.transition(delivery.id, event) },
                     onRequestProof = { leg, event -> vm.requestProof(delivery.id, leg, event) },
                     onRequestRecordPurchase = { vm.requestRecordPurchase(delivery.id) },
                     onRequestOpenDispute = { vm.requestOpenDispute(delivery.id) },
+                    onRequestRate = { vm.requestRate(delivery.id) },
                 )
             }
 
@@ -134,10 +150,12 @@ private fun DeliveryCard(
     myCarrierId: String?,
     roles: Set<UserRole>,
     isTransitioning: Boolean,
+    alreadyReviewed: Boolean,
     onEvent: (String) -> Unit,
     onRequestProof: (leg: String, event: String) -> Unit,
     onRequestRecordPurchase: () -> Unit,
     onRequestOpenDispute: () -> Unit,
+    onRequestRate: () -> Unit,
 ) {
     val availableEvents = NON_PROOF_DELIVERY_TRANSITIONS
         .filter {
@@ -171,6 +189,12 @@ private fun DeliveryCard(
     // (rpc_open_seller_dispute, 0038); a carrier had none at all until now.
     val showOpenDispute = delivery.status == KirimStatus.DELIVERED &&
         UserRole.CARRIER.appliesTo(delivery, currentUserId, myCarrierId, roles)
+
+    // Whichever side I was on -- requester or carrier -- listMyDeliveries's
+    // own RLS already scoped this card to a delivery I was a party to, so no
+    // further role check is needed the way showOpenDispute's carrier-only
+    // button needs one.
+    val showRate = delivery.status == KirimStatus.COMPLETED && !alreadyReviewed
 
     AppCard {
         Row(verticalAlignment = Alignment.Top) {
@@ -206,7 +230,9 @@ private fun DeliveryCard(
             Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
         }
 
-        if (availableEvents.isNotEmpty() || availableProofEvents.isNotEmpty() || showRecordPurchase || showOpenDispute) {
+        if (availableEvents.isNotEmpty() || availableProofEvents.isNotEmpty() ||
+            showRecordPurchase || showOpenDispute || showRate
+        ) {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -264,6 +290,19 @@ private fun DeliveryCard(
                             CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
                         } else {
                             Text(stringResource(R.string.deliveries_report_problem))
+                        }
+                    }
+                }
+                if (showRate) {
+                    Button(
+                        onClick = onRequestRate,
+                        enabled = !isTransitioning,
+                        shape = MaterialTheme.shapes.small,
+                    ) {
+                        if (isTransitioning) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                        } else {
+                            Text(stringResource(R.string.deliveries_rate))
                         }
                     }
                 }
@@ -334,6 +373,55 @@ private fun OpenDisputeDialog(
             TextButton(onClick = onConfirm, enabled = description.trim().length >= 10) {
                 Text(stringResource(R.string.deliveries_open_dispute_submit))
             }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.deliveries_record_purchase_cancel)) }
+        },
+    )
+}
+
+/** rpc_submit_review (0044). A 1-5 star picker plus an optional comment --
+ *  submitting again while the dialog is reopened for the same delivery edits
+ *  the caller's own prior rating (the server enforces the 24h edit window,
+ *  this dialog doesn't need to know where that window stands). */
+@Composable
+private fun RateDeliveryDialog(
+    rating: Int,
+    comment: String,
+    onRatingChange: (Int) -> Unit,
+    onCommentChange: (String) -> Unit,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.deliveries_rate_title)) },
+        text = {
+            Column {
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    (1..5).forEach { star ->
+                        IconButton(onClick = { onRatingChange(star) }) {
+                            Icon(
+                                imageVector = if (star <= rating) Icons.Filled.Star else Icons.Outlined.Star,
+                                contentDescription = stringResource(R.string.deliveries_rate_star, star),
+                                tint = if (star <= rating) MaterialTheme.colorScheme.primary
+                                       else MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = comment,
+                    onValueChange = onCommentChange,
+                    label = { Text(stringResource(R.string.deliveries_rate_comment_label)) },
+                    minLines = 2,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm) { Text(stringResource(R.string.deliveries_rate_submit)) }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.deliveries_record_purchase_cancel)) }

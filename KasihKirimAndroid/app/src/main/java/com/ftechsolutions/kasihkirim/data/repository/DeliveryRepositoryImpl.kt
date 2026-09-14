@@ -5,6 +5,7 @@ import com.ftechsolutions.kasihkirim.core.result.AppResult
 import com.ftechsolutions.kasihkirim.core.security.SafeLog
 import com.ftechsolutions.kasihkirim.data.remote.SupabaseClientProvider
 import com.ftechsolutions.kasihkirim.data.remote.dto.DeliveryDto
+import com.ftechsolutions.kasihkirim.data.remote.dto.ReviewDeliveryIdDto
 import com.ftechsolutions.kasihkirim.domain.model.Delivery
 import com.ftechsolutions.kasihkirim.domain.model.KirimStatus
 import com.ftechsolutions.kasihkirim.domain.repository.DeliveryRepository
@@ -139,6 +140,34 @@ class DeliveryRepositoryImpl : DeliveryRepository {
         KirimStatus.fromWire(json.getValue("status").jsonPrimitive.content) ?: KirimStatus.MATCHED
     }
 
+    override suspend fun listMyReviewedDeliveryIds(): AppResult<Set<String>> = runCatchingResult {
+        val userId = SupabaseClientProvider.client.auth.currentUserOrNull()?.id
+            ?: return AppResult.Failure(AppError.SessionExpired)
+        SupabaseClientProvider.client.postgrest.from("reviews")
+            .select(columns = Columns.raw("delivery_id")) {
+                filter { eq("rater_id", userId) }
+            }
+            .decodeList<ReviewDeliveryIdDto>()
+            .map { it.deliveryId }
+            .toSet()
+    }
+
+    override suspend fun submitReview(
+        deliveryId: String,
+        rating: Int,
+        comment: String?,
+    ): AppResult<Unit> = runCatchingResult {
+        SupabaseClientProvider.client.postgrest.rpc(
+            "rpc_submit_review",
+            buildJsonObject {
+                put("p_delivery_id", deliveryId)
+                put("p_rating", rating)
+                put("p_comment", comment)
+            },
+        )
+        Unit
+    }
+
     private inline fun <T> runCatchingResult(block: () -> T): AppResult<T> =
         try {
             AppResult.Success(block())
@@ -164,6 +193,11 @@ private fun Throwable.toDeliveryAppError(): AppError = when {
     message?.contains("PHOTO_PATH_REQUIRED", true) == true -> AppError.Server("PHOTO_PATH_REQUIRED")
     message?.contains("PROOF_REQUIRED", true) == true -> AppError.Server("PROOF_REQUIRED")
     message?.contains("STATE_ACTOR_NOT_PERMITTED", true) == true -> AppError.NotAuthorized
+    // rpc_submit_review (0044).
+    message?.contains("NOT_A_PARTY", true) == true -> AppError.NotAuthorized
+    message?.contains("INVALID_RATING", true) == true -> AppError.Server("INVALID_RATING")
+    message?.contains("DELIVERY_NOT_COMPLETED", true) == true -> AppError.Server("DELIVERY_NOT_COMPLETED")
+    message?.contains("EDIT_WINDOW_CLOSED", true) == true -> AppError.Server("EDIT_WINDOW_CLOSED")
     this is IOException -> AppError.Network
     message?.contains("timeout", true) == true -> AppError.Timeout
     message?.contains("SESSION_EXPIRED", true) == true -> AppError.SessionExpired

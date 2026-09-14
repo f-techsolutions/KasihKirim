@@ -30,6 +30,8 @@ private class FakeDeliveryRepository(
     var proofResult: AppResult<KirimStatus> = AppResult.Success(KirimStatus.PICKED_UP),
     var recordPurchaseResult: AppResult<KirimStatus> = AppResult.Success(KirimStatus.AWAITING_PICKUP),
     var openDisputeResult: AppResult<Unit> = AppResult.Success(Unit),
+    var reviewedDeliveryIds: AppResult<Set<String>> = AppResult.Success(emptySet()),
+    var submitReviewResult: AppResult<Unit> = AppResult.Success(Unit),
 ) : DeliveryRepository {
     var transitionCalls = 0
     var lastDeliveryId: String? = null
@@ -42,6 +44,7 @@ private class FakeDeliveryRepository(
     var openDisputeCalls = 0
     var lastDisputeCategory: String? = null
     var lastDisputeDescription: String? = null
+    var submitReviewCalls = mutableListOf<Triple<String, Int, String?>>()
 
     override suspend fun listMyDeliveries(): AppResult<List<Delivery>> = AppResult.Success(deliveries)
 
@@ -79,6 +82,13 @@ private class FakeDeliveryRepository(
         lastDisputeCategory = category
         lastDisputeDescription = description
         return openDisputeResult
+    }
+
+    override suspend fun listMyReviewedDeliveryIds(): AppResult<Set<String>> = reviewedDeliveryIds
+
+    override suspend fun submitReview(deliveryId: String, rating: Int, comment: String?): AppResult<Unit> {
+        submitReviewCalls += Triple(deliveryId, rating, comment)
+        return submitReviewResult
     }
 }
 
@@ -314,5 +324,90 @@ class DeliveriesViewModelTest {
         assertNull(vm.state.value.openDisputeDeliveryId)
         assertNull(vm.state.value.transitioningId)
         assertEquals(AppError.Server("DISPUTE_ALREADY_OPEN"), vm.state.value.error)
+    }
+
+    @Test fun `reviewed delivery ids load alongside the delivery list`() = runTest(dispatcher) {
+        val vm = DeliveriesViewModel(
+            FakeDeliveryRepository(reviewedDeliveryIds = AppResult.Success(setOf("d1"))),
+        )
+        advanceUntilIdle()
+
+        assertEquals(setOf("d1"), vm.state.value.reviewedDeliveryIds)
+    }
+
+    @Test fun `requestRate opens the dialog and resets its fields to the default`() = runTest(dispatcher) {
+        val vm = DeliveriesViewModel(FakeDeliveryRepository())
+        advanceUntilIdle()
+
+        vm.onRatingValueChange(2)
+        vm.onRatingCommentChange("stale text from a previous delivery")
+        vm.requestRate("d1")
+
+        assertEquals("d1", vm.state.value.rateDeliveryId)
+        assertEquals(5, vm.state.value.ratingValue)
+        assertEquals("", vm.state.value.ratingComment)
+    }
+
+    @Test fun `cancelRate closes the dialog without calling the backend`() = runTest(dispatcher) {
+        val repo = FakeDeliveryRepository()
+        val vm = DeliveriesViewModel(repo)
+        advanceUntilIdle()
+
+        vm.requestRate("d1")
+        vm.cancelRate()
+
+        assertNull(vm.state.value.rateDeliveryId)
+        assertEquals(0, repo.submitReviewCalls.size)
+    }
+
+    @Test fun `submitRating sends the delivery id, star value and trimmed comment, then reloads`() = runTest(dispatcher) {
+        val repo = FakeDeliveryRepository()
+        val vm = DeliveriesViewModel(repo)
+        advanceUntilIdle()
+
+        vm.requestRate("d1")
+        vm.onRatingValueChange(4)
+        vm.onRatingCommentChange("  Penghantaran tepat masa  ")
+        vm.submitRating(); advanceUntilIdle()
+
+        assertEquals(listOf(Triple("d1", 4, "Penghantaran tepat masa")), repo.submitReviewCalls)
+        assertNull(vm.state.value.rateDeliveryId)
+        assertNull(vm.state.value.transitioningId)
+    }
+
+    @Test fun `submitRating with an empty comment sends null, not a blank string`() = runTest(dispatcher) {
+        val repo = FakeDeliveryRepository()
+        val vm = DeliveriesViewModel(repo)
+        advanceUntilIdle()
+
+        vm.requestRate("d1")
+        vm.submitRating(); advanceUntilIdle()
+
+        assertEquals(listOf(Triple("d1", 5, null)), repo.submitReviewCalls)
+    }
+
+    @Test fun `submitRating with no delivery pending is a no-op`() = runTest(dispatcher) {
+        val repo = FakeDeliveryRepository()
+        val vm = DeliveriesViewModel(repo)
+        advanceUntilIdle()
+
+        vm.submitRating(); advanceUntilIdle()
+
+        assertEquals(0, repo.submitReviewCalls.size)
+    }
+
+    @Test fun `a rejected rating surfaces EDIT_WINDOW_CLOSED and clears the dialog`() = runTest(dispatcher) {
+        val repo = FakeDeliveryRepository(
+            submitReviewResult = AppResult.Failure(AppError.Server("EDIT_WINDOW_CLOSED")),
+        )
+        val vm = DeliveriesViewModel(repo)
+        advanceUntilIdle()
+
+        vm.requestRate("d1")
+        vm.submitRating(); advanceUntilIdle()
+
+        assertNull(vm.state.value.rateDeliveryId)
+        assertNull(vm.state.value.transitioningId)
+        assertEquals(AppError.Server("EDIT_WINDOW_CLOSED"), vm.state.value.error)
     }
 }
