@@ -39,4 +39,16 @@ interface DeliveryRepository {
      *  carrier id, not role membership alone. Applies to every kirim_type,
      *  unlike the seller path which is PASARAN-only. */
     suspend fun openDispute(deliveryId: String, category: String, description: String): AppResult<Unit>
+
+    /** Ids of deliveries the caller has already reviewed (rpc_submit_review,
+     *  0044) -- visible or not, since an invisible review still counts as
+     *  "already rated" for the purpose of showing/hiding the Rate button. */
+    suspend fun listMyReviewedDeliveryIds(): AppResult<Set<String>>
+
+    /** rpc_submit_review (0044). The only write path onto public.reviews --
+     *  the server derives who the other party is from the delivery itself
+     *  and refuses anyone who wasn't actually part of it. Also the edit
+     *  path: calling this again for the same delivery within
+     *  reviews.editable_until (24h) replaces the caller's own prior rating. */
+    suspend fun submitReview(deliveryId: String, rating: Int, comment: String?): AppResult<Unit>
 }

@@ -33,6 +33,15 @@ data class DeliveriesUiState(
     val openDisputeDeliveryId: String? = null,
     val disputeCategory: DisputeCategory = DisputeCategory.OTHER,
     val disputeDescription: String = "",
+    /** Ids of deliveries the caller has already reviewed -- loaded alongside
+     *  [deliveries] so a COMPLETED delivery already rated doesn't show the
+     *  Rate button again. */
+    val reviewedDeliveryIds: Set<String> = emptySet(),
+    /** Non-null while the rating dialog is open for this COMPLETED delivery
+     *  (rpc_submit_review, 0044). */
+    val rateDeliveryId: String? = null,
+    val ratingValue: Int = 5,
+    val ratingComment: String = "",
 )
 
 data class PendingProof(val deliveryId: String, val leg: String, val event: String)
@@ -47,9 +56,20 @@ class DeliveriesViewModel(private val repo: DeliveryRepository) : ViewModel() {
     fun load() {
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true, error = null) }
-            when (val result = repo.listMyDeliveries()) {
-                is AppResult.Success -> _state.update { it.copy(isLoading = false, deliveries = result.data) }
-                is AppResult.Failure -> _state.update { it.copy(isLoading = false, error = result.error) }
+            val deliveries = repo.listMyDeliveries()
+            val reviewed = repo.listMyReviewedDeliveryIds()
+            // Same reasoning as AdminViewModel's own load(): one failure is
+            // reported, but whatever did load still renders -- a broken
+            // reviewed-ids read shouldn't hide the delivery list itself.
+            _state.update {
+                it.copy(
+                    isLoading = false,
+                    deliveries = (deliveries as? AppResult.Success)?.data ?: it.deliveries,
+                    reviewedDeliveryIds = (reviewed as? AppResult.Success)?.data ?: it.reviewedDeliveryIds,
+                    error = listOf(deliveries, reviewed)
+                        .filterIsInstance<AppResult.Failure>()
+                        .firstOrNull()?.error,
+                )
             }
         }
     }
@@ -147,6 +167,36 @@ class DeliveriesViewModel(private val repo: DeliveryRepository) : ViewModel() {
         viewModelScope.launch {
             _state.update { it.copy(transitioningId = deliveryId, openDisputeDeliveryId = null, error = null) }
             when (val result = repo.openDispute(deliveryId, category.wire, description)) {
+                is AppResult.Success -> {
+                    _state.update { it.copy(transitioningId = null) }
+                    load()
+                }
+                is AppResult.Failure -> _state.update { it.copy(transitioningId = null, error = result.error) }
+            }
+        }
+    }
+
+    /** Opens the rating dialog for a COMPLETED delivery. */
+    fun requestRate(deliveryId: String) {
+        _state.update { it.copy(rateDeliveryId = deliveryId, error = null, ratingValue = 5, ratingComment = "") }
+    }
+
+    fun cancelRate() = _state.update { it.copy(rateDeliveryId = null) }
+
+    fun onRatingValueChange(value: Int) = _state.update { it.copy(ratingValue = value) }
+    fun onRatingCommentChange(text: String) = _state.update { it.copy(ratingComment = text) }
+
+    /** rpc_submit_review (0044). Not routed through [decide]: a rated
+     *  delivery never leaves [DeliveriesUiState.deliveries] the way a queue
+     *  row leaves a review queue -- only [reviewedDeliveryIds] needs to
+     *  reflect the change, so [load] (not a full reload elsewhere) is enough. */
+    fun submitRating() {
+        val deliveryId = _state.value.rateDeliveryId ?: return
+        val rating = _state.value.ratingValue
+        val comment = _state.value.ratingComment.trim().takeIf { it.isNotEmpty() }
+        viewModelScope.launch {
+            _state.update { it.copy(transitioningId = deliveryId, rateDeliveryId = null, error = null) }
+            when (val result = repo.submitReview(deliveryId, rating, comment)) {
                 is AppResult.Success -> {
                     _state.update { it.copy(transitioningId = null) }
                     load()

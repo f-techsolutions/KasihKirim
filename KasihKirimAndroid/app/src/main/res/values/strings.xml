@@ -293,6 +293,11 @@
     <string name="deliveries_open_dispute_category">Kategori</string>
     <string name="deliveries_open_dispute_description">Terangkan masalah anda</string>
     <string name="deliveries_open_dispute_submit">Hantar Laporan</string>
+    <string name="deliveries_rate">Beri Penilaian</string>
+    <string name="deliveries_rate_title">Nilai Penghantaran Ini</string>
+    <string name="deliveries_rate_star">%1$d bintang</string>
+    <string name="deliveries_rate_comment_label">Catatan (pilihan)</string>
+    <string name="deliveries_rate_submit">Hantar Penilaian</string>
 
     <string name="earnings_title">Pendapatan Saya</string>
     <string name="earnings_available">Boleh dikeluarkan</string>
@@ -470,6 +475,9 @@
     <string name="err_already_paid">Pembayaran ini sudah selesai.</string>
     <string name="err_insufficient_balance_at_settlement">Baki tidak lagi mencukupi untuk membayar jumlah ini.</string>
     <string name="err_payout_not_found">Permintaan pengeluaran tidak dijumpai.</string>
+    <string name="err_invalid_rating">Penilaian mesti antara 1 hingga 5.</string>
+    <string name="err_delivery_not_completed">Penghantaran ini belum selesai.</string>
+    <string name="err_edit_window_closed">Tempoh untuk mengubah penilaian ini telah tamat.</string>
     <string name="err_cannot_act_on_self">Tindakan ini tidak boleh dikenakan pada akaun sendiri.</string>
     <string name="err_user_not_found">Pengguna tidak dijumpai.</string>
 
