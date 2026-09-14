@@ -63,23 +63,10 @@ class DeliveryRepositoryImpl : DeliveryRepository {
         event: String,
         photoBytes: ByteArray,
     ): AppResult<KirimStatus> = runCatchingResult {
-        // TEMPORARY DIAGNOSTIC for the anon-role upload bug. A custom request
-        // header doesn't survive into Supabase's Storage Logs -- req.headers
-        // there only ever lists a fixed, known set (x_upsert, content_type,
-        // x_client_info, etc.), never one we add ourselves -- so the token
-        // state is smuggled into the filename instead, since req.url /
-        // resources is proven to log verbatim. Remove once the anon-role
-        // root cause is confirmed.
-        val debugSession = SupabaseClientProvider.client.auth.currentSessionOrNull()
-        val debugExpiresInSec = debugSession?.let {
-            (it.expiresAt.toEpochMilliseconds() - Instant.now().toEpochMilli()) / 1000
-        }
-        val debugTag = "tok-${debugSession != null}-exp-${debugExpiresInSec ?: "none"}"
-
         // First path segment must equal the delivery id -- storage RLS
         // (pod_insert_assigned_carrier) checks exactly that:
         // (storage.foldername(objects.name))[1] = d.id::text.
-        val path = "$deliveryId/${leg}_${debugTag}_${System.currentTimeMillis()}.jpg"
+        val path = "$deliveryId/${leg}_${System.currentTimeMillis()}.jpg"
         SupabaseClientProvider.client.storage.from(POD_BUCKET).upload(path, photoBytes)
 
         SupabaseClientProvider.client.postgrest.rpc(

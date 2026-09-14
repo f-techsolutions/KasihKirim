@@ -10,6 +10,7 @@ import com.ftechsolutions.kasihkirim.domain.model.UserRole
 import com.ftechsolutions.kasihkirim.domain.repository.AuthRepository
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.providers.builtin.Email
+import io.github.jan.supabase.auth.status.SessionStatus
 import io.github.jan.supabase.auth.user.UserInfo
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -30,13 +31,34 @@ class AuthRepositoryImpl : AuthRepository {
             _authState.value = AuthState.Error(AppError.NotConfigured); return
         }
         _authState.value = AuthState.Initializing
-        _authState.value = try {
+        try {
             SupabaseClientProvider.client.auth.awaitInitialization()
-            val user = SupabaseClientProvider.client.auth.currentUserOrNull()
-            if (user != null) AuthState.Authenticated(user.toAuthUser()) else AuthState.Unauthenticated
         } catch (t: Throwable) {
             SafeLog.e(tag, "session restore failed", t)
-            AuthState.Error(t.toAppError())
+            _authState.value = AuthState.Error(t.toAppError())
+            return
+        }
+
+        // Keeps reacting for the rest of this call's lifetime (called once
+        // from AuthViewModel.init via viewModelScope, which is Activity-
+        // scoped and gates every screen in App.kt) -- not just this initial
+        // restore. Found on-device: a session that goes bad mid-visit (a
+        // background refresh-token failure) previously left _authState
+        // frozen at Authenticated forever, since nothing after this one-shot
+        // check ever touched it again -- the UI kept rendering the full
+        // authenticated app while every call underneath silently started
+        // failing with no live token (confirmed via a Storage upload
+        // reaching the server as role=anon), with no way back to the
+        // sign-in screen short of restarting the app.
+        SupabaseClientProvider.client.auth.sessionStatus.collect { status ->
+            _authState.value = when (status) {
+                is SessionStatus.Authenticated ->
+                    status.session.user?.toAuthUser()?.let(AuthState::Authenticated)
+                        ?: AuthState.Unauthenticated
+                is SessionStatus.NotAuthenticated, is SessionStatus.RefreshFailure ->
+                    AuthState.Unauthenticated
+                SessionStatus.Initializing -> AuthState.Initializing
+            }
         }
     }
 
