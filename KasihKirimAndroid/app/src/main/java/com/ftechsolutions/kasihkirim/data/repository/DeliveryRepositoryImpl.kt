@@ -13,7 +13,6 @@ import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
 import io.github.jan.supabase.postgrest.query.Order
 import io.github.jan.supabase.storage.storage
-import io.ktor.client.request.header
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -64,25 +63,24 @@ class DeliveryRepositoryImpl : DeliveryRepository {
         event: String,
         photoBytes: ByteArray,
     ): AppResult<KirimStatus> = runCatchingResult {
-        // First path segment must equal the delivery id -- storage RLS
-        // (pod_insert_assigned_carrier) checks exactly that:
-        // (storage.foldername(objects.name))[1] = d.id::text.
-        val path = "$deliveryId/${leg}_${System.currentTimeMillis()}.jpg"
-
-        // TEMPORARY DIAGNOSTIC for the anon-role upload bug -- read via the
-        // Supabase Storage Logs dashboard on req.headers, not device logcat.
-        // Remove once the root cause of the Storage 400s is confirmed.
-        val authPlugin = SupabaseClientProvider.client.auth
-        val debugSession = authPlugin.currentSessionOrNull()
+        // TEMPORARY DIAGNOSTIC for the anon-role upload bug. A custom request
+        // header doesn't survive into Supabase's Storage Logs -- req.headers
+        // there only ever lists a fixed, known set (x_upsert, content_type,
+        // x_client_info, etc.), never one we add ourselves -- so the token
+        // state is smuggled into the filename instead, since req.url /
+        // resources is proven to log verbatim. Remove once the anon-role
+        // root cause is confirmed.
+        val debugSession = SupabaseClientProvider.client.auth.currentSessionOrNull()
         val debugExpiresInSec = debugSession?.let {
             (it.expiresAt.toEpochMilliseconds() - Instant.now().toEpochMilli()) / 1000
         }
-        SupabaseClientProvider.client.storage.from(POD_BUCKET).upload(path, photoBytes) {
-            httpOverride {
-                header("x-debug-token-present", (debugSession != null).toString())
-                header("x-debug-token-expires-in-sec", debugExpiresInSec?.toString() ?: "no-session")
-            }
-        }
+        val debugTag = "tok-${debugSession != null}-exp-${debugExpiresInSec ?: "none"}"
+
+        // First path segment must equal the delivery id -- storage RLS
+        // (pod_insert_assigned_carrier) checks exactly that:
+        // (storage.foldername(objects.name))[1] = d.id::text.
+        val path = "$deliveryId/${leg}_${debugTag}_${System.currentTimeMillis()}.jpg"
+        SupabaseClientProvider.client.storage.from(POD_BUCKET).upload(path, photoBytes)
 
         SupabaseClientProvider.client.postgrest.rpc(
             "rpc_submit_proof",
