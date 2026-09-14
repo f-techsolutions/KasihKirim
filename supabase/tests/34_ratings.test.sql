@@ -94,9 +94,12 @@ SELECT throws_ok(
   NULL, NULL, 'a direct INSERT is refused now that rpc_submit_review is the only write path');
 
 -- ── first review: not yet visible, no aggregate effect ──────────────────────
+-- rpc_submit_review RETURNS public.reviews -- a composite row, not JSONB
+-- (PostgREST serializes that to JSON for a real client; raw SQL here needs
+-- row field access, (fn(...)).column, not the ->> JSON operator).
 SELECT is(
-  (public.rpc_submit_review(tests.uid('_delivery2'), 5, 'Great carrier!'))->>'is_visible',
-  'false', 'the first review of a pair is not visible yet');
+  (public.rpc_submit_review(tests.uid('_delivery2'), 5, 'Great carrier!')).is_visible,
+  false, 'the first review of a pair is not visible yet');
 SELECT tests.clear_auth();
 
 SELECT is(
@@ -106,8 +109,8 @@ SELECT is(
 -- ── second review (the carrier rating the customer back): double-blind reveal ─
 SELECT tests.authenticate_as('rahman');
 SELECT is(
-  (public.rpc_submit_review(tests.uid('_delivery2'), 4, 'Good customer'))->>'is_visible',
-  'true', 'the second review reveals immediately');
+  (public.rpc_submit_review(tests.uid('_delivery2'), 4, 'Good customer')).is_visible,
+  true, 'the second review reveals immediately');
 SELECT tests.clear_auth();
 
 SELECT is(
@@ -131,8 +134,8 @@ SELECT is(
 -- ── editing within the window changes the aggregate, not the visibility ────
 SELECT tests.authenticate_as('aisyah');
 SELECT is(
-  (public.rpc_submit_review(tests.uid('_delivery2'), 3, 'Actually just okay'))->>'is_visible',
-  'true', 'editing an already-revealed review keeps it visible');
+  (public.rpc_submit_review(tests.uid('_delivery2'), 3, 'Actually just okay')).is_visible,
+  true, 'editing an already-revealed review keeps it visible');
 SELECT tests.clear_auth();
 SELECT is(
   (SELECT rating_avg FROM public.profiles WHERE id = tests.uid('rahman')),
