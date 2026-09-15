@@ -161,7 +161,28 @@ jobs:
         id: db_tests
         run: |
           set -euo pipefail
-          supabase test db 2>&1 | tee db-tests.log
+          attempt=1
+          max_attempts=3
+          while true; do
+            if supabase test db 2>&1 | tee db-tests.log; then
+              break
+            fi
+            # pg_prove runs in a short-lived Docker container the Supabase
+            # CLI pulls fresh on every invocation -- an anonymous-pull rate
+            # limit there is registry flakiness, not a test failure
+            # (confirmed via Dependabot PR #13's own CI log: "docker:
+            # toomanyrequests: Rate exceeded" before a single assertion
+            # ran). Retry only that specific signature, and only a bounded
+            # number of times -- a real assertion failure still fails the
+            # build on the first try.
+            if [ "$attempt" -lt "$max_attempts" ] && grep -q "toomanyrequests" db-tests.log; then
+              attempt=$((attempt + 1))
+              echo "::warning::Docker registry rate-limited the pg_prove pull -- retrying ($attempt/$max_attempts)"
+              sleep $((attempt * 15))
+              continue
+            fi
+            exit 1
+          done
           echo "DB TESTS       PASS"
 
       - name: Test summary
