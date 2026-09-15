@@ -124,9 +124,9 @@ BEGIN
 
   SELECT * INTO k FROM public.kirim_requests WHERE id = d.kirim_id;
 
-  SELECT jsonb_build_object('name', n.name, 'lat', ST_Y(n.geog::geometry), 'lng', ST_X(n.geog::geometry))
+  SELECT jsonb_build_object('name', n.name, 'lat', public.ST_Y(n.geog::public.geometry), 'lng', public.ST_X(n.geog::public.geometry))
     INTO v_origin FROM ref.route_nodes n WHERE n.id = k.origin_node_id;
-  SELECT jsonb_build_object('name', n.name, 'lat', ST_Y(n.geog::geometry), 'lng', ST_X(n.geog::geometry))
+  SELECT jsonb_build_object('name', n.name, 'lat', public.ST_Y(n.geog::public.geometry), 'lng', public.ST_X(n.geog::public.geometry))
     INTO v_dest FROM ref.route_nodes n WHERE n.id = k.dest_node_id;
 
   SELECT * INTO loc FROM public.delivery_locations WHERE delivery_id = p_delivery;
@@ -137,7 +137,7 @@ BEGIN
     'destination', v_dest,
     'carrier_location', CASE WHEN loc.delivery_id IS NULL THEN NULL ELSE
       jsonb_build_object(
-        'lat', ST_Y(loc.geog::geometry), 'lng', ST_X(loc.geog::geometry),
+        'lat', public.ST_Y(loc.geog::public.geometry), 'lng', public.ST_X(loc.geog::public.geometry),
         'heading_deg', loc.heading_deg, 'speed_kmh', loc.speed_kmh,
         'accuracy_m', loc.accuracy_m, 'recorded_at', loc.recorded_at)
     END);

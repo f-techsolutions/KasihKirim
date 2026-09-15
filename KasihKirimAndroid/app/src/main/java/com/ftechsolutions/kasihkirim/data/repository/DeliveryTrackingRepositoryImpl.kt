@@ -8,6 +8,7 @@ import com.ftechsolutions.kasihkirim.data.remote.dto.DeliveryTrackingDto
 import com.ftechsolutions.kasihkirim.domain.model.DeliveryTracking
 import com.ftechsolutions.kasihkirim.domain.repository.DeliveryTrackingRepository
 import io.github.jan.supabase.postgrest.postgrest
+import io.github.jan.supabase.postgrest.query.filter.FilterOperator
 import io.github.jan.supabase.realtime.PostgresAction
 import io.github.jan.supabase.realtime.channel
 import io.github.jan.supabase.realtime.postgresChangeFlow
@@ -61,7 +62,11 @@ class DeliveryTrackingRepositoryImpl : DeliveryTrackingRepository {
         val channel = SupabaseClientProvider.client.channel("delivery_location_$deliveryId")
         return channel.postgresChangeFlow<PostgresAction>(schema = "public") {
             table = "delivery_locations"
-            filter = "delivery_id=eq.$deliveryId"
+            // filter's setter is private in the pinned supabase-bom 3.5.0
+            // (made so after the version whose docs first suggested plain
+            // assignment) -- this two-arg builder is the only public way
+            // to set it in this version.
+            filter("delivery_id", FilterOperator.EQ, deliveryId)
         }
             .filter { it is PostgresAction.Insert || it is PostgresAction.Update }
             .map { }
