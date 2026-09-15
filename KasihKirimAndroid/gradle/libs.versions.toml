@@ -3,7 +3,7 @@
 # confirmed to resolve on the first real build. Do not upgrade casually.
 [versions]
 agp             = "9.4.0"
-kotlin          = "2.3.21"
+kotlin          = "2.4.20"
 composeBom      = "2026.08.00"
 navigation      = "2.10.0"
 lifecycle       = "2.11.0"
