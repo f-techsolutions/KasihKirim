@@ -12,6 +12,7 @@ import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.filled.Redeem
 import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -40,6 +41,7 @@ fun ProfileScreen(
     onOpenServiceability: () -> Unit,
     onOpenSales: () -> Unit,
     onOpenCarrierApplication: () -> Unit,
+    onOpenPromotions: () -> Unit,
 ) {
     val profileState by profileVm.state.collectAsState()
 
@@ -94,6 +96,15 @@ fun ProfileScreen(
                     onClick = onOpenCarrierApplication,
                 )
             }
+            // Kongsi & Untung (0045): a promoter is any profile, not a role
+            // held or applied for -- unlike Sales/Carrier above, this row
+            // never disappears or changes label.
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            ActionRow(
+                icon = Icons.Filled.Redeem,
+                label = stringResource(R.string.profile_kongsi_untung),
+                onClick = onOpenPromotions,
+            )
         }
 
         Spacer(Modifier.weight(1f))

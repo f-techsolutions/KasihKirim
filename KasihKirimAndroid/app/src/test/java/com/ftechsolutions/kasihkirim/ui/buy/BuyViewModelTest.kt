@@ -10,11 +10,16 @@ import com.ftechsolutions.kasihkirim.domain.model.CheckoutResult
 import com.ftechsolutions.kasihkirim.domain.model.Community
 import com.ftechsolutions.kasihkirim.domain.model.NewAddress
 import com.ftechsolutions.kasihkirim.domain.model.BuyListing
+import com.ftechsolutions.kasihkirim.domain.model.CreatedPromotion
+import com.ftechsolutions.kasihkirim.domain.model.MyPromotions
+import com.ftechsolutions.kasihkirim.domain.model.OpenedPromotion
 import com.ftechsolutions.kasihkirim.domain.model.PaymentStatusInfo
+import com.ftechsolutions.kasihkirim.domain.model.PromotionSubjectType
 import com.ftechsolutions.kasihkirim.domain.model.Sen
 import com.ftechsolutions.kasihkirim.domain.model.Serviceability
 import com.ftechsolutions.kasihkirim.domain.repository.AddressRepository
 import com.ftechsolutions.kasihkirim.domain.repository.BuyRepository
+import com.ftechsolutions.kasihkirim.domain.repository.PromotionRepository
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -132,6 +137,27 @@ private class FakeBuyRepository(
         throw NotImplementedError()
 }
 
+private class FakePromotionRepository(
+    var createResult: AppResult<CreatedPromotion>? = null,
+) : PromotionRepository {
+    var createCalls = 0
+    var lastSubjectId: String? = null
+
+    override suspend fun createPromotion(subjectType: PromotionSubjectType, subjectId: String): AppResult<CreatedPromotion> {
+        createCalls++
+        lastSubjectId = subjectId
+        return createResult ?: AppResult.Success(
+            CreatedPromotion(
+                id = "promo1", code = "ABCD1234", subjectType = subjectType, subjectId = subjectId,
+                shareLink = "kasihkirim://promo/ABCD1234",
+            ),
+        )
+    }
+
+    override suspend fun openPromotion(code: String): AppResult<OpenedPromotion> = throw NotImplementedError()
+    override suspend fun myPromotions(): AppResult<MyPromotions> = throw NotImplementedError()
+}
+
 @OptIn(ExperimentalCoroutinesApi::class)
 class BuyViewModelTest {
 
@@ -141,7 +167,7 @@ class BuyViewModelTest {
     @After fun tearDown() = Dispatchers.resetMain()
 
     @Test fun `listings, cart, and addresses load on init, defaulting to the default address`() = runTest(dispatcher) {
-        val vm = BuyViewModel(FakeBuyRepository(), FakeAddressRepository())
+        val vm = BuyViewModel(FakeBuyRepository(), FakeAddressRepository(), FakePromotionRepository())
         advanceUntilIdle()
 
         assertEquals(1, vm.state.value.listings.size)
@@ -151,7 +177,7 @@ class BuyViewModelTest {
 
     @Test fun `addToCart calls the repository and reloads the cart`() = runTest(dispatcher) {
         val repo = FakeBuyRepository()
-        val vm = BuyViewModel(repo, FakeAddressRepository())
+        val vm = BuyViewModel(repo, FakeAddressRepository(), FakePromotionRepository())
         advanceUntilIdle()
 
         vm.addToCart("p1"); advanceUntilIdle()
@@ -163,7 +189,7 @@ class BuyViewModelTest {
     @Test fun `cartTotalSen and cartSpansMultipleSellers reflect the loaded cart`() = runTest(dispatcher) {
         val secondSellerLine = CART_LINE.copy(cartItemId = "ci2", sellerId = "s2", quantity = 1)
         val repo = FakeBuyRepository(cart = listOf(CART_LINE, secondSellerLine))
-        val vm = BuyViewModel(repo, FakeAddressRepository())
+        val vm = BuyViewModel(repo, FakeAddressRepository(), FakePromotionRepository())
         advanceUntilIdle()
 
         assertEquals(CART_LINE.lineTotalSen.value + secondSellerLine.lineTotalSen.value, vm.state.value.cartTotalSen)
@@ -172,7 +198,7 @@ class BuyViewModelTest {
 
     @Test fun `checkout succeeds and clears the cart and voucher input`() = runTest(dispatcher) {
         val repo = FakeBuyRepository(cart = listOf(CART_LINE))
-        val vm = BuyViewModel(repo, FakeAddressRepository())
+        val vm = BuyViewModel(repo, FakeAddressRepository(), FakePromotionRepository())
         advanceUntilIdle()
 
         vm.onVoucherCodeChange("SAVE5")
@@ -191,7 +217,7 @@ class BuyViewModelTest {
             cart = listOf(CART_LINE),
             checkoutResult = AppResult.Failure(AppError.Server("INSUFFICIENT_STOCK")),
         )
-        val vm = BuyViewModel(repo, FakeAddressRepository())
+        val vm = BuyViewModel(repo, FakeAddressRepository(), FakePromotionRepository())
         advanceUntilIdle()
 
         vm.checkout(); advanceUntilIdle()
@@ -204,7 +230,7 @@ class BuyViewModelTest {
     @Test fun `checkout forces COD when the cart spans multiple sellers even if online was selected`() = runTest(dispatcher) {
         val secondSellerLine = CART_LINE.copy(cartItemId = "ci2", sellerId = "s2", quantity = 1)
         val repo = FakeBuyRepository(cart = listOf(CART_LINE, secondSellerLine))
-        val vm = BuyViewModel(repo, FakeAddressRepository())
+        val vm = BuyViewModel(repo, FakeAddressRepository(), FakePromotionRepository())
         advanceUntilIdle()
 
         vm.onPaymentMethodSelected("FPX")
@@ -215,7 +241,7 @@ class BuyViewModelTest {
 
     @Test fun `checkout passes the selected online method for a single-seller cart`() = runTest(dispatcher) {
         val repo = FakeBuyRepository(cart = listOf(CART_LINE))
-        val vm = BuyViewModel(repo, FakeAddressRepository())
+        val vm = BuyViewModel(repo, FakeAddressRepository(), FakePromotionRepository())
         advanceUntilIdle()
 
         vm.onPaymentMethodSelected("FPX")
@@ -235,7 +261,7 @@ class BuyViewModelTest {
                 ),
             )
         }
-        val vm = BuyViewModel(repo, FakeAddressRepository())
+        val vm = BuyViewModel(repo, FakeAddressRepository(), FakePromotionRepository())
         advanceUntilIdle()
 
         vm.payNow("o1"); advanceUntilIdle()
@@ -247,7 +273,7 @@ class BuyViewModelTest {
 
     @Test fun `onPaymentUrlLaunched consumes the one-shot Custom Tab event`() = runTest(dispatcher) {
         val repo = FakeBuyRepository(cart = listOf(CART_LINE))
-        val vm = BuyViewModel(repo, FakeAddressRepository())
+        val vm = BuyViewModel(repo, FakeAddressRepository(), FakePromotionRepository())
         advanceUntilIdle()
 
         vm.payNow("o1"); advanceUntilIdle()
@@ -260,7 +286,7 @@ class BuyViewModelTest {
     @Test fun `addToCart ignores a second call for the same product while the first is still in flight`() = runTest(dispatcher) {
         val gate = CompletableDeferred<Unit>()
         val repo = FakeBuyRepository(addToCartGate = gate)
-        val vm = BuyViewModel(repo, FakeAddressRepository())
+        val vm = BuyViewModel(repo, FakeAddressRepository(), FakePromotionRepository())
         advanceUntilIdle()
 
         vm.addToCart("p1")
@@ -282,7 +308,7 @@ class BuyViewModelTest {
             override suspend fun addToCart(productId: String, quantity: Int): AppResult<Unit> =
                 AppResult.Failure(AppError.Server("PRODUCT_NOT_FOUND"))
         }
-        val vm = BuyViewModel(repo, FakeAddressRepository())
+        val vm = BuyViewModel(repo, FakeAddressRepository(), FakePromotionRepository())
         advanceUntilIdle()
 
         vm.addToCart("p1"); advanceUntilIdle()
@@ -293,7 +319,7 @@ class BuyViewModelTest {
 
     @Test fun `requestCheckout opens a confirmation step rather than checking out immediately`() = runTest(dispatcher) {
         val repo = FakeBuyRepository(cart = listOf(CART_LINE))
-        val vm = BuyViewModel(repo, FakeAddressRepository())
+        val vm = BuyViewModel(repo, FakeAddressRepository(), FakePromotionRepository())
         advanceUntilIdle()
 
         vm.requestCheckout()
@@ -307,7 +333,7 @@ class BuyViewModelTest {
     }
 
     @Test fun `requestCheckout does nothing without a selected address`() = runTest(dispatcher) {
-        val vm = BuyViewModel(FakeBuyRepository(), FakeAddressRepository(addresses = emptyList()))
+        val vm = BuyViewModel(FakeBuyRepository(), FakeAddressRepository(addresses = emptyList()), FakePromotionRepository())
         advanceUntilIdle()
 
         vm.requestCheckout()
@@ -317,7 +343,7 @@ class BuyViewModelTest {
 
     @Test fun `checkout clears the confirmation step once it actually runs`() = runTest(dispatcher) {
         val repo = FakeBuyRepository(cart = listOf(CART_LINE))
-        val vm = BuyViewModel(repo, FakeAddressRepository())
+        val vm = BuyViewModel(repo, FakeAddressRepository(), FakePromotionRepository())
         advanceUntilIdle()
 
         vm.requestCheckout()
@@ -331,10 +357,46 @@ class BuyViewModelTest {
         val vm = BuyViewModel(
             FakeBuyRepository(),
             FakeAddressRepository(listResult = AppResult.Failure(AppError.Network)),
+            FakePromotionRepository(),
         )
         advanceUntilIdle()
 
         assertEquals(AppError.Network, vm.state.value.error)
         assertTrue(vm.state.value.addresses.isEmpty())
+    }
+
+    @Test fun `shareProduct creates a promotion and hands BuyScreen a one-shot share request`() = runTest(dispatcher) {
+        val promoRepo = FakePromotionRepository()
+        val vm = BuyViewModel(FakeBuyRepository(), FakeAddressRepository(), promoRepo)
+        advanceUntilIdle()
+
+        vm.shareProduct(LISTING); advanceUntilIdle()
+
+        assertEquals(1, promoRepo.createCalls)
+        assertEquals("p1", promoRepo.lastSubjectId)
+        assertEquals(ShareRequest("Ikan Bilis", "kasihkirim://promo/ABCD1234"), vm.state.value.pendingShare)
+        assertNull(vm.state.value.isSharingProductId)
+    }
+
+    @Test fun `onShareLaunched consumes the one-shot share event`() = runTest(dispatcher) {
+        val vm = BuyViewModel(FakeBuyRepository(), FakeAddressRepository(), FakePromotionRepository())
+        advanceUntilIdle()
+
+        vm.shareProduct(LISTING); advanceUntilIdle()
+        assertNotNull(vm.state.value.pendingShare)
+
+        vm.onShareLaunched()
+        assertNull(vm.state.value.pendingShare)
+    }
+
+    @Test fun `a failed shareProduct surfaces the error rather than a share request`() = runTest(dispatcher) {
+        val promoRepo = FakePromotionRepository(createResult = AppResult.Failure(AppError.Server("KONGSI_UNTUNG_DISABLED")))
+        val vm = BuyViewModel(FakeBuyRepository(), FakeAddressRepository(), promoRepo)
+        advanceUntilIdle()
+
+        vm.shareProduct(LISTING); advanceUntilIdle()
+
+        assertEquals(AppError.Server("KONGSI_UNTUNG_DISABLED"), vm.state.value.error)
+        assertNull(vm.state.value.pendingShare)
     }
 }

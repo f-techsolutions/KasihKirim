@@ -263,6 +263,9 @@ internal fun AppError.messageRes(): Int = when (this) {
         "INVALID_RATING" -> R.string.err_invalid_rating
         "DELIVERY_NOT_COMPLETED" -> R.string.err_delivery_not_completed
         "EDIT_WINDOW_CLOSED" -> R.string.err_edit_window_closed
+        "KONGSI_UNTUNG_DISABLED" -> R.string.err_kongsi_untung_disabled
+        "INVALID_SUBJECT_TYPE" -> R.string.err_invalid_subject_type
+        "SELLER_NOT_FOUND" -> R.string.err_seller_not_found
         else -> R.string.err_unexpected
     }
     else -> R.string.err_unexpected

@@ -322,6 +322,22 @@
     <string name="earnings_no_payouts">Tiada permintaan pengeluaran lagi.</string>
     <string name="earnings_cancel">Batal</string>
 
+    <string name="profile_kongsi_untung">Kongsi &amp; Untung</string>
+    <string name="promo_title">Kongsi &amp; Untung</string>
+    <string name="promo_redeem_title">Ada Kod Rujukan?</string>
+    <string name="promo_redeem_code_label">Kod</string>
+    <string name="promo_redeem_submit">Semak</string>
+    <string name="promo_redeem_not_found">Kod ini tidak sah atau sudah tidak aktif.</string>
+    <string name="promo_available">Boleh dikeluarkan</string>
+    <string name="promo_my_codes_title">Kod Saya</string>
+    <string name="promo_no_codes">Anda belum berkongsi apa-apa lagi.</string>
+    <string name="promo_no_codes_hint">Kongsikan pautan produk untuk mula memperoleh komisen.</string>
+    <string name="promo_click_count">%1$d klik</string>
+    <string name="promo_pending">Belum selesai</string>
+    <string name="promo_settled">Selesai</string>
+    <string name="buy_share_earn">Kongsi &amp; Untung</string>
+    <string name="buy_share_earn_message">Beli %1$s melalui pautan saya: %2$s</string>
+
     <string name="muatan_jual_title">Muatan Jual</string>
     <string name="muatan_jual_empty">Tiada muatan dijual buat masa ini.</string>
     <string name="muatan_jual_notice">Pembelian belum dibuka lagi. Anda boleh lihat apa yang ada, tetapi tidak boleh beli dalam aplikasi ini buat masa ini.</string>
@@ -480,6 +496,9 @@
     <string name="err_edit_window_closed">Tempoh untuk mengubah penilaian ini telah tamat.</string>
     <string name="err_cannot_act_on_self">Tindakan ini tidak boleh dikenakan pada akaun sendiri.</string>
     <string name="err_user_not_found">Pengguna tidak dijumpai.</string>
+    <string name="err_kongsi_untung_disabled">Ciri Kongsi &amp; Untung belum dibuka lagi.</string>
+    <string name="err_invalid_subject_type">Jenis kandungan untuk dikongsi tidak sah.</string>
+    <string name="err_seller_not_found">Penjual tidak dijumpai atau belum diluluskan.</string>
 
     <string name="profile_badges_title">Lencana</string>
 </resources>

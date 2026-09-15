@@ -22,6 +22,7 @@ import com.ftechsolutions.kasihkirim.domain.repository.DeliveryRepository
 import com.ftechsolutions.kasihkirim.domain.repository.EarningsRepository
 import com.ftechsolutions.kasihkirim.domain.repository.KirimRepository
 import com.ftechsolutions.kasihkirim.domain.repository.MuatanJualRepository
+import com.ftechsolutions.kasihkirim.domain.repository.PromotionRepository
 import com.ftechsolutions.kasihkirim.domain.repository.SellerRepository
 import com.ftechsolutions.kasihkirim.domain.repository.TripRepository
 import com.ftechsolutions.kasihkirim.domain.repository.VehicleRepository
@@ -49,6 +50,8 @@ import com.ftechsolutions.kasihkirim.ui.orders.OrdersScreen
 import com.ftechsolutions.kasihkirim.ui.orders.OrdersViewModel
 import com.ftechsolutions.kasihkirim.ui.profile.ProfileScreen
 import com.ftechsolutions.kasihkirim.ui.profile.ProfileViewModel
+import com.ftechsolutions.kasihkirim.ui.promotions.PromotionsScreen
+import com.ftechsolutions.kasihkirim.ui.promotions.PromotionsViewModel
 import com.ftechsolutions.kasihkirim.ui.sales.SalesScreen
 import com.ftechsolutions.kasihkirim.ui.sales.SalesViewModel
 import com.ftechsolutions.kasihkirim.ui.send.KirimQuoteViewModel
@@ -67,6 +70,7 @@ private const val DELIVERIES_ROUTE = "deliveries"
 private const val BUY_ROUTE = "buy"
 private const val BUY_ORDERS_ROUTE = "buy_orders"
 private const val CARRIER_APPLICATION_ROUTE = "carrier_application"
+private const val PROMOTIONS_ROUTE = "promotions"
 
 @Composable
 fun AppNavHost(
@@ -84,6 +88,7 @@ fun AppNavHost(
     buyRepository: BuyRepository,
     badgeRepository: BadgeRepository,
     adminRepository: AdminRepository,
+    promotionRepository: PromotionRepository,
 ) {
     val nav: NavHostController = rememberNavController()
     val tabs = tabsFor(user.primaryRole)
@@ -128,6 +133,7 @@ fun AppNavHost(
                     onOpenServiceability = { nav.navigate(SERVICEABILITY_ROUTE) },
                     onOpenSales = { nav.navigate(Destination.SALES.route) },
                     onOpenCarrierApplication = { nav.navigate(CARRIER_APPLICATION_ROUTE) },
+                    onOpenPromotions = { nav.navigate(PROMOTIONS_ROUTE) },
                 )
             }
             composable(CARRIER_APPLICATION_ROUTE) {
@@ -136,13 +142,21 @@ fun AppNavHost(
                 )
                 CarrierApplicationScreen(vm, onBack = { nav.popBackStack() })
             }
+            composable(PROMOTIONS_ROUTE) {
+                val vm: PromotionsViewModel = viewModel(
+                    factory = PromotionsViewModel.Factory(promotionRepository, earningsRepository),
+                )
+                PromotionsScreen(vm, onBack = { nav.popBackStack() })
+            }
             // Jualan Phase B (0020_jualan_checkout_and_growth.sql): browse
             // active products across all sellers, cart, checkout. Reached
             // from Home rather than a bottom tab -- the tab row is already
             // full per role (Destinations.kt), same reasoning as
             // ADDRESSES_ROUTE/VEHICLES_ROUTE living off Profile/Trips.
             composable(BUY_ROUTE) {
-                val vm: BuyViewModel = viewModel(factory = BuyViewModel.Factory(buyRepository, addressRepository))
+                val vm: BuyViewModel = viewModel(
+                    factory = BuyViewModel.Factory(buyRepository, addressRepository, promotionRepository),
+                )
                 BuyScreen(vm, onBack = { nav.popBackStack() }, onOpenOrders = { nav.navigate(BUY_ORDERS_ROUTE) })
             }
             composable(BUY_ORDERS_ROUTE) {

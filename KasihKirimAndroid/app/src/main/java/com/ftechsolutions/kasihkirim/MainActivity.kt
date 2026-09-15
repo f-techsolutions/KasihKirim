@@ -31,6 +31,7 @@ class MainActivity : ComponentActivity() {
                     app.buyRepository,
                     app.badgeRepository,
                     app.adminRepository,
+                    app.promotionRepository,
                 )
             }
         }
