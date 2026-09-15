@@ -34,13 +34,23 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v4
 
-      # See android-cloud-build.yml for why this step exists: the bundled
-      # cmdline-tools (16.0) can't see platforms;android-37.
+      # See android-cloud-build.yml for why this step exists and why the
+      # bundled version is discovered rather than hardcoded: the bundled
+      # cmdline-tools can't see platforms;android-37, and the exact version
+      # GitHub's runner image bundles has drifted under us before (16.0 ->
+      # 20.0, confirmed via CI logs of Dependabot PRs #18/#21).
       - name: Update Android cmdline-tools
         run: |
+          set -euo pipefail
+          bundled_tools="$(find "$ANDROID_HOME/cmdline-tools" -mindepth 1 -maxdepth 1 -type d ! -name latest | sort -V | tail -1)"
+          if [ -z "$bundled_tools" ]; then
+            echo "::error::No bundled cmdline-tools directory found under $ANDROID_HOME/cmdline-tools"
+            exit 1
+          fi
+          echo "Using bundled cmdline-tools: $bundled_tools"
           rm -rf "$ANDROID_HOME/cmdline-tools/latest"
-          yes | "$ANDROID_HOME/cmdline-tools/16.0/bin/sdkmanager" --licenses >/dev/null || true
-          "$ANDROID_HOME/cmdline-tools/16.0/bin/sdkmanager" "cmdline-tools;latest"
+          yes | "$bundled_tools/bin/sdkmanager" --licenses >/dev/null || true
+          "$bundled_tools/bin/sdkmanager" "cmdline-tools;latest"
           echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
 
       - name: Install Android SDK packages
@@ -143,7 +153,7 @@ jobs:
         run: rm -f release-signing.jks
 
       - name: Upload signed AAB
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: KasihKirim-release-aab
           path: KasihKirimAndroid/app/build/outputs/bundle/release/app-release.aab

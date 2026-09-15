@@ -27,7 +27,7 @@ class EncryptedSessionManagerTest {
     }
 
     @Test fun loadSessionReturnsNullWhenNothingWasEverSaved() = runBlocking {
-        assertNull(manager.loadSession())
+        assertNull(manager.loadSessionOrNull())
     }
 
     @Test fun savedSessionRoundTripsExactly() = runBlocking {
@@ -41,9 +41,9 @@ class EncryptedSessionManagerTest {
         manager.saveSession(session)
         val loaded = manager.loadSession()
 
-        assertEquals(session.accessToken, loaded?.accessToken)
-        assertEquals(session.refreshToken, loaded?.refreshToken)
-        assertEquals(session.tokenType, loaded?.tokenType)
+        assertEquals(session.accessToken, loaded.accessToken)
+        assertEquals(session.refreshToken, loaded.refreshToken)
+        assertEquals(session.tokenType, loaded.tokenType)
     }
 
     @Test fun deleteSessionClearsAPreviouslySavedSession() = runBlocking {
@@ -58,7 +58,7 @@ class EncryptedSessionManagerTest {
 
         manager.deleteSession()
 
-        assertNull(manager.loadSession())
+        assertNull(manager.loadSessionOrNull())
     }
 
     @Test fun sessionIsNotStoredAsPlaintextInSharedPreferences() = runBlocking {
