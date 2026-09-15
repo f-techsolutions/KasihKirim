@@ -1,5 +1,6 @@
 package com.ftechsolutions.kasihkirim.ui.navigation
 
+import android.net.Uri
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -21,6 +22,7 @@ import com.ftechsolutions.kasihkirim.domain.repository.BadgeRepository
 import com.ftechsolutions.kasihkirim.domain.repository.BuyRepository
 import com.ftechsolutions.kasihkirim.domain.repository.CarrierLotRepository
 import com.ftechsolutions.kasihkirim.domain.repository.CarrierRepository
+import com.ftechsolutions.kasihkirim.domain.repository.DealsRepository
 import com.ftechsolutions.kasihkirim.domain.repository.DeliveryRepository
 import com.ftechsolutions.kasihkirim.domain.repository.DeliveryTrackingRepository
 import com.ftechsolutions.kasihkirim.domain.repository.EarningsRepository
@@ -43,6 +45,8 @@ import com.ftechsolutions.kasihkirim.ui.buy.BuyScreen
 import com.ftechsolutions.kasihkirim.ui.buy.BuyViewModel
 import com.ftechsolutions.kasihkirim.ui.carrier.CarrierApplicationScreen
 import com.ftechsolutions.kasihkirim.ui.carrier.CarrierApplicationViewModel
+import com.ftechsolutions.kasihkirim.ui.deals.DealsGalleryScreen
+import com.ftechsolutions.kasihkirim.ui.deals.DealsGalleryViewModel
 import com.ftechsolutions.kasihkirim.ui.deliveries.DeliveriesScreen
 import com.ftechsolutions.kasihkirim.ui.deliveries.DeliveriesViewModel
 import com.ftechsolutions.kasihkirim.ui.deliveries.DeliveryTrackingScreen
@@ -81,6 +85,7 @@ private const val BUY_ORDERS_ROUTE = "buy_orders"
 private const val CARRIER_APPLICATION_ROUTE = "carrier_application"
 private const val PROMOTIONS_ROUTE = "promotions"
 private const val CARRIER_LOTS_ROUTE = "carrier_lots"
+private const val DEALS_GALLERY_ROUTE = "deals_gallery"
 
 @Composable
 fun AppNavHost(
@@ -101,6 +106,7 @@ fun AppNavHost(
     badgeRepository: BadgeRepository,
     adminRepository: AdminRepository,
     promotionRepository: PromotionRepository,
+    dealsRepository: DealsRepository,
 ) {
     val nav: NavHostController = rememberNavController()
     val tabs = tabsFor(user.primaryRole)
@@ -133,7 +139,21 @@ fun AppNavHost(
             modifier = Modifier.padding(padding),
         ) {
             composable(Destination.HOME.route) {
-                HomeScreen(user, onOpenBuy = { nav.navigate(BUY_ROUTE) })
+                HomeScreen(
+                    user,
+                    onOpenBuy = { nav.navigate(BUY_ROUTE) },
+                    onOpenDeals = { nav.navigate(DEALS_GALLERY_ROUTE) },
+                )
+            }
+            composable(DEALS_GALLERY_ROUTE) {
+                val vm: DealsGalleryViewModel = viewModel(factory = DealsGalleryViewModel.Factory(dealsRepository))
+                DealsGalleryScreen(
+                    vm,
+                    onBack = { nav.popBackStack() },
+                    onOpenDeal = { deal ->
+                        nav.navigate("$BUY_ROUTE?query=${Uri.encode(deal.productTitle)}")
+                    },
+                )
             }
             composable(Destination.PROFILE.route) {
                 val profileVm: ProfileViewModel = viewModel(factory = ProfileViewModel.Factory(badgeRepository))
@@ -179,9 +199,17 @@ fun AppNavHost(
             // from Home rather than a bottom tab -- the tab row is already
             // full per role (Destinations.kt), same reasoning as
             // ADDRESSES_ROUTE/VEHICLES_ROUTE living off Profile/Trips.
-            composable(BUY_ROUTE) {
+            // The optional ?query= argument is DealsGalleryScreen's own
+            // deep link -- a bare nav.navigate(BUY_ROUTE) (Home's own entry,
+            // BuyOrdersScreen's back stack) still resolves since the
+            // argument carries a default.
+            composable(
+                "$BUY_ROUTE?query={query}",
+                arguments = listOf(navArgument("query") { type = NavType.StringType; defaultValue = "" }),
+            ) { backStackEntry ->
+                val initialQuery = backStackEntry.arguments?.getString("query").orEmpty()
                 val vm: BuyViewModel = viewModel(
-                    factory = BuyViewModel.Factory(buyRepository, addressRepository, promotionRepository),
+                    factory = BuyViewModel.Factory(buyRepository, addressRepository, promotionRepository, initialQuery),
                 )
                 BuyScreen(vm, onBack = { nav.popBackStack() }, onOpenOrders = { nav.navigate(BUY_ORDERS_ROUTE) })
             }

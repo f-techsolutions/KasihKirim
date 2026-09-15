@@ -9,6 +9,7 @@ import com.ftechsolutions.kasihkirim.data.repository.BadgeRepositoryImpl
 import com.ftechsolutions.kasihkirim.data.repository.BuyRepositoryImpl
 import com.ftechsolutions.kasihkirim.data.repository.CarrierLotRepositoryImpl
 import com.ftechsolutions.kasihkirim.data.repository.CarrierRepositoryImpl
+import com.ftechsolutions.kasihkirim.data.repository.DealsRepositoryImpl
 import com.ftechsolutions.kasihkirim.data.repository.DeliveryRepositoryImpl
 import com.ftechsolutions.kasihkirim.data.repository.DeliveryTrackingRepositoryImpl
 import com.ftechsolutions.kasihkirim.data.repository.EarningsRepositoryImpl
@@ -25,6 +26,7 @@ import com.ftechsolutions.kasihkirim.domain.repository.BadgeRepository
 import com.ftechsolutions.kasihkirim.domain.repository.BuyRepository
 import com.ftechsolutions.kasihkirim.domain.repository.CarrierLotRepository
 import com.ftechsolutions.kasihkirim.domain.repository.CarrierRepository
+import com.ftechsolutions.kasihkirim.domain.repository.DealsRepository
 import com.ftechsolutions.kasihkirim.domain.repository.DeliveryRepository
 import com.ftechsolutions.kasihkirim.domain.repository.DeliveryTrackingRepository
 import com.ftechsolutions.kasihkirim.domain.repository.EarningsRepository
@@ -62,4 +64,5 @@ class KasihKirimApplication : Application() {
     val badgeRepository: BadgeRepository by lazy { BadgeRepositoryImpl() }
     val adminRepository: AdminRepository by lazy { AdminRepositoryImpl() }
     val promotionRepository: PromotionRepository by lazy { PromotionRepositoryImpl() }
+    val dealsRepository: DealsRepository by lazy { DealsRepositoryImpl() }
 }

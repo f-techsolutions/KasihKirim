@@ -20,6 +20,7 @@ import com.ftechsolutions.kasihkirim.domain.repository.BadgeRepository
 import com.ftechsolutions.kasihkirim.domain.repository.BuyRepository
 import com.ftechsolutions.kasihkirim.domain.repository.CarrierLotRepository
 import com.ftechsolutions.kasihkirim.domain.repository.CarrierRepository
+import com.ftechsolutions.kasihkirim.domain.repository.DealsRepository
 import com.ftechsolutions.kasihkirim.domain.repository.DeliveryRepository
 import com.ftechsolutions.kasihkirim.domain.repository.DeliveryTrackingRepository
 import com.ftechsolutions.kasihkirim.domain.repository.EarningsRepository
@@ -57,6 +58,7 @@ fun App(
     badgeRepository: BadgeRepository,
     adminRepository: AdminRepository,
     promotionRepository: PromotionRepository,
+    dealsRepository: DealsRepository,
 ) {
     val state by vm.authState.collectAsStateWithLifecycle()
 
@@ -72,7 +74,7 @@ fun App(
                 s.user, vm, addressRepository, kirimRepository, earningsRepository,
                 vehicleRepository, tripRepository, deliveryRepository, deliveryTrackingRepository,
                 muatanJualRepository, sellerRepository, carrierRepository, carrierLotRepository,
-                buyRepository, badgeRepository, adminRepository, promotionRepository,
+                buyRepository, badgeRepository, adminRepository, promotionRepository, dealsRepository,
             )
             is AuthState.Error -> Centered {
                 Text(stringResource(s.error.messageRes()),

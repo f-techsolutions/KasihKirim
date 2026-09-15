@@ -74,9 +74,10 @@ class BuyViewModel(
     private val buyRepo: BuyRepository,
     private val addressRepo: AddressRepository,
     private val promotionRepo: PromotionRepository,
+    initialQuery: String = "",
 ) : ViewModel() {
 
-    private val _state = MutableStateFlow(BuyUiState())
+    private val _state = MutableStateFlow(BuyUiState(searchQuery = initialQuery))
     val state: StateFlow<BuyUiState> = _state.asStateFlow()
 
     private var pollingJob: Job? = null
@@ -298,14 +299,17 @@ class BuyViewModel(
         super.onCleared()
     }
 
-    /** Manual DI, matching SalesViewModel.Factory (§9). */
+    /** Manual DI, matching SalesViewModel.Factory (§9). initialQuery lets
+     *  DealsGalleryScreen deep-link a tapped deal straight to its own
+     *  product -- see BUY_ROUTE's own "?query={query}" argument. */
     class Factory(
         private val buyRepo: BuyRepository,
         private val addressRepo: AddressRepository,
         private val promotionRepo: PromotionRepository,
+        private val initialQuery: String = "",
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T =
-            BuyViewModel(buyRepo, addressRepo, promotionRepo) as T
+            BuyViewModel(buyRepo, addressRepo, promotionRepo, initialQuery) as T
     }
 }

@@ -175,6 +175,14 @@ class BuyViewModelTest {
         assertFalse(vm.state.value.isLoading)
     }
 
+    @Test fun `initialQuery seeds the search box and filters the first load`() = runTest(dispatcher) {
+        val repo = FakeBuyRepository()
+        val vm = BuyViewModel(repo, FakeAddressRepository(), FakePromotionRepository(), initialQuery = "Ikan Bilis")
+        advanceUntilIdle()
+
+        assertEquals("Ikan Bilis", vm.state.value.searchQuery)
+    }
+
     @Test fun `addToCart calls the repository and reloads the cart`() = runTest(dispatcher) {
         val repo = FakeBuyRepository()
         val vm = BuyViewModel(repo, FakeAddressRepository(), FakePromotionRepository())

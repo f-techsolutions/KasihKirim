@@ -34,6 +34,7 @@ class MainActivity : ComponentActivity() {
                     app.badgeRepository,
                     app.adminRepository,
                     app.promotionRepository,
+                    app.dealsRepository,
                 )
             }
         }

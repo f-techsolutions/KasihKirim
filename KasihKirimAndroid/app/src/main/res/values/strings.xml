@@ -400,6 +400,13 @@
     <string name="home_buy_title">Beli-Belah</string>
     <string name="home_buy_subtitle">Beli produk terus daripada penjual tempatan</string>
 
+    <string name="home_deals_title">Tawaran Istimewa</string>
+    <string name="home_deals_subtitle">Lihat tawaran pilihan minggu ini</string>
+
+    <string name="deals_title">Tawaran Istimewa</string>
+    <string name="deals_empty">Tiada tawaran buat masa ini.</string>
+    <string name="deals_view_product">Lihat Produk</string>
+
     <string name="buy_title">Beli-Belah</string>
     <string name="buy_search_hint">Cari produk</string>
     <string name="buy_empty">Tiada produk tersedia buat masa ini.</string>
