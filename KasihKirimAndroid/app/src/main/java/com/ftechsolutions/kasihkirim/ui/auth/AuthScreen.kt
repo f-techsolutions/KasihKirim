@@ -266,6 +266,8 @@ internal fun AppError.messageRes(): Int = when (this) {
         "KONGSI_UNTUNG_DISABLED" -> R.string.err_kongsi_untung_disabled
         "INVALID_SUBJECT_TYPE" -> R.string.err_invalid_subject_type
         "SELLER_NOT_FOUND" -> R.string.err_seller_not_found
+        "DELIVERY_NOT_IN_TRANSIT" -> R.string.err_delivery_not_in_transit
+        "INVALID_COORDINATES" -> R.string.err_invalid_coordinates
         else -> R.string.err_unexpected
     }
     else -> R.string.err_unexpected

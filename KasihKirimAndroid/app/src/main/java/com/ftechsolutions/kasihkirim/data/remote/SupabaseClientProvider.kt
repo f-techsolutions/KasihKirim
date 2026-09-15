@@ -10,6 +10,7 @@ import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.functions.Functions
 import io.github.jan.supabase.postgrest.Postgrest
+import io.github.jan.supabase.realtime.Realtime
 import io.github.jan.supabase.storage.Storage
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -62,6 +63,9 @@ object SupabaseClientProvider {
                 sessionManager = EncryptedSessionManager(appContext)
             }
             install(Postgrest)
+            // Live delivery tracking only (Phase 2): the tracking screen's
+            // postgres_changes subscription on public.delivery_locations.
+            install(Realtime)
             // Proof-of-delivery photo upload only (the `pod` bucket) -- no
             // other feature in this app touches Storage.
             install(Storage)

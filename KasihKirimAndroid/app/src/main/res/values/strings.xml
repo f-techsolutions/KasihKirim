@@ -499,6 +499,21 @@
     <string name="err_kongsi_untung_disabled">Ciri Kongsi &amp; Untung belum dibuka lagi.</string>
     <string name="err_invalid_subject_type">Jenis kandungan untuk dikongsi tidak sah.</string>
     <string name="err_seller_not_found">Penjual tidak dijumpai atau belum diluluskan.</string>
+    <string name="err_delivery_not_in_transit">Lokasi hanya boleh dikongsi semasa penghantaran dalam perjalanan.</string>
+    <string name="err_invalid_coordinates">Lokasi peranti tidak sah.</string>
 
     <string name="profile_badges_title">Lencana</string>
+
+    <string name="deliveries_share_location">Kongsi Lokasi Saya</string>
+    <string name="deliveries_stop_sharing_location">Berhenti Kongsi Lokasi</string>
+    <string name="deliveries_location_permission_denied">Kebenaran lokasi diperlukan untuk kongsi lokasi.</string>
+    <string name="deliveries_track">Jejak Penghantaran</string>
+    <string name="tracking_title">Jejak Penghantaran</string>
+    <string name="tracking_origin">Dari: %1$s</string>
+    <string name="tracking_destination">Ke: %1$s</string>
+    <string name="tracking_carrier_position">Kedudukan Carrier</string>
+    <string name="tracking_no_location_yet">Carrier belum kongsi lokasi lagi.</string>
+    <string name="tracking_updated_at">Dikemaskini: %1$s</string>
+    <string name="tracking_speed">Kelajuan: %1$.0f km/j</string>
+    <string name="tracking_open_maps">Buka dalam Peta</string>
 </resources>

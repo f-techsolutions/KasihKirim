@@ -20,6 +20,7 @@ import com.ftechsolutions.kasihkirim.domain.repository.BadgeRepository
 import com.ftechsolutions.kasihkirim.domain.repository.BuyRepository
 import com.ftechsolutions.kasihkirim.domain.repository.CarrierRepository
 import com.ftechsolutions.kasihkirim.domain.repository.DeliveryRepository
+import com.ftechsolutions.kasihkirim.domain.repository.DeliveryTrackingRepository
 import com.ftechsolutions.kasihkirim.domain.repository.EarningsRepository
 import com.ftechsolutions.kasihkirim.domain.repository.KirimRepository
 import com.ftechsolutions.kasihkirim.domain.repository.MuatanJualRepository
@@ -46,6 +47,7 @@ fun App(
     vehicleRepository: VehicleRepository,
     tripRepository: TripRepository,
     deliveryRepository: DeliveryRepository,
+    deliveryTrackingRepository: DeliveryTrackingRepository,
     muatanJualRepository: MuatanJualRepository,
     sellerRepository: SellerRepository,
     carrierRepository: CarrierRepository,
@@ -66,9 +68,9 @@ fun App(
             AuthState.Unauthenticated -> AuthScreen(vm)
             is AuthState.Authenticated -> AppNavHost(
                 s.user, vm, addressRepository, kirimRepository, earningsRepository,
-                vehicleRepository, tripRepository, deliveryRepository, muatanJualRepository,
-                sellerRepository, carrierRepository, buyRepository, badgeRepository, adminRepository,
-                promotionRepository,
+                vehicleRepository, tripRepository, deliveryRepository, deliveryTrackingRepository,
+                muatanJualRepository, sellerRepository, carrierRepository, buyRepository, badgeRepository,
+                adminRepository, promotionRepository,
             )
             is AuthState.Error -> Centered {
                 Text(stringResource(s.error.messageRes()),

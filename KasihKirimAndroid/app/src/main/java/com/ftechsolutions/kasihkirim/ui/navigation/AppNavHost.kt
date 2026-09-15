@@ -8,10 +8,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.ftechsolutions.kasihkirim.domain.model.AuthUser
 import com.ftechsolutions.kasihkirim.domain.repository.AddressRepository
 import com.ftechsolutions.kasihkirim.domain.repository.AdminRepository
@@ -19,6 +21,7 @@ import com.ftechsolutions.kasihkirim.domain.repository.BadgeRepository
 import com.ftechsolutions.kasihkirim.domain.repository.BuyRepository
 import com.ftechsolutions.kasihkirim.domain.repository.CarrierRepository
 import com.ftechsolutions.kasihkirim.domain.repository.DeliveryRepository
+import com.ftechsolutions.kasihkirim.domain.repository.DeliveryTrackingRepository
 import com.ftechsolutions.kasihkirim.domain.repository.EarningsRepository
 import com.ftechsolutions.kasihkirim.domain.repository.KirimRepository
 import com.ftechsolutions.kasihkirim.domain.repository.MuatanJualRepository
@@ -41,6 +44,8 @@ import com.ftechsolutions.kasihkirim.ui.carrier.CarrierApplicationScreen
 import com.ftechsolutions.kasihkirim.ui.carrier.CarrierApplicationViewModel
 import com.ftechsolutions.kasihkirim.ui.deliveries.DeliveriesScreen
 import com.ftechsolutions.kasihkirim.ui.deliveries.DeliveriesViewModel
+import com.ftechsolutions.kasihkirim.ui.deliveries.DeliveryTrackingScreen
+import com.ftechsolutions.kasihkirim.ui.deliveries.DeliveryTrackingViewModel
 import com.ftechsolutions.kasihkirim.ui.earnings.EarningsScreen
 import com.ftechsolutions.kasihkirim.ui.earnings.EarningsViewModel
 import com.ftechsolutions.kasihkirim.ui.home.HomeScreen
@@ -67,6 +72,7 @@ private const val ADDRESSES_ROUTE = "addresses"
 private const val SERVICEABILITY_ROUTE = "serviceability"
 private const val VEHICLES_ROUTE = "vehicles"
 private const val DELIVERIES_ROUTE = "deliveries"
+private const val DELIVERY_TRACKING_ROUTE = "delivery_tracking"
 private const val BUY_ROUTE = "buy"
 private const val BUY_ORDERS_ROUTE = "buy_orders"
 private const val CARRIER_APPLICATION_ROUTE = "carrier_application"
@@ -82,6 +88,7 @@ fun AppNavHost(
     vehicleRepository: VehicleRepository,
     tripRepository: TripRepository,
     deliveryRepository: DeliveryRepository,
+    deliveryTrackingRepository: DeliveryTrackingRepository,
     muatanJualRepository: MuatanJualRepository,
     sellerRepository: SellerRepository,
     carrierRepository: CarrierRepository,
@@ -194,14 +201,29 @@ fun AppNavHost(
                 VehiclesScreen(vm, onBack = { nav.popBackStack() })
             }
             composable(DELIVERIES_ROUTE) {
-                val vm: DeliveriesViewModel = viewModel(factory = DeliveriesViewModel.Factory(deliveryRepository))
+                val vm: DeliveriesViewModel = viewModel(
+                    factory = DeliveriesViewModel.Factory(deliveryRepository, deliveryTrackingRepository),
+                )
                 DeliveriesScreen(
                     vm,
                     currentUserId = user.id,
                     myCarrierId = user.carrierId,
                     roles = user.roles,
                     onBack = { nav.popBackStack() },
+                    onOpenTracking = { deliveryId -> nav.navigate("$DELIVERY_TRACKING_ROUTE/$deliveryId") },
                 )
+            }
+            composable(
+                "$DELIVERY_TRACKING_ROUTE/{deliveryId}",
+                arguments = listOf(navArgument("deliveryId") { type = NavType.StringType }),
+            ) { backStackEntry ->
+                val deliveryId = backStackEntry.arguments?.getString("deliveryId")
+                if (deliveryId != null) {
+                    val vm: DeliveryTrackingViewModel = viewModel(
+                        factory = DeliveryTrackingViewModel.Factory(deliveryTrackingRepository, deliveryId),
+                    )
+                    DeliveryTrackingScreen(vm, onBack = { nav.popBackStack() })
+                }
             }
             composable(Destination.BOARD.route) {
                 val vm: BoardViewModel = viewModel(
