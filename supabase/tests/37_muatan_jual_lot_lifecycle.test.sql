@@ -160,7 +160,11 @@ SELECT ok(
   'the carrier''s own capital is posted to the ledger at lot creation (ADDENDUM-COMMERCE.md §5.4)');
 
 -- ── the float-limit exposure check (ck_carrier_exposure, 0006) ──────────────
-UPDATE public.carriers SET cod_held_sen = 40000 WHERE id = tests.uid('_carrier');
+-- 30000 clears ck_carrier_exposure on its own against the first lot's
+-- inventory_at_risk_sen (30000+0+15000=45000 <= float_limit_sen 50000), but
+-- adding a second 15000 lot on top (60000) is what rpc_create_lot itself
+-- must refuse.
+UPDATE public.carriers SET cod_held_sen = 30000 WHERE id = tests.uid('_carrier');
 SELECT tests.authenticate_as('rahman');
 SELECT throws_ok(
   $$SELECT public.rpc_create_lot('Another lot', 'kraf',

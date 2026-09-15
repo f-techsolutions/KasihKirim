@@ -116,8 +116,8 @@ BEGIN
   SELECT * INTO d FROM public.deliveries WHERE id = p_delivery;
   IF NOT FOUND THEN RAISE EXCEPTION 'DELIVERY_NOT_FOUND'; END IF;
 
-  IF d.carrier_id <> authz.my_carrier_id()
-     AND d.requester_id <> (SELECT auth.uid())
+  IF d.carrier_id IS DISTINCT FROM authz.my_carrier_id()
+     AND d.requester_id IS DISTINCT FROM (SELECT auth.uid())
      AND NOT authz.is_admin() THEN
     RAISE EXCEPTION 'STATE_ACTOR_NOT_PERMITTED';
   END IF;
