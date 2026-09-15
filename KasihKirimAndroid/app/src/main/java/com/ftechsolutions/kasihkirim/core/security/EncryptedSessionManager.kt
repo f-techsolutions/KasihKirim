@@ -5,6 +5,7 @@ import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
 import io.github.jan.supabase.auth.SessionManager
+import io.github.jan.supabase.auth.exception.NoSessionFoundException
 import io.github.jan.supabase.auth.user.UserSession
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -50,10 +51,10 @@ class EncryptedSessionManager(context: Context) : SessionManager {
             .apply()
     }
 
-    override suspend fun loadSession(): UserSession? = withContext(Dispatchers.IO) {
+    override suspend fun loadSession(): UserSession = withContext(Dispatchers.IO) {
         val ivB64 = prefs.getString(KEY_IV, null)
         val ciphertextB64 = prefs.getString(KEY_CIPHERTEXT, null)
-        if (ivB64 == null || ciphertextB64 == null) return@withContext null
+        if (ivB64 == null || ciphertextB64 == null) throw NoSessionFoundException()
         try {
             val cipher = Cipher.getInstance(TRANSFORMATION)
             cipher.init(
@@ -63,12 +64,14 @@ class EncryptedSessionManager(context: Context) : SessionManager {
             )
             val plaintext = cipher.doFinal(Base64.decode(ciphertextB64, Base64.NO_WRAP))
             json.decodeFromString(UserSession.serializer(), plaintext.decodeToString())
+        } catch (e: NoSessionFoundException) {
+            throw e
         } catch (e: Exception) {
             // A corrupted or undecryptable session (e.g. the Keystore key
             // was lost, as can happen across a device restore) should sign
             // the user out, never crash the app on launch.
             deleteSession()
-            null
+            throw NoSessionFoundException()
         }
     }
 
