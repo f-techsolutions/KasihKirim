@@ -132,14 +132,16 @@ SELECT is(
   5000::bigint, 'the retry did not post a second time -- cod_held_sen is unchanged');
 
 -- ── float-limit exposure still guards this path ─────────────────────────
-UPDATE public.carriers SET cod_held_sen = 40000 WHERE id = tests.uid('_carrier');
+-- 37000 clears ck_carrier_exposure on its own against the first
+-- settlement's own inventory_at_risk_sen (37000+0+12000=49000 <=
+-- float_limit_sen 50000), but the second settlement below must still
+-- refuse: 37000 + GREATEST(0,12000-4500) + 7500 = 52000 > 50000.
+UPDATE public.carriers SET cod_held_sen = 37000 WHERE id = tests.uid('_carrier');
 DO $$
 DECLARE v_purchase2 JSONB;
 BEGIN
   PERFORM tests.authenticate_as('aisyah');
-  -- 3kg more: goods_sen 7500, would raise cod_held_sen to 47500 and
-  -- (after relieving 4500 of inventory_at_risk_sen) exposure to 55000,
-  -- over the fixture carrier's own 50000 float_limit_sen.
+  -- 3kg more: goods_sen 7500, cost_of_goods_sen 4500.
   v_purchase2 := public.rpc_buy_from_lot(tests.uid('_lot39'), 3);
   PERFORM tests.clear_auth();
   INSERT INTO tests.handles(handle,user_id)
