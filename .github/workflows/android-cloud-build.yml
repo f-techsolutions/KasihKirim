@@ -52,7 +52,7 @@ jobs:
       # release and the real platform/build-tools packages), so drop
       # 'tools' from the request rather than accept the action's default.
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
         with:
           packages: 'platform-tools'
 

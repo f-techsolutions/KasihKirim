@@ -32,7 +32,7 @@ jobs:
           cache: gradle
 
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
 
       # See android-cloud-build.yml for why this step exists: the bundled
       # cmdline-tools (16.0) can't see platforms;android-37.
