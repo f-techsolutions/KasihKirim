@@ -91,7 +91,11 @@ SELECT is(
 SELECT tests.clear_auth();
 UPDATE public.deal_campaigns SET starts_at = now() - interval '1 hour' WHERE id = tests.uid('_deal38');
 
-UPDATE public.deal_campaigns SET ends_at = now() - interval '1 hour' WHERE id = tests.uid('_deal38');
+-- now() is frozen for the whole transaction, so ends_at must use a
+-- different offset than starts_at's own "now() - interval '1 hour'" just
+-- above -- otherwise they'd land on the exact same instant and trip
+-- deal_campaigns' own "ends_at > starts_at" check.
+UPDATE public.deal_campaigns SET ends_at = now() - interval '30 minutes' WHERE id = tests.uid('_deal38');
 SELECT tests.authenticate_as('aisyah');
 SELECT is(
   (SELECT count(*)::int FROM public.v_deal_campaigns WHERE id = tests.uid('_deal38')),
