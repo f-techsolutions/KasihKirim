@@ -8,10 +8,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.filled.Redeem
 import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -40,6 +42,8 @@ fun ProfileScreen(
     onOpenServiceability: () -> Unit,
     onOpenSales: () -> Unit,
     onOpenCarrierApplication: () -> Unit,
+    onOpenPromotions: () -> Unit,
+    onOpenCarrierLots: () -> Unit,
 ) {
     val profileState by profileVm.state.collectAsState()
 
@@ -94,6 +98,29 @@ fun ProfileScreen(
                     onClick = onOpenCarrierApplication,
                 )
             }
+            // Muatan Jual (Phase 3, 0047): a carrier selling their own
+            // carried stock -- FR-440's "carrier applies for the seller
+            // role" is carrier-only, unlike Kongsi & Untung below (any
+            // profile). ref.compliance_state stays NOT_READY regardless;
+            // this row and CarrierLotsScreen exist so onboarding and
+            // listing prep can happen ahead of go-live.
+            if (UserRole.CARRIER in user.roles) {
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                ActionRow(
+                    icon = Icons.Filled.Inventory2,
+                    label = stringResource(R.string.profile_muatan_jual_lots),
+                    onClick = onOpenCarrierLots,
+                )
+            }
+            // Kongsi & Untung (0045): a promoter is any profile, not a role
+            // held or applied for -- unlike Sales/Carrier above, this row
+            // never disappears or changes label.
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            ActionRow(
+                icon = Icons.Filled.Redeem,
+                label = stringResource(R.string.profile_kongsi_untung),
+                onClick = onOpenPromotions,
+            )
         }
 
         Spacer(Modifier.weight(1f))

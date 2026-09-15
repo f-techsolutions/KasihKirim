@@ -3,13 +3,17 @@ package com.ftechsolutions.kasihkirim.ui.deliveries
 import com.ftechsolutions.kasihkirim.core.result.AppError
 import com.ftechsolutions.kasihkirim.core.result.AppResult
 import com.ftechsolutions.kasihkirim.domain.model.Delivery
+import com.ftechsolutions.kasihkirim.domain.model.DeliveryTracking
 import com.ftechsolutions.kasihkirim.domain.model.DisputeCategory
 import com.ftechsolutions.kasihkirim.domain.model.KirimStatus
 import com.ftechsolutions.kasihkirim.domain.model.KirimType
 import com.ftechsolutions.kasihkirim.domain.model.Sen
 import com.ftechsolutions.kasihkirim.domain.repository.DeliveryRepository
+import com.ftechsolutions.kasihkirim.domain.repository.DeliveryTrackingRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.*
 import org.junit.After
 import org.junit.Assert.*
@@ -92,16 +96,46 @@ private class FakeDeliveryRepository(
     }
 }
 
+private class FakeDeliveryTrackingRepository(
+    var updateResult: AppResult<Unit> = AppResult.Success(Unit),
+) : DeliveryTrackingRepository {
+    var updateCalls = 0
+    var lastDeliveryId: String? = null
+    var lastLat: Double? = null
+    var lastLng: Double? = null
+
+    override suspend fun updateMyLocation(
+        deliveryId: String,
+        lat: Double,
+        lng: Double,
+        headingDeg: Double?,
+        speedKmh: Double?,
+        accuracyM: Double?,
+    ): AppResult<Unit> {
+        updateCalls++
+        lastDeliveryId = deliveryId
+        lastLat = lat
+        lastLng = lng
+        return updateResult
+    }
+
+    override suspend fun getTracking(deliveryId: String): AppResult<DeliveryTracking> =
+        AppResult.Failure(AppError.Unexpected)
+
+    override fun observeLocationChanges(deliveryId: String): Flow<Unit> = emptyFlow()
+}
+
 @OptIn(ExperimentalCoroutinesApi::class)
 class DeliveriesViewModelTest {
 
     private val dispatcher = StandardTestDispatcher()
+    private val trackingRepo = FakeDeliveryTrackingRepository()
 
     @Before fun setUp() = Dispatchers.setMain(dispatcher)
     @After fun tearDown() = Dispatchers.resetMain()
 
     @Test fun `loads the caller's own deliveries on construction`() = runTest(dispatcher) {
-        val vm = DeliveriesViewModel(FakeDeliveryRepository())
+        val vm = DeliveriesViewModel(FakeDeliveryRepository(), trackingRepo)
         advanceUntilIdle()
 
         assertEquals(1, vm.state.value.deliveries.size)
@@ -110,7 +144,7 @@ class DeliveriesViewModelTest {
 
     @Test fun `transition sends the delivery id and event, then reloads`() = runTest(dispatcher) {
         val repo = FakeDeliveryRepository()
-        val vm = DeliveriesViewModel(repo)
+        val vm = DeliveriesViewModel(repo, trackingRepo)
         advanceUntilIdle()
 
         vm.transition("d1", "GO_TO_PICKUP"); advanceUntilIdle()
@@ -123,7 +157,7 @@ class DeliveriesViewModelTest {
 
     @Test fun `a failed transition surfaces the error and clears transitioningId`() = runTest(dispatcher) {
         val repo = FakeDeliveryRepository(transitionResult = AppResult.Failure(AppError.Server("STATE_INVALID_TRANSITION")))
-        val vm = DeliveriesViewModel(repo)
+        val vm = DeliveriesViewModel(repo, trackingRepo)
         advanceUntilIdle()
 
         vm.transition("d1", "GO_TO_PICKUP"); advanceUntilIdle()
@@ -133,7 +167,7 @@ class DeliveriesViewModelTest {
     }
 
     @Test fun `requestProof opens the pending-proof step for the right delivery, leg and event`() = runTest(dispatcher) {
-        val vm = DeliveriesViewModel(FakeDeliveryRepository())
+        val vm = DeliveriesViewModel(FakeDeliveryRepository(), trackingRepo)
         advanceUntilIdle()
 
         vm.requestProof("d1", "pickup", "CONFIRM_PICKUP")
@@ -146,7 +180,7 @@ class DeliveriesViewModelTest {
 
     @Test fun `cancelProof closes the pending-proof step without calling the backend`() = runTest(dispatcher) {
         val repo = FakeDeliveryRepository()
-        val vm = DeliveriesViewModel(repo)
+        val vm = DeliveriesViewModel(repo, trackingRepo)
         advanceUntilIdle()
 
         vm.requestProof("d1", "pickup", "CONFIRM_PICKUP")
@@ -158,7 +192,7 @@ class DeliveriesViewModelTest {
 
     @Test fun `submitProof uploads the photo for the pending leg and event, then reloads`() = runTest(dispatcher) {
         val repo = FakeDeliveryRepository()
-        val vm = DeliveriesViewModel(repo)
+        val vm = DeliveriesViewModel(repo, trackingRepo)
         advanceUntilIdle()
 
         vm.requestProof("d1", "pickup", "CONFIRM_PICKUP")
@@ -175,7 +209,7 @@ class DeliveriesViewModelTest {
 
     @Test fun `submitProof with no pending proof is a no-op`() = runTest(dispatcher) {
         val repo = FakeDeliveryRepository()
-        val vm = DeliveriesViewModel(repo)
+        val vm = DeliveriesViewModel(repo, trackingRepo)
         advanceUntilIdle()
 
         vm.submitProof(byteArrayOf(1)); advanceUntilIdle()
@@ -185,7 +219,7 @@ class DeliveriesViewModelTest {
 
     @Test fun `a failed proof submission surfaces the error and clears pendingProof`() = runTest(dispatcher) {
         val repo = FakeDeliveryRepository(proofResult = AppResult.Failure(AppError.Server("PROOF_REQUIRED")))
-        val vm = DeliveriesViewModel(repo)
+        val vm = DeliveriesViewModel(repo, trackingRepo)
         advanceUntilIdle()
 
         vm.requestProof("d1", "pickup", "CONFIRM_PICKUP")
@@ -197,7 +231,7 @@ class DeliveriesViewModelTest {
     }
 
     @Test fun `requestRecordPurchase opens the dialog for the right delivery`() = runTest(dispatcher) {
-        val vm = DeliveriesViewModel(FakeDeliveryRepository())
+        val vm = DeliveriesViewModel(FakeDeliveryRepository(), trackingRepo)
         advanceUntilIdle()
 
         vm.requestRecordPurchase("d1")
@@ -207,7 +241,7 @@ class DeliveriesViewModelTest {
 
     @Test fun `cancelRecordPurchase closes the dialog without calling the backend`() = runTest(dispatcher) {
         val repo = FakeDeliveryRepository()
-        val vm = DeliveriesViewModel(repo)
+        val vm = DeliveriesViewModel(repo, trackingRepo)
         advanceUntilIdle()
 
         vm.requestRecordPurchase("d1")
@@ -219,7 +253,7 @@ class DeliveriesViewModelTest {
 
     @Test fun `recordPurchase sends the delivery id and amount, then reloads`() = runTest(dispatcher) {
         val repo = FakeDeliveryRepository()
-        val vm = DeliveriesViewModel(repo)
+        val vm = DeliveriesViewModel(repo, trackingRepo)
         advanceUntilIdle()
 
         vm.requestRecordPurchase("d1")
@@ -234,7 +268,7 @@ class DeliveriesViewModelTest {
 
     @Test fun `recordPurchase with no delivery pending is a no-op`() = runTest(dispatcher) {
         val repo = FakeDeliveryRepository()
-        val vm = DeliveriesViewModel(repo)
+        val vm = DeliveriesViewModel(repo, trackingRepo)
         advanceUntilIdle()
 
         vm.recordPurchase(3200L); advanceUntilIdle()
@@ -246,7 +280,7 @@ class DeliveriesViewModelTest {
         val repo = FakeDeliveryRepository(
             recordPurchaseResult = AppResult.Failure(AppError.Server("BUDGET_EXCEEDED_NEEDS_VARIANCE")),
         )
-        val vm = DeliveriesViewModel(repo)
+        val vm = DeliveriesViewModel(repo, trackingRepo)
         advanceUntilIdle()
 
         vm.requestRecordPurchase("d1")
@@ -258,7 +292,7 @@ class DeliveriesViewModelTest {
     }
 
     @Test fun `requestOpenDispute opens the dialog for the right delivery and resets its fields`() = runTest(dispatcher) {
-        val vm = DeliveriesViewModel(FakeDeliveryRepository())
+        val vm = DeliveriesViewModel(FakeDeliveryRepository(), trackingRepo)
         advanceUntilIdle()
 
         vm.onDisputeCategorySelected(DisputeCategory.DAMAGED)
@@ -272,7 +306,7 @@ class DeliveriesViewModelTest {
 
     @Test fun `cancelOpenDispute closes the dialog without calling the backend`() = runTest(dispatcher) {
         val repo = FakeDeliveryRepository()
-        val vm = DeliveriesViewModel(repo)
+        val vm = DeliveriesViewModel(repo, trackingRepo)
         advanceUntilIdle()
 
         vm.requestOpenDispute("d1")
@@ -284,7 +318,7 @@ class DeliveriesViewModelTest {
 
     @Test fun `submitDispute sends the delivery id, category and description, then reloads`() = runTest(dispatcher) {
         val repo = FakeDeliveryRepository()
-        val vm = DeliveriesViewModel(repo)
+        val vm = DeliveriesViewModel(repo, trackingRepo)
         advanceUntilIdle()
 
         vm.requestOpenDispute("d1")
@@ -302,7 +336,7 @@ class DeliveriesViewModelTest {
 
     @Test fun `submitDispute with no delivery pending is a no-op`() = runTest(dispatcher) {
         val repo = FakeDeliveryRepository()
-        val vm = DeliveriesViewModel(repo)
+        val vm = DeliveriesViewModel(repo, trackingRepo)
         advanceUntilIdle()
 
         vm.submitDispute(); advanceUntilIdle()
@@ -314,7 +348,7 @@ class DeliveriesViewModelTest {
         val repo = FakeDeliveryRepository(
             openDisputeResult = AppResult.Failure(AppError.Server("DISPUTE_ALREADY_OPEN")),
         )
-        val vm = DeliveriesViewModel(repo)
+        val vm = DeliveriesViewModel(repo, trackingRepo)
         advanceUntilIdle()
 
         vm.requestOpenDispute("d1")
@@ -329,6 +363,7 @@ class DeliveriesViewModelTest {
     @Test fun `reviewed delivery ids load alongside the delivery list`() = runTest(dispatcher) {
         val vm = DeliveriesViewModel(
             FakeDeliveryRepository(reviewedDeliveryIds = AppResult.Success(setOf("d1"))),
+            trackingRepo,
         )
         advanceUntilIdle()
 
@@ -336,7 +371,7 @@ class DeliveriesViewModelTest {
     }
 
     @Test fun `requestRate opens the dialog and resets its fields to the default`() = runTest(dispatcher) {
-        val vm = DeliveriesViewModel(FakeDeliveryRepository())
+        val vm = DeliveriesViewModel(FakeDeliveryRepository(), trackingRepo)
         advanceUntilIdle()
 
         vm.onRatingValueChange(2)
@@ -350,7 +385,7 @@ class DeliveriesViewModelTest {
 
     @Test fun `cancelRate closes the dialog without calling the backend`() = runTest(dispatcher) {
         val repo = FakeDeliveryRepository()
-        val vm = DeliveriesViewModel(repo)
+        val vm = DeliveriesViewModel(repo, trackingRepo)
         advanceUntilIdle()
 
         vm.requestRate("d1")
@@ -362,7 +397,7 @@ class DeliveriesViewModelTest {
 
     @Test fun `submitRating sends the delivery id, star value and trimmed comment, then reloads`() = runTest(dispatcher) {
         val repo = FakeDeliveryRepository()
-        val vm = DeliveriesViewModel(repo)
+        val vm = DeliveriesViewModel(repo, trackingRepo)
         advanceUntilIdle()
 
         vm.requestRate("d1")
@@ -377,7 +412,7 @@ class DeliveriesViewModelTest {
 
     @Test fun `submitRating with an empty comment sends null, not a blank string`() = runTest(dispatcher) {
         val repo = FakeDeliveryRepository()
-        val vm = DeliveriesViewModel(repo)
+        val vm = DeliveriesViewModel(repo, trackingRepo)
         advanceUntilIdle()
 
         vm.requestRate("d1")
@@ -388,7 +423,7 @@ class DeliveriesViewModelTest {
 
     @Test fun `submitRating with no delivery pending is a no-op`() = runTest(dispatcher) {
         val repo = FakeDeliveryRepository()
-        val vm = DeliveriesViewModel(repo)
+        val vm = DeliveriesViewModel(repo, trackingRepo)
         advanceUntilIdle()
 
         vm.submitRating(); advanceUntilIdle()
@@ -400,7 +435,7 @@ class DeliveriesViewModelTest {
         val repo = FakeDeliveryRepository(
             submitReviewResult = AppResult.Failure(AppError.Server("EDIT_WINDOW_CLOSED")),
         )
-        val vm = DeliveriesViewModel(repo)
+        val vm = DeliveriesViewModel(repo, trackingRepo)
         advanceUntilIdle()
 
         vm.requestRate("d1")
@@ -409,5 +444,68 @@ class DeliveriesViewModelTest {
         assertNull(vm.state.value.rateDeliveryId)
         assertNull(vm.state.value.transitioningId)
         assertEquals(AppError.Server("EDIT_WINDOW_CLOSED"), vm.state.value.error)
+    }
+
+    @Test fun `startSharingLocation sets sharingLocationDeliveryId`() = runTest(dispatcher) {
+        val vm = DeliveriesViewModel(FakeDeliveryRepository(), trackingRepo)
+        advanceUntilIdle()
+
+        vm.startSharingLocation("d1")
+
+        assertEquals("d1", vm.state.value.sharingLocationDeliveryId)
+    }
+
+    @Test fun `stopSharingLocation clears sharingLocationDeliveryId`() = runTest(dispatcher) {
+        val vm = DeliveriesViewModel(FakeDeliveryRepository(), trackingRepo)
+        advanceUntilIdle()
+
+        vm.startSharingLocation("d1")
+        vm.stopSharingLocation()
+
+        assertNull(vm.state.value.sharingLocationDeliveryId)
+    }
+
+    @Test fun `postLocation forwards coordinates while sharing stays on`() = runTest(dispatcher) {
+        val vm = DeliveriesViewModel(FakeDeliveryRepository(), trackingRepo)
+        advanceUntilIdle()
+
+        vm.startSharingLocation("d1")
+        vm.postLocation("d1", 5.9749, 116.0724, headingDeg = null, speedKmh = null, accuracyM = null)
+        advanceUntilIdle()
+
+        assertEquals(1, trackingRepo.updateCalls)
+        assertEquals("d1", trackingRepo.lastDeliveryId)
+        assertEquals(5.9749, trackingRepo.lastLat)
+        assertEquals("d1", vm.state.value.sharingLocationDeliveryId)
+    }
+
+    @Test fun `postLocation turns sharing off on DELIVERY_NOT_IN_TRANSIT`() = runTest(dispatcher) {
+        val failingTrackingRepo = FakeDeliveryTrackingRepository(
+            updateResult = AppResult.Failure(AppError.Server("DELIVERY_NOT_IN_TRANSIT")),
+        )
+        val vm = DeliveriesViewModel(FakeDeliveryRepository(), failingTrackingRepo)
+        advanceUntilIdle()
+
+        vm.startSharingLocation("d1")
+        vm.postLocation("d1", 5.9749, 116.0724, headingDeg = null, speedKmh = null, accuracyM = null)
+        advanceUntilIdle()
+
+        assertNull(vm.state.value.sharingLocationDeliveryId)
+        assertEquals(AppError.Server("DELIVERY_NOT_IN_TRANSIT"), vm.state.value.error)
+    }
+
+    @Test fun `postLocation keeps sharing on for an unrelated error`() = runTest(dispatcher) {
+        val failingTrackingRepo = FakeDeliveryTrackingRepository(
+            updateResult = AppResult.Failure(AppError.Network),
+        )
+        val vm = DeliveriesViewModel(FakeDeliveryRepository(), failingTrackingRepo)
+        advanceUntilIdle()
+
+        vm.startSharingLocation("d1")
+        vm.postLocation("d1", 5.9749, 116.0724, headingDeg = null, speedKmh = null, accuracyM = null)
+        advanceUntilIdle()
+
+        assertEquals("d1", vm.state.value.sharingLocationDeliveryId)
+        assertEquals(AppError.Network, vm.state.value.error)
     }
 }

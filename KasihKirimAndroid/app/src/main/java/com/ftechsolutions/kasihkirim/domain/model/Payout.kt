@@ -1,12 +1,14 @@
 package com.ftechsolutions.kasihkirim.domain.model
 
 /** Which ledger balance a withdrawal draws from -- rpc_request_withdrawal's
- *  own p_payee_type (0042_carrier_seller_payouts.sql). 'agent' exists in
+ *  own p_payee_type (0042_carrier_seller_payouts.sql, extended for
+ *  'promoter' by 0045_kongsi_untung_promotions.sql). 'agent' exists in
  *  internal.payouts' own CHECK but has no client-facing app, so it is not
  *  modelled here. */
 enum class PayeeType(val wire: String) {
     CARRIER("carrier"),
     SELLER("seller"),
+    PROMOTER("promoter"),
 }
 
 /** Mirrors ref.payout_status exactly (0001_schema.sql). BATCHED/PROCESSING

@@ -24,9 +24,11 @@ import com.ftechsolutions.kasihkirim.domain.model.Serviceability
 import com.ftechsolutions.kasihkirim.domain.model.Trip
 import com.ftechsolutions.kasihkirim.domain.model.TripStatus
 import com.ftechsolutions.kasihkirim.domain.model.UserRole
+import com.ftechsolutions.kasihkirim.domain.model.DeliveryTracking
 import com.ftechsolutions.kasihkirim.domain.repository.AddressRepository
 import com.ftechsolutions.kasihkirim.domain.repository.AuthRepository
 import com.ftechsolutions.kasihkirim.domain.repository.DeliveryRepository
+import com.ftechsolutions.kasihkirim.domain.repository.DeliveryTrackingRepository
 import com.ftechsolutions.kasihkirim.domain.repository.KirimRepository
 import com.ftechsolutions.kasihkirim.domain.repository.MuatanJualRepository
 import com.ftechsolutions.kasihkirim.domain.repository.TripRepository
@@ -41,8 +43,10 @@ import com.ftechsolutions.kasihkirim.ui.muatanjual.MuatanJualViewModel
 import com.ftechsolutions.kasihkirim.ui.orders.OrdersScreen
 import com.ftechsolutions.kasihkirim.ui.orders.OrdersViewModel
 import com.ftechsolutions.kasihkirim.ui.theme.KasihKirimTheme
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.emptyFlow
 import org.junit.Rule
 import org.junit.Test
 import java.io.File
@@ -157,6 +161,21 @@ private class FakeDeliveryRepository : DeliveryRepository {
         AppResult.Success(KirimStatus.AWAITING_PICKUP)
     override suspend fun openDispute(deliveryId: String, category: String, description: String) =
         AppResult.Success(Unit)
+    override suspend fun listMyReviewedDeliveryIds() = AppResult.Success(emptySet<String>())
+    override suspend fun submitReview(deliveryId: String, rating: Int, comment: String?) = AppResult.Success(Unit)
+}
+
+private class FakeDeliveryTrackingRepository : DeliveryTrackingRepository {
+    override suspend fun updateMyLocation(
+        deliveryId: String,
+        lat: Double,
+        lng: Double,
+        headingDeg: Double?,
+        speedKmh: Double?,
+        accuracyM: Double?,
+    ) = AppResult.Success(Unit)
+    override suspend fun getTracking(deliveryId: String) = AppResult.Failure<DeliveryTracking>(AppError.Unexpected)
+    override fun observeLocationChanges(deliveryId: String): Flow<Unit> = emptyFlow()
 }
 
 private class FakeMuatanJualRepository : MuatanJualRepository {
@@ -225,11 +244,12 @@ class ScreenshotDemoTest {
         composeRule.setContent {
             KasihKirimTheme {
                 DeliveriesScreen(
-                    DeliveriesViewModel(FakeDeliveryRepository()),
+                    DeliveriesViewModel(FakeDeliveryRepository(), FakeDeliveryTrackingRepository()),
                     currentUserId = DEMO_CARRIER_ID,
                     myCarrierId = DEMO_CARRIER_ID,
                     roles = setOf(UserRole.CARRIER),
                     onBack = {},
+                    onOpenTracking = {},
                 )
             }
         }

@@ -90,6 +90,8 @@ private class FakeSellerRepository(
     override suspend fun applySeller(draft: NewSeller): AppResult<Seller> =
         applyResult ?: AppResult.Success(Seller(id = "s1", businessName = draft.businessName, status = SellerStatus.NOT_STARTED, communityId = draft.communityId, ssmRegNo = draft.ssmRegNo))
 
+    override suspend fun acceptMuatanJualTerms(): AppResult<Unit> = AppResult.Success(Unit)
+
     override suspend fun listMyProducts(sellerId: String): AppResult<List<Product>> = AppResult.Success(products)
 
     override suspend fun createProduct(draft: NewProduct): AppResult<Product> =

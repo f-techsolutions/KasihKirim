@@ -8,6 +8,7 @@ import com.ftechsolutions.kasihkirim.core.result.AppResult
 import com.ftechsolutions.kasihkirim.domain.model.Delivery
 import com.ftechsolutions.kasihkirim.domain.model.DisputeCategory
 import com.ftechsolutions.kasihkirim.domain.repository.DeliveryRepository
+import com.ftechsolutions.kasihkirim.domain.repository.DeliveryTrackingRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -42,11 +43,19 @@ data class DeliveriesUiState(
     val rateDeliveryId: String? = null,
     val ratingValue: Int = 5,
     val ratingComment: String = "",
+    /** Non-null while the carrier is broadcasting their position for this
+     *  delivery (rpc_update_delivery_location, 0046) -- the screen owns the
+     *  actual FusedLocationProviderClient updates and calls [postLocation]
+     *  as they arrive; this is just which delivery, if any, they belong to. */
+    val sharingLocationDeliveryId: String? = null,
 )
 
 data class PendingProof(val deliveryId: String, val leg: String, val event: String)
 
-class DeliveriesViewModel(private val repo: DeliveryRepository) : ViewModel() {
+class DeliveriesViewModel(
+    private val repo: DeliveryRepository,
+    private val trackingRepo: DeliveryTrackingRepository,
+) : ViewModel() {
 
     private val _state = MutableStateFlow(DeliveriesUiState())
     val state: StateFlow<DeliveriesUiState> = _state.asStateFlow()
@@ -206,9 +215,50 @@ class DeliveriesViewModel(private val repo: DeliveryRepository) : ViewModel() {
         }
     }
 
+    /** The screen's permission/FusedLocationProviderClient plumbing decided
+     *  to start sharing for [deliveryId] -- this only flips the state the
+     *  screen's own effect watches to actually request location updates. */
+    fun startSharingLocation(deliveryId: String) {
+        _state.update { it.copy(sharingLocationDeliveryId = deliveryId, error = null) }
+    }
+
+    fun stopSharingLocation() {
+        _state.update { it.copy(sharingLocationDeliveryId = null) }
+    }
+
+    /** A fresh device location arrived while sharing is on -- forward it.
+     *  DELIVERY_NOT_IN_TRANSIT means the delivery left the trackable window
+     *  (e.g. it was just delivered) while sharing was still on, so sharing
+     *  is turned off rather than retrying forever against a write the
+     *  server will keep refusing. */
+    fun postLocation(
+        deliveryId: String,
+        lat: Double,
+        lng: Double,
+        headingDeg: Double?,
+        speedKmh: Double?,
+        accuracyM: Double?,
+    ) {
+        viewModelScope.launch {
+            when (val result = trackingRepo.updateMyLocation(deliveryId, lat, lng, headingDeg, speedKmh, accuracyM)) {
+                is AppResult.Success -> Unit
+                is AppResult.Failure -> _state.update {
+                    val stillTracked = (result.error as? AppError.Server)?.code != "DELIVERY_NOT_IN_TRANSIT"
+                    it.copy(
+                        sharingLocationDeliveryId = if (stillTracked) it.sharingLocationDeliveryId else null,
+                        error = result.error,
+                    )
+                }
+            }
+        }
+    }
+
     /** Manual DI, matching AuthViewModel.Factory (§9). */
-    class Factory(private val repo: DeliveryRepository) : ViewModelProvider.Factory {
+    class Factory(
+        private val repo: DeliveryRepository,
+        private val trackingRepo: DeliveryTrackingRepository,
+    ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
-        override fun <T : ViewModel> create(modelClass: Class<T>): T = DeliveriesViewModel(repo) as T
+        override fun <T : ViewModel> create(modelClass: Class<T>): T = DeliveriesViewModel(repo, trackingRepo) as T
     }
 }

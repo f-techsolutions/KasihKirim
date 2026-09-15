@@ -16,6 +16,7 @@ junit           = "4.13.2"
 androidxJunit   = "1.2.1"
 espresso        = "3.7.0"
 androidxBrowser = "1.8.0"
+playServicesLocation = "21.3.0"
 
 [libraries]
 androidx-core-ktx        = { module = "androidx.core:core-ktx",                       version.ref = "coreKtx" }
@@ -43,11 +44,19 @@ supabase-storage  = { module = "io.github.jan-tennert.supabase:storage-kt" }
 # Storage server surface this app calls. Same BOM as the other supabase-kt
 # modules above, so its version always matches theirs.
 supabase-functions= { module = "io.github.jan-tennert.supabase:functions-kt" }
+# Phase 2 live delivery tracking: the Realtime websocket channel a customer's
+# tracking screen subscribes to (postgres_changes on public.delivery_locations).
+# Same BOM as the other supabase-kt modules above.
+supabase-realtime = { module = "io.github.jan-tennert.supabase:realtime-kt" }
 ktor-okhttp       = { module = "io.ktor:ktor-client-okhttp",                    version.ref = "ktor" }
 # Custom Tabs for the Billplz hosted payment page (P2-A) -- a WebView would
 # have to reimplement TLS/cert-pinning trust and cookie handling that the
 # device's own browser already does correctly.
 androidx-browser  = { module = "androidx.browser:browser",                     version.ref = "androidxBrowser" }
+# FusedLocationProviderClient for the carrier's own "share my location" while
+# a delivery is in transit (Phase 2 live delivery tracking). Free, no API key
+# -- distinct from the Maps/Places SDKs, which do need billing.
+play-services-location = { module = "com.google.android.gms:play-services-location", version.ref = "playServicesLocation" }
 
 coroutines-test   = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
 junit             = { module = "junit:junit",                                   version.ref = "junit" }

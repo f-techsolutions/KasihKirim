@@ -2,7 +2,11 @@
 
 package com.ftechsolutions.kasihkirim.ui.deliveries
 
+import android.Manifest
+import android.annotation.SuppressLint
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.os.Looper
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
@@ -14,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -22,9 +27,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import com.ftechsolutions.kasihkirim.R
 import com.ftechsolutions.kasihkirim.domain.model.Delivery
 import com.ftechsolutions.kasihkirim.domain.model.DisputeCategory
@@ -32,6 +39,7 @@ import com.ftechsolutions.kasihkirim.domain.model.KirimStatus
 import com.ftechsolutions.kasihkirim.domain.model.NON_PROOF_DELIVERY_TRANSITIONS
 import com.ftechsolutions.kasihkirim.domain.model.PROOF_DELIVERY_TRANSITIONS
 import com.ftechsolutions.kasihkirim.domain.model.Sen
+import com.ftechsolutions.kasihkirim.domain.model.TRACKABLE_DELIVERY_STATUSES
 import com.ftechsolutions.kasihkirim.domain.model.UserRole
 import com.ftechsolutions.kasihkirim.domain.model.appliesTo
 import com.ftechsolutions.kasihkirim.ui.auth.messageRes
@@ -39,8 +47,16 @@ import com.ftechsolutions.kasihkirim.ui.common.AppCard
 import com.ftechsolutions.kasihkirim.ui.common.BadgeTone
 import com.ftechsolutions.kasihkirim.ui.common.EmptyStateCard
 import com.ftechsolutions.kasihkirim.ui.common.StatusBadge
+import com.google.android.gms.location.LocationCallback
+import com.google.android.gms.location.LocationRequest
+import com.google.android.gms.location.LocationResult
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
 import java.io.ByteArrayOutputStream
 
+private const val LOCATION_UPDATE_INTERVAL_MS = 15_000L
+
+@SuppressLint("MissingPermission") // checked via ContextCompat.checkSelfPermission before every request
 @Composable
 fun DeliveriesScreen(
     vm: DeliveriesViewModel,
@@ -48,8 +64,65 @@ fun DeliveriesScreen(
     myCarrierId: String?,
     roles: Set<UserRole>,
     onBack: () -> Unit,
+    onOpenTracking: (deliveryId: String) -> Unit,
 ) {
     val state by vm.state.collectAsState()
+    val context = LocalContext.current
+    val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
+    var pendingShareDeliveryId by remember { mutableStateOf<String?>(null) }
+
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions(),
+    ) { granted ->
+        val deliveryId = pendingShareDeliveryId
+        pendingShareDeliveryId = null
+        val hasLocation = granted[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+            granted[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        if (deliveryId != null && hasLocation) vm.startSharingLocation(deliveryId)
+    }
+
+    fun requestShareLocation(deliveryId: String) {
+        val alreadyGranted = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) ==
+                PackageManager.PERMISSION_GRANTED
+        if (alreadyGranted) {
+            vm.startSharingLocation(deliveryId)
+        } else {
+            pendingShareDeliveryId = deliveryId
+            locationPermissionLauncher.launch(
+                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION),
+            )
+        }
+    }
+
+    // The ViewModel only tracks WHICH delivery (if any) is being shared --
+    // the actual FusedLocationProviderClient subscription lives here, tied
+    // to that id, and torn down whenever it changes or the screen leaves.
+    DisposableEffect(state.sharingLocationDeliveryId) {
+        val deliveryId = state.sharingLocationDeliveryId
+        val callback = if (deliveryId != null) {
+            val cb = object : LocationCallback() {
+                override fun onLocationResult(result: LocationResult) {
+                    val loc = result.lastLocation ?: return
+                    vm.postLocation(
+                        deliveryId,
+                        loc.latitude,
+                        loc.longitude,
+                        headingDeg = loc.bearing.toDouble().takeIf { loc.hasBearing() },
+                        speedKmh = (loc.speed * 3.6).takeIf { loc.hasSpeed() },
+                        accuracyM = loc.accuracy.toDouble().takeIf { loc.hasAccuracy() },
+                    )
+                }
+            }
+            val request = LocationRequest.Builder(Priority.PRIORITY_BALANCED_POWER_ACCURACY, LOCATION_UPDATE_INTERVAL_MS).build()
+            fusedLocationClient.requestLocationUpdates(request, cb, Looper.getMainLooper())
+            cb
+        } else {
+            null
+        }
+        onDispose { callback?.let { fusedLocationClient.removeLocationUpdates(it) } }
+    }
 
     // MediaStore's own camera app writes and returns a downscaled preview
     // Bitmap directly -- no FileProvider/Uri plumbing or CAMERA permission
@@ -129,11 +202,20 @@ fun DeliveriesScreen(
                     roles = roles,
                     isTransitioning = state.transitioningId == delivery.id,
                     alreadyReviewed = delivery.id in state.reviewedDeliveryIds,
+                    isSharingLocation = state.sharingLocationDeliveryId == delivery.id,
                     onEvent = { event -> vm.transition(delivery.id, event) },
                     onRequestProof = { leg, event -> vm.requestProof(delivery.id, leg, event) },
                     onRequestRecordPurchase = { vm.requestRecordPurchase(delivery.id) },
                     onRequestOpenDispute = { vm.requestOpenDispute(delivery.id) },
                     onRequestRate = { vm.requestRate(delivery.id) },
+                    onToggleShareLocation = {
+                        if (state.sharingLocationDeliveryId == delivery.id) {
+                            vm.stopSharingLocation()
+                        } else {
+                            requestShareLocation(delivery.id)
+                        }
+                    },
+                    onOpenTracking = { onOpenTracking(delivery.id) },
                 )
             }
 
@@ -151,11 +233,14 @@ private fun DeliveryCard(
     roles: Set<UserRole>,
     isTransitioning: Boolean,
     alreadyReviewed: Boolean,
+    isSharingLocation: Boolean,
     onEvent: (String) -> Unit,
     onRequestProof: (leg: String, event: String) -> Unit,
     onRequestRecordPurchase: () -> Unit,
     onRequestOpenDispute: () -> Unit,
     onRequestRate: () -> Unit,
+    onToggleShareLocation: () -> Unit,
+    onOpenTracking: () -> Unit,
 ) {
     val availableEvents = NON_PROOF_DELIVERY_TRANSITIONS
         .filter {
@@ -196,6 +281,17 @@ private fun DeliveryCard(
     // button needs one.
     val showRate = delivery.status == KirimStatus.COMPLETED && !alreadyReviewed
 
+    // Live delivery tracking (0046): a carrier can share their own position
+    // only while it's actually being carried, and only for their own
+    // delivery -- the server enforces both, this just avoids offering a
+    // button that would come back NOT_ASSIGNED_CARRIER/DELIVERY_NOT_IN_TRANSIT.
+    // Track is offered to whichever side this card belongs to (carrier or
+    // customer) -- listMyDeliveries's own RLS already scoped it to one of
+    // them, the same reasoning showRate relies on above.
+    val trackable = delivery.status in TRACKABLE_DELIVERY_STATUSES
+    val showShareLocation = trackable && UserRole.CARRIER.appliesTo(delivery, currentUserId, myCarrierId, roles)
+    val showTrack = trackable
+
     AppCard {
         Row(verticalAlignment = Alignment.Top) {
             Text(delivery.itemDescription, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
@@ -231,7 +327,7 @@ private fun DeliveryCard(
         }
 
         if (availableEvents.isNotEmpty() || availableProofEvents.isNotEmpty() ||
-            showRecordPurchase || showOpenDispute || showRate
+            showRecordPurchase || showOpenDispute || showRate || showShareLocation || showTrack
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
@@ -304,6 +400,24 @@ private fun DeliveryCard(
                         } else {
                             Text(stringResource(R.string.deliveries_rate))
                         }
+                    }
+                }
+                if (showShareLocation) {
+                    // Filled tonal while active so the carrier can tell at a
+                    // glance that sharing is on, without a separate label.
+                    if (isSharingLocation) {
+                        FilledTonalButton(onClick = onToggleShareLocation, shape = MaterialTheme.shapes.small) {
+                            Text(stringResource(R.string.deliveries_stop_sharing_location))
+                        }
+                    } else {
+                        OutlinedButton(onClick = onToggleShareLocation, shape = MaterialTheme.shapes.small) {
+                            Text(stringResource(R.string.deliveries_share_location))
+                        }
+                    }
+                }
+                if (showTrack) {
+                    OutlinedButton(onClick = onOpenTracking, shape = MaterialTheme.shapes.small) {
+                        Text(stringResource(R.string.deliveries_track))
                     }
                 }
             }

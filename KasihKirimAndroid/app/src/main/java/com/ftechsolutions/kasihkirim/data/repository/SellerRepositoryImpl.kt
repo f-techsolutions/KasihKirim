@@ -14,6 +14,7 @@ import com.ftechsolutions.kasihkirim.data.remote.dto.SellerDto
 import com.ftechsolutions.kasihkirim.data.remote.dto.SellerOrderDto
 import com.ftechsolutions.kasihkirim.domain.model.Inventory
 import com.ftechsolutions.kasihkirim.domain.model.InventoryMovement
+import com.ftechsolutions.kasihkirim.domain.model.MuatanJualOnboardingStatus
 import com.ftechsolutions.kasihkirim.domain.model.NewProduct
 import com.ftechsolutions.kasihkirim.domain.model.NewSeller
 import com.ftechsolutions.kasihkirim.domain.model.OrderStatus
@@ -86,6 +87,7 @@ class SellerRepositoryImpl : SellerRepository {
                     put("p_business_name", draft.businessName)
                     put("p_community_id", draft.communityId)
                     put("p_ssm_reg_no", draft.ssmRegNo)
+                    put("p_seller_kind", draft.sellerKind)
                 },
             )
             .decodeAs<JsonObject>()
@@ -95,7 +97,16 @@ class SellerRepositoryImpl : SellerRepository {
             status = SellerStatus.fromWire(json.getValue("status").jsonPrimitive.content) ?: SellerStatus.NOT_STARTED,
             communityId = draft.communityId,
             ssmRegNo = draft.ssmRegNo,
+            sellerKind = draft.sellerKind,
+            onboardingStatus = MuatanJualOnboardingStatus.fromWire(
+                json["onboarding_status"]?.jsonPrimitive?.content ?: "PENDING",
+            ) ?: MuatanJualOnboardingStatus.PENDING,
         )
+    }
+
+    override suspend fun acceptMuatanJualTerms(): AppResult<Unit> = runCatchingResult {
+        SupabaseClientProvider.client.postgrest.rpc("rpc_accept_muatan_jual_terms")
+        Unit
     }
 
     override suspend fun listMyProducts(sellerId: String): AppResult<List<Product>> = runCatchingResult {

@@ -25,12 +25,16 @@ class MainActivity : ComponentActivity() {
                     app.vehicleRepository,
                     app.tripRepository,
                     app.deliveryRepository,
+                    app.deliveryTrackingRepository,
                     app.muatanJualRepository,
                     app.sellerRepository,
                     app.carrierRepository,
+                    app.carrierLotRepository,
                     app.buyRepository,
                     app.badgeRepository,
                     app.adminRepository,
+                    app.promotionRepository,
+                    app.dealsRepository,
                 )
             }
         }

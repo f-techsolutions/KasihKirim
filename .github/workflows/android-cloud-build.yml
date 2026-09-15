@@ -42,8 +42,19 @@ jobs:
           java-version: '17'
           cache: gradle
 
+      # The action's own default `packages` input is 'tools platform-tools'.
+      # Google has removed the legacy 'tools' package from the SDK
+      # repository manifest, so sdkmanager now fails outright trying to
+      # install it ("Warning: Failed to find package 'tools'" -> non-zero
+      # exit), taking down this whole step before any of our own SDK setup
+      # even runs. platform-tools is the only package actually used from
+      # this step (the next steps below install a fresh cmdline-tools
+      # release and the real platform/build-tools packages), so drop
+      # 'tools' from the request rather than accept the action's default.
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools'
 
       # android-actions/setup-android@v3 bundles an old cmdline-tools (16.0)
       # that only understands SDK XML schema up to version 3, so it can't

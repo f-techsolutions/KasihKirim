@@ -7,6 +7,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.LocalOffer
 import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -27,7 +28,7 @@ import com.ftechsolutions.kasihkirim.ui.common.EmptyStateCard
 import com.ftechsolutions.kasihkirim.ui.common.GradientHeroCard
 
 @Composable
-fun HomeScreen(user: AuthUser, onOpenBuy: () -> Unit) {
+fun HomeScreen(user: AuthUser, onOpenBuy: () -> Unit, onOpenDeals: () -> Unit) {
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -35,6 +36,7 @@ fun HomeScreen(user: AuthUser, onOpenBuy: () -> Unit) {
         Spacer(Modifier.height(12.dp))
         HeroCard(user)
         BuyEntryCard(onClick = onOpenBuy)
+        DealsEntryCard(onClick = onOpenDeals)
         // Roles shown for transparency during Phase 1. They come from the JWT
         // claim; they do not grant anything.
         EmptyStateCard(
@@ -58,6 +60,34 @@ private fun BuyEntryCard(onClick: () -> Unit) {
                 Text(stringResource(R.string.home_buy_title), style = MaterialTheme.typography.titleMedium)
                 Text(
                     stringResource(R.string.home_buy_subtitle),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Icon(
+                Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/** 0048_promotions_gallery.sql -- an admin-curated set of featured
+ *  products, the same entry-card shape as BuyEntryCard just above it. */
+@Composable
+private fun DealsEntryCard(onClick: () -> Unit) {
+    AppCard {
+        Row(
+            modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.Filled.LocalOffer, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(stringResource(R.string.home_deals_title), style = MaterialTheme.typography.titleMedium)
+                Text(
+                    stringResource(R.string.home_deals_subtitle),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
