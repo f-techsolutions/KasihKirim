@@ -1,0 +1,437 @@
+package com.ftechsolutions.kasihkirim.data.repository
+
+import com.ftechsolutions.kasihkirim.core.result.AppError
+import com.ftechsolutions.kasihkirim.core.result.AppResult
+import com.ftechsolutions.kasihkirim.core.security.SafeLog
+import com.ftechsolutions.kasihkirim.data.remote.SupabaseClientProvider
+import com.ftechsolutions.kasihkirim.data.remote.dto.AdminAccountDto
+import com.ftechsolutions.kasihkirim.data.remote.dto.CarrierApplicationDto
+import com.ftechsolutions.kasihkirim.data.remote.dto.DisputeDto
+import com.ftechsolutions.kasihkirim.data.remote.dto.ProductReviewDto
+import com.ftechsolutions.kasihkirim.data.remote.dto.SellerApplicationDto
+import com.ftechsolutions.kasihkirim.domain.model.AccountStatus
+import com.ftechsolutions.kasihkirim.domain.model.AdminAccount
+import com.ftechsolutions.kasihkirim.domain.model.AdminDeliveryAttempt
+import com.ftechsolutions.kasihkirim.domain.model.AdminOrderSearchResult
+import com.ftechsolutions.kasihkirim.domain.model.AdminOrderSummary
+import com.ftechsolutions.kasihkirim.domain.model.AdminPaymentRecord
+import com.ftechsolutions.kasihkirim.domain.model.AdminPaymentSummary
+import com.ftechsolutions.kasihkirim.domain.model.AdminPayout
+import com.ftechsolutions.kasihkirim.domain.model.CarrierApplication
+import com.ftechsolutions.kasihkirim.domain.model.Dispute
+import com.ftechsolutions.kasihkirim.domain.model.DisputeStatus
+import com.ftechsolutions.kasihkirim.domain.model.KirimStatus
+import com.ftechsolutions.kasihkirim.domain.model.KirimType
+import com.ftechsolutions.kasihkirim.domain.model.PayoutStatus
+import com.ftechsolutions.kasihkirim.domain.model.ProductReview
+import com.ftechsolutions.kasihkirim.domain.model.ProductStatus
+import com.ftechsolutions.kasihkirim.domain.model.Sen
+import com.ftechsolutions.kasihkirim.domain.model.SellerApplication
+import com.ftechsolutions.kasihkirim.domain.model.SellerStatus
+import com.ftechsolutions.kasihkirim.domain.repository.AdminRepository
+import io.github.jan.supabase.postgrest.postgrest
+import io.github.jan.supabase.postgrest.query.Columns
+import io.github.jan.supabase.postgrest.query.Order
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.int
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.long
+import kotlinx.serialization.json.put
+import java.io.IOException
+
+private const val SELLER_APPLICATION_COLUMNS =
+    "id,business_name,ssm_reg_no,status,review_note,created_at"
+
+private const val CARRIER_APPLICATION_COLUMNS =
+    "id,status,review_note,created_at,communities(name)"
+
+private const val PRODUCT_REVIEW_COLUMNS =
+    "id,title,description,status,price_sen,unit,created_at,sellers(business_name)"
+
+private const val DISPUTE_COLUMNS =
+    "id,category,description,status,refund_sen,holds_escrow,resolution_note,sla_due_at,created_at"
+
+private const val ACCOUNT_COLUMNS =
+    "id,phone,full_name,display_name,status,suspended_reason,created_at"
+
+/** Statuses that still need a decision from a reviewer. */
+private val SELLER_QUEUE = setOf(
+    SellerStatus.NOT_STARTED,
+    SellerStatus.SUBMITTED,
+    SellerStatus.UNDER_REVIEW,
+    SellerStatus.MORE_INFO_REQUIRED,
+)
+
+private val PRODUCT_QUEUE = setOf(ProductStatus.DRAFT, ProductStatus.PENDING_REVIEW)
+
+/** Statuses that still need a decision from a reviewer -- identical set to
+ *  SELLER_QUEUE since both map the same ref.verification_status enum. */
+private val CARRIER_QUEUE = setOf(
+    SellerStatus.NOT_STARTED,
+    SellerStatus.SUBMITTED,
+    SellerStatus.UNDER_REVIEW,
+    SellerStatus.MORE_INFO_REQUIRED,
+)
+
+class AdminRepositoryImpl : AdminRepository {
+
+    private val tag = "AdminRepository"
+
+    // The queue filters below run client-side. Postgrest-kt's `isIn` has no
+    // working example anywhere in this module, and the review queues are
+    // bounded by how fast a human can clear them -- so this fetches what RLS
+    // already scopes to an admin and narrows it here, rather than being the
+    // first call site to guess at an untested filter method's signature.
+
+    override suspend fun listSellerApplications(): AppResult<List<SellerApplication>> = runCatchingResult {
+        SupabaseClientProvider.client.postgrest.from("sellers")
+            .select(columns = Columns.raw(SELLER_APPLICATION_COLUMNS)) {
+                order("created_at", Order.ASCENDING)
+            }
+            .decodeList<SellerApplicationDto>()
+            .map { it.toDomain() }
+            .filter { it.status in SELLER_QUEUE }
+    }
+
+    override suspend fun setSellerStatus(
+        sellerId: String,
+        status: SellerStatus,
+        reason: String?,
+    ): AppResult<Unit> = runCatchingResult {
+        SupabaseClientProvider.client.postgrest.rpc(
+            "rpc_admin_set_seller_status",
+            buildJsonObject {
+                put("p_seller_id", sellerId)
+                put("p_status", status.wire)
+                put("p_reason", reason)
+            },
+        )
+        Unit
+    }
+
+    override suspend fun listCarrierApplications(): AppResult<List<CarrierApplication>> = runCatchingResult {
+        SupabaseClientProvider.client.postgrest.from("carriers")
+            .select(columns = Columns.raw(CARRIER_APPLICATION_COLUMNS)) {
+                order("created_at", Order.ASCENDING)
+            }
+            .decodeList<CarrierApplicationDto>()
+            .map { it.toDomain() }
+            .filter { it.status in CARRIER_QUEUE }
+    }
+
+    override suspend fun setCarrierStatus(
+        carrierId: String,
+        status: SellerStatus,
+        reason: String?,
+    ): AppResult<Unit> = runCatchingResult {
+        SupabaseClientProvider.client.postgrest.rpc(
+            "rpc_admin_set_carrier_status",
+            buildJsonObject {
+                put("p_carrier_id", carrierId)
+                put("p_status", status.wire)
+                put("p_reason", reason)
+            },
+        )
+        Unit
+    }
+
+    override suspend fun listProductReviews(): AppResult<List<ProductReview>> = runCatchingResult {
+        SupabaseClientProvider.client.postgrest.from("products")
+            .select(columns = Columns.raw(PRODUCT_REVIEW_COLUMNS)) {
+                filter { exact("deleted_at", null) }
+                order("created_at", Order.ASCENDING)
+            }
+            .decodeList<ProductReviewDto>()
+            .map { it.toDomain() }
+            .filter { it.status in PRODUCT_QUEUE }
+    }
+
+    override suspend fun setProductStatus(
+        productId: String,
+        status: ProductStatus,
+        rejectionReason: String?,
+    ): AppResult<Unit> = runCatchingResult {
+        SupabaseClientProvider.client.postgrest.rpc(
+            "rpc_admin_set_product_status",
+            buildJsonObject {
+                put("p_product_id", productId)
+                put("p_status", status.wire)
+                put("p_rejection_reason", rejectionReason)
+            },
+        )
+        Unit
+    }
+
+    override suspend fun listOpenDisputes(): AppResult<List<Dispute>> = runCatchingResult {
+        SupabaseClientProvider.client.postgrest.from("disputes")
+            .select(columns = Columns.raw(DISPUTE_COLUMNS)) {
+                order("created_at", Order.ASCENDING)
+            }
+            .decodeList<DisputeDto>()
+            .map { it.toDomain() }
+            .filter { !it.status.isFinal }
+    }
+
+    override suspend fun resolveDispute(
+        disputeId: String,
+        status: DisputeStatus,
+        note: String?,
+        refundSen: Long,
+    ): AppResult<Unit> = runCatchingResult {
+        SupabaseClientProvider.client.postgrest.rpc(
+            "rpc_admin_resolve_dispute",
+            buildJsonObject {
+                put("p_dispute_id", disputeId)
+                put("p_status", status.wire)
+                put("p_note", note)
+                put("p_refund_sen", refundSen)
+            },
+        )
+        Unit
+    }
+
+    override suspend fun searchAccounts(query: String): AppResult<List<AdminAccount>> = runCatchingResult {
+        if (query.isBlank()) return@runCatchingResult emptyList()
+        val pattern = "%$query%"
+        val byPhone = SupabaseClientProvider.client.postgrest.from("profiles")
+            .select(columns = Columns.raw(ACCOUNT_COLUMNS)) {
+                filter { ilike("phone", pattern) }
+            }
+            .decodeList<AdminAccountDto>()
+        val byName = SupabaseClientProvider.client.postgrest.from("profiles")
+            .select(columns = Columns.raw(ACCOUNT_COLUMNS)) {
+                filter { ilike("full_name", pattern) }
+            }
+            .decodeList<AdminAccountDto>()
+        (byPhone + byName).distinctBy { it.id }.map { it.toDomain() }
+    }
+
+    override suspend fun setAccountStatus(
+        userId: String,
+        status: AccountStatus,
+        reason: String?,
+    ): AppResult<Unit> = runCatchingResult {
+        SupabaseClientProvider.client.postgrest.rpc(
+            "rpc_admin_set_account_status",
+            buildJsonObject {
+                put("p_user_id", userId)
+                put("p_status", status.wire)
+                put("p_reason", reason)
+            },
+        )
+        Unit
+    }
+
+    override suspend fun listPayouts(): AppResult<List<AdminPayout>> = runCatchingResult {
+        SupabaseClientProvider.client.postgrest
+            .rpc("rpc_admin_list_payouts", buildJsonObject {})
+            .decodeAs<JsonArray>()
+            .map { (it as JsonObject).toAdminPayout() }
+    }
+
+    override suspend fun reviewPayout(payoutId: String, approve: Boolean, reason: String?): AppResult<Unit> = runCatchingResult {
+        SupabaseClientProvider.client.postgrest.rpc(
+            "rpc_admin_review_payout",
+            buildJsonObject {
+                put("p_payout_id", payoutId)
+                put("p_approve", approve)
+                put("p_reason", reason)
+            },
+        )
+        Unit
+    }
+
+    override suspend fun approvePayout(payoutId: String, approve: Boolean, reason: String?): AppResult<Unit> = runCatchingResult {
+        SupabaseClientProvider.client.postgrest.rpc(
+            "rpc_admin_approve_payout",
+            buildJsonObject {
+                put("p_payout_id", payoutId)
+                put("p_approve", approve)
+                put("p_reason", reason)
+            },
+        )
+        Unit
+    }
+
+    override suspend fun markPayoutPaid(payoutId: String, providerRef: String?): AppResult<Unit> = runCatchingResult {
+        SupabaseClientProvider.client.postgrest.rpc(
+            "rpc_admin_mark_payout_paid",
+            buildJsonObject {
+                put("p_payout_id", payoutId)
+                put("p_provider_ref", providerRef)
+            },
+        )
+        Unit
+    }
+
+    override suspend fun markPayoutFailed(payoutId: String, reason: String): AppResult<Unit> = runCatchingResult {
+        SupabaseClientProvider.client.postgrest.rpc(
+            "rpc_admin_mark_payout_failed",
+            buildJsonObject {
+                put("p_payout_id", payoutId)
+                put("p_reason", reason)
+            },
+        )
+        Unit
+    }
+
+    override suspend fun searchOrder(query: String): AppResult<AdminOrderSearchResult?> = runCatchingResult {
+        if (query.isBlank()) return@runCatchingResult null
+        val body = SupabaseClientProvider.client.postgrest
+            .rpc("rpc_admin_search_order", buildJsonObject { put("p_query", query) })
+            .decodeAs<JsonObject>()
+        if (body["found"]?.jsonPrimitive?.booleanOrNull != true) null else body.toAdminOrderSearchResult()
+    }
+
+    override suspend fun listRecentPayments(limit: Int): AppResult<List<AdminPaymentRecord>> = runCatchingResult {
+        SupabaseClientProvider.client.postgrest
+            .rpc("rpc_admin_recent_payments", buildJsonObject { put("p_limit", limit) })
+            .decodeAs<JsonArray>()
+            .map { (it as JsonObject).toAdminPaymentRecord() }
+    }
+
+    private inline fun <T> runCatchingResult(block: () -> T): AppResult<T> =
+        try {
+            AppResult.Success(block())
+        } catch (t: Throwable) {
+            SafeLog.e(tag, "admin call failed: ${t::class.simpleName}", t)
+            AppResult.Failure(t.toAdminAppError())
+        }
+}
+
+private fun JsonObject.toAdminPayout() = AdminPayout(
+    id = getValue("id").jsonPrimitive.content,
+    payeeType = getValue("payee_type").jsonPrimitive.content,
+    payeeLabel = this["payee_label"]?.stringOrNull(),
+    amountSen = Sen(getValue("amount_sen").jsonPrimitive.long),
+    status = PayoutStatus.fromWire(getValue("status").jsonPrimitive.content) ?: PayoutStatus.REQUESTED,
+    bankCode = getValue("bank_code").jsonPrimitive.content,
+    accountNoLast4 = getValue("account_no_last4").jsonPrimitive.content,
+    holderName = getValue("holder_name").jsonPrimitive.content,
+    reviewedBy = this["reviewed_by"]?.stringOrNull(),
+    approvedBy = this["approved_by"]?.stringOrNull(),
+    requestedAt = getValue("requested_at").jsonPrimitive.content,
+)
+
+// RETURNS TABLE(...) always includes every column as a key, even when its
+// value is SQL NULL, unlike the jsonb_build_object calls elsewhere in this
+// file's own RPCs -- see EarningsRepositoryImpl's identical helper for why
+// a bare `?.jsonPrimitive?.content` would silently turn a real NULL into
+// the literal string "null" here.
+private fun JsonElement.stringOrNull(): String? =
+    (this as? JsonPrimitive)?.takeIf { it !is JsonNull }?.content
+
+private fun JsonElement.longOrNull(): Long? =
+    (this as? JsonPrimitive)?.takeIf { it !is JsonNull }?.long
+
+/** rpc_admin_search_order's own JSONB shape (0043) -- jsonb_build_object
+ *  calls, so a genuinely absent value is a missing key here, not a JSON
+ *  null the way rpc_admin_recent_payments's RETURNS TABLE(...) shape is. */
+private fun JsonObject.toAdminOrderSearchResult() = AdminOrderSearchResult(
+    kirimId = getValue("kirim_id").jsonPrimitive.content,
+    referenceCode = getValue("reference_code").jsonPrimitive.content,
+    kirimType = KirimType.fromWire(getValue("kirim_type").jsonPrimitive.content) ?: KirimType.HANTAR,
+    status = KirimStatus.fromWire(getValue("status").jsonPrimitive.content),
+    itemDescription = getValue("item_description").jsonPrimitive.content,
+    estWeightGrams = getValue("est_weight_grams").jsonPrimitive.int,
+    budgetCapSen = this["budget_cap_sen"]?.longOrNull()?.let(::Sen),
+    deliveryFeeSen = this["delivery_fee_sen"]?.longOrNull()?.let(::Sen),
+    commissionSen = this["commission_sen"]?.longOrNull()?.let(::Sen),
+    totalEscrowSen = this["total_escrow_sen"]?.longOrNull()?.let(::Sen),
+    paymentMethod = this["payment_method"]?.stringOrNull(),
+    createdAt = getValue("created_at").jsonPrimitive.content,
+    requesterName = (this["requester"] as? JsonObject)?.let {
+        it["full_name"]?.stringOrNull() ?: it["display_name"]?.stringOrNull()
+    },
+    requesterPhone = (this["requester"] as? JsonObject)?.get("phone")?.stringOrNull(),
+    order = (this["order"] as? JsonObject)?.toAdminOrderSummary(),
+    payment = (this["payment"] as? JsonObject)?.toAdminPaymentSummary(),
+    deliveries = (this["deliveries"] as? JsonArray).orEmpty()
+        .map { (it as JsonObject).toAdminDeliveryAttempt() },
+)
+
+private fun JsonObject.toAdminOrderSummary() = AdminOrderSummary(
+    id = getValue("id").jsonPrimitive.content,
+    referenceCode = getValue("reference_code").jsonPrimitive.content,
+    status = getValue("status").jsonPrimitive.content,
+    goodsSubtotalSen = Sen(getValue("goods_subtotal_sen").jsonPrimitive.long),
+    deliveryFeeSen = Sen(getValue("delivery_fee_sen").jsonPrimitive.long),
+    discountSen = Sen(getValue("discount_sen").jsonPrimitive.long),
+    commissionSen = Sen(getValue("commission_sen").jsonPrimitive.long),
+    totalSen = Sen(getValue("total_sen").jsonPrimitive.long),
+    createdAt = getValue("created_at").jsonPrimitive.content,
+)
+
+private fun JsonObject.toAdminPaymentSummary() = AdminPaymentSummary(
+    id = getValue("id").jsonPrimitive.content,
+    provider = getValue("provider").jsonPrimitive.content,
+    method = getValue("method").jsonPrimitive.content,
+    amountSen = Sen(getValue("amount_sen").jsonPrimitive.long),
+    status = getValue("status").jsonPrimitive.content,
+    failureCode = this["failure_code"]?.stringOrNull(),
+    createdAt = getValue("created_at").jsonPrimitive.content,
+)
+
+private fun JsonObject.toAdminDeliveryAttempt() = AdminDeliveryAttempt(
+    id = getValue("id").jsonPrimitive.content,
+    attemptNo = getValue("attempt_no").jsonPrimitive.int,
+    status = KirimStatus.fromWire(getValue("status").jsonPrimitive.content),
+    carrierName = this["carrier_name"]?.stringOrNull(),
+    carrierPhone = this["carrier_phone"]?.stringOrNull(),
+    codAmountSen = Sen(getValue("cod_amount_sen").jsonPrimitive.long),
+    carrierEarningSen = this["carrier_earning_sen"]?.longOrNull()?.let(::Sen),
+    failureReason = this["failure_reason"]?.stringOrNull(),
+    matchedAt = this["matched_at"]?.stringOrNull(),
+    pickedUpAt = this["picked_up_at"]?.stringOrNull(),
+    deliveredAt = this["delivered_at"]?.stringOrNull(),
+    completedAt = this["completed_at"]?.stringOrNull(),
+    hasOpenDispute = getValue("has_open_dispute").jsonPrimitive.booleanOrNull == true,
+)
+
+// rpc_admin_recent_payments is a RETURNS TABLE(...) -- every column is a key
+// even when NULL, so stringOrNull() (not a missing-key check) is required.
+private fun JsonObject.toAdminPaymentRecord() = AdminPaymentRecord(
+    id = getValue("id").jsonPrimitive.content,
+    referenceType = getValue("reference_type").jsonPrimitive.content,
+    referenceId = getValue("reference_id").jsonPrimitive.content,
+    payerName = this["payer_name"]?.stringOrNull(),
+    payerPhone = this["payer_phone"]?.stringOrNull(),
+    provider = getValue("provider").jsonPrimitive.content,
+    method = getValue("method").jsonPrimitive.content,
+    amountSen = Sen(getValue("amount_sen").jsonPrimitive.long),
+    status = getValue("status").jsonPrimitive.content,
+    failureCode = this["failure_code"]?.stringOrNull(),
+    createdAt = getValue("created_at").jsonPrimitive.content,
+)
+
+private fun Throwable.toAdminAppError(): AppError = when {
+    // The server's own name for "you are not an admin" -- raised by every
+    // rpc_admin_* function before it touches a row.
+    message?.contains("STATE_ACTOR_NOT_PERMITTED", true) == true -> AppError.NotAuthorized
+    message?.contains("SELLER_NOT_FOUND", true) == true -> AppError.Server("SELLER_NOT_FOUND")
+    message?.contains("CARRIER_NOT_FOUND", true) == true -> AppError.Server("CARRIER_NOT_FOUND")
+    message?.contains("PRODUCT_NOT_FOUND", true) == true -> AppError.Server("PRODUCT_NOT_FOUND")
+    message?.contains("DISPUTE_NOT_FOUND", true) == true -> AppError.Server("DISPUTE_NOT_FOUND")
+    message?.contains("USER_NOT_FOUND", true) == true -> AppError.Server("USER_NOT_FOUND")
+    message?.contains("CANNOT_ACT_ON_SELF", true) == true -> AppError.Server("CANNOT_ACT_ON_SELF")
+    message?.contains("CANNOT_APPROVE_OWN_REVIEW", true) == true -> AppError.Server("CANNOT_APPROVE_OWN_REVIEW")
+    message?.contains("INVALID_PAYOUT_STATE", true) == true -> AppError.Server("INVALID_PAYOUT_STATE")
+    message?.contains("ALREADY_PAID", true) == true -> AppError.Server("ALREADY_PAID")
+    message?.contains("INSUFFICIENT_BALANCE_AT_SETTLEMENT", true) == true ->
+        AppError.Server("INSUFFICIENT_BALANCE_AT_SETTLEMENT")
+    message?.contains("PAYOUT_NOT_FOUND", true) == true -> AppError.Server("PAYOUT_NOT_FOUND")
+    message?.contains("INVALID_STATUS", true) == true -> AppError.Server("INVALID_STATUS")
+    message?.contains("INVALID_REFUND", true) == true -> AppError.Server("INVALID_REFUND")
+    this is IOException -> AppError.Network
+    message?.contains("timeout", true) == true -> AppError.Timeout
+    message?.contains("JWT", true) == true -> AppError.SessionExpired
+    message?.contains("row-level security", true) == true -> AppError.NotAuthorized
+    message?.contains("permission denied", true) == true -> AppError.NotAuthorized
+    else -> AppError.Unexpected
+}

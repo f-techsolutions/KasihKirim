@@ -7,35 +7,64 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.ftechsolutions.kasihkirim.R
+import com.ftechsolutions.kasihkirim.domain.model.CapacityInvite
 import com.ftechsolutions.kasihkirim.domain.model.KirimSummary
 import com.ftechsolutions.kasihkirim.domain.model.KirimType
 import com.ftechsolutions.kasihkirim.domain.model.Trip
+import com.ftechsolutions.kasihkirim.domain.model.formatGrams
 import com.ftechsolutions.kasihkirim.ui.auth.messageRes
+import com.ftechsolutions.kasihkirim.ui.common.AppCard
+import com.ftechsolutions.kasihkirim.ui.common.BadgeTone
+import com.ftechsolutions.kasihkirim.ui.common.EmptyStateCard
+import com.ftechsolutions.kasihkirim.ui.common.ScreenHeader
+import com.ftechsolutions.kasihkirim.ui.common.StatusBadge
 
 @Composable
 fun BoardScreen(vm: BoardViewModel, isCarrier: Boolean) {
     val state by vm.state.collectAsState()
 
+    // The bottom nav's saveState/restoreState keeps this ViewModel alive
+    // across tab switches, but disposes/recreates this Composable, so
+    // init{}'s one-shot load() never refires on re-entry (same bug already
+    // found and fixed on EarningsScreen).
+    LaunchedEffect(Unit) { vm.load() }
+
     LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         item {
-            Spacer(Modifier.height(16.dp))
-            Text(stringResource(R.string.board_title), style = MaterialTheme.typography.headlineSmall)
+            Spacer(Modifier.height(12.dp))
+            ScreenHeader(stringResource(R.string.board_title))
         }
 
-        if (state.items.isEmpty() && !state.isLoading) {
-            item { Text(stringResource(R.string.board_empty)) }
+        if (state.invites.isNotEmpty()) {
+            item { ScreenHeader(stringResource(R.string.board_invites_title)) }
+            items(state.invites, key = { it.id }) { invite ->
+                InviteCard(
+                    invite = invite,
+                    nodeNames = state.nodeNames,
+                    hasResponded = invite.id in state.respondedInviteIds,
+                    isResponding = state.respondingInviteId == invite.id,
+                    onRespond = { vm.respondToInvite(invite.id) },
+                )
+            }
+            item { Spacer(Modifier.height(4.dp)) }
+        }
+
+        if (state.items.isEmpty() && !state.isLoading && state.error == null) {
+            item { EmptyStateCard(stringResource(R.string.board_empty)) }
         }
         items(state.items, key = { it.id }) { kirim ->
             BoardCard(
@@ -64,44 +93,113 @@ private fun BoardCard(
 ) {
     var selectedTripId by remember(kirim.id) { mutableStateOf<String?>(null) }
 
-    ElevatedCard {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(kirim.itemDescription, style = MaterialTheme.typography.titleMedium)
+    AppCard {
+        Row(verticalAlignment = Alignment.Top) {
+            Text(kirim.itemDescription, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            StatusBadge(kirim.kirimType.labelMs(), tone = if (kirim.kirimType == KirimType.BELI) BadgeTone.INFO else BadgeTone.NEUTRAL)
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(
+            "${nodeNames[kirim.originNodeId] ?: "?"} → ${nodeNames[kirim.destNodeId] ?: "?"}",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        Text(
+            kirim.estWeightGrams.formatGrams(),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        kirim.deliveryFeeSen?.let {
             Text(
-                "${nodeNames[kirim.originNodeId] ?: "?"} → ${nodeNames[kirim.destNodeId] ?: "?"}",
-                style = MaterialTheme.typography.bodyMedium,
+                stringResource(R.string.kirim_quote_delivery, it.format()),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Text("${kirim.estWeightGrams / 1000}kg · ${kirim.kirimType.labelMs()}", style = MaterialTheme.typography.bodySmall)
-            kirim.deliveryFeeSen?.let { Text(stringResource(R.string.kirim_quote_delivery, it.format())) }
+        }
+        // A PASARAN listing's real cash-handling commitment: rpc_accept_offer
+        // charges the whole order (goods + carriage) as COD the instant this
+        // carrier accepts, not just the delivery_fee_sen shown above.
+        kirim.codTotalSen?.let {
+            Spacer(Modifier.height(2.dp))
+            Text(
+                stringResource(R.string.board_cod_total, it.format()),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
 
-            if (isCarrier) {
-                if (eligibleTrips.isEmpty()) {
-                    Text(stringResource(R.string.board_no_trips), style = MaterialTheme.typography.bodySmall)
+        if (isCarrier) {
+            if (eligibleTrips.isEmpty()) {
+                Spacer(Modifier.height(4.dp))
+                Text(stringResource(R.string.board_no_trips), style = MaterialTheme.typography.bodySmall)
+            } else {
+                Spacer(Modifier.height(10.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    eligibleTrips.forEach { trip ->
+                        FilterChip(
+                            selected = selectedTripId == trip.id,
+                            onClick = { selectedTripId = trip.id },
+                            label = { Text("${nodeNames[trip.originNodeId] ?: "?"} → ${nodeNames[trip.destNodeId] ?: "?"}") },
+                        )
+                    }
+                }
+                Spacer(Modifier.height(10.dp))
+                Button(
+                    onClick = { selectedTripId?.let(onAccept) },
+                    enabled = selectedTripId != null && !isAccepting,
+                    shape = MaterialTheme.shapes.medium,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 46.dp),
+                ) {
+                    if (isAccepting) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                    } else {
+                        Text(stringResource(R.string.board_accept))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun InviteCard(
+    invite: CapacityInvite,
+    nodeNames: Map<String, String>,
+    hasResponded: Boolean,
+    isResponding: Boolean,
+    onRespond: () -> Unit,
+) {
+    AppCard {
+        Text(
+            "${nodeNames[invite.originNodeId] ?: "?"} → ${nodeNames[invite.destNodeId] ?: "?"}",
+            style = MaterialTheme.typography.titleMedium,
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            invite.message ?: stringResource(R.string.board_invite_default_message),
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        Spacer(Modifier.height(10.dp))
+        if (hasResponded) {
+            Text(
+                stringResource(R.string.board_invite_responded),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        } else {
+            OutlinedButton(
+                onClick = onRespond,
+                enabled = !isResponding,
+                shape = MaterialTheme.shapes.small,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                if (isResponding) {
+                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
                 } else {
-                    Spacer(Modifier.height(4.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        eligibleTrips.forEach { trip ->
-                            FilterChip(
-                                selected = selectedTripId == trip.id,
-                                onClick = { selectedTripId = trip.id },
-                                label = { Text("${nodeNames[trip.originNodeId] ?: "?"} → ${nodeNames[trip.destNodeId] ?: "?"}") },
-                            )
-                        }
-                    }
-                    Button(
-                        onClick = { selectedTripId?.let(onAccept) },
-                        enabled = selectedTripId != null && !isAccepting,
-                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-                    ) {
-                        if (isAccepting) {
-                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                        } else {
-                            Text(stringResource(R.string.board_accept))
-                        }
-                    }
+                    Text(stringResource(R.string.board_invite_respond))
                 }
             }
         }

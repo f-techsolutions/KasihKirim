@@ -98,15 +98,31 @@ jobs:
           import re
           import sys
 
-          policy_pattern = re.compile(
-              r'CREATE\s+POLICY\b.*?(?=CREATE\s+POLICY\b|\Z)',
-              re.IGNORECASE | re.DOTALL
-          )
+          policy_start = re.compile(r'CREATE\s+POLICY\b', re.IGNORECASE)
 
           bare_uid = re.compile(
               r'(?<!SELECT\s)(?<!SELECT\s\()auth\.uid\(\)',
               re.IGNORECASE
           )
+
+          def statement_end(text, start):
+              """Index just past the semicolon that ends the statement
+              beginning at `start`, tracking paren depth so a `;` nested
+              inside a function body (e.g. a policy calling a PL/pgSQL
+              helper) doesn't end it early. Falls back to end-of-text if
+              no top-level `;` is found."""
+              depth = 0
+              i = start
+              while i < len(text):
+                  ch = text[i]
+                  if ch == '(':
+                      depth += 1
+                  elif ch == ')':
+                      depth -= 1
+                  elif ch == ';' and depth <= 0:
+                      return i + 1
+                  i += 1
+              return len(text)
 
           failures = []
 
@@ -117,8 +133,9 @@ jobs:
               text = re.sub(r'--[^\n]*', '', text)
               text = re.sub(r'/\*.*?\*/', '', text, flags=re.DOTALL)
 
-              for match in policy_pattern.finditer(text):
-                  block = match.group(0)
+              for match in policy_start.finditer(text):
+                  end = statement_end(text, match.start())
+                  block = text[match.start():end]
 
                   if bare_uid.search(block):
                       start_line = text[:match.start()].count("\n") + 1

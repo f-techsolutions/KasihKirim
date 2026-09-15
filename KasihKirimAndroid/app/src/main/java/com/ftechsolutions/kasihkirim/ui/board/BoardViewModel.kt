@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.ftechsolutions.kasihkirim.core.result.AppError
 import com.ftechsolutions.kasihkirim.core.result.AppResult
+import com.ftechsolutions.kasihkirim.domain.model.CapacityInvite
 import com.ftechsolutions.kasihkirim.domain.model.KirimSummary
 import com.ftechsolutions.kasihkirim.domain.model.Trip
 import com.ftechsolutions.kasihkirim.domain.model.TripStatus
@@ -27,6 +28,12 @@ data class BoardUiState(
     /** The Kirim currently being accepted, if any -- disables its own button
      *  only, not the whole board. */
     val acceptingKirimId: String? = null,
+    /** Ajak Kirim (0006_carrier_commerce.sql) invites addressed to the
+     *  caller -- their own community, a direct target, or (for a carrier)
+     *  one they sent. */
+    val invites: List<CapacityInvite> = emptyList(),
+    val respondedInviteIds: Set<String> = emptySet(),
+    val respondingInviteId: String? = null,
     val error: AppError? = null,
 )
 
@@ -47,26 +54,50 @@ class BoardViewModel(
             _state.update { it.copy(isLoading = true, error = null) }
             val boardResult = kirimRepo.listBoard()
             val tripsResult = if (isCarrier) tripRepo.listMyTrips() else AppResult.Success(emptyList())
+            val invitesResult = kirimRepo.listMyInvites()
             val nodeNames = (addressRepo.searchCommunities("") as? AppResult.Success)?.data
                 ?.mapNotNull { c -> c.nodeId?.let { it to c.name } }
                 ?.toMap()
                 .orEmpty()
-            when {
-                boardResult is AppResult.Failure ->
+            when (boardResult) {
+                is AppResult.Failure ->
                     _state.update { it.copy(isLoading = false, error = boardResult.error) }
-                tripsResult is AppResult.Failure ->
-                    _state.update { it.copy(isLoading = false, error = tripsResult.error) }
-                boardResult is AppResult.Success && tripsResult is AppResult.Success ->
+                is AppResult.Success ->
+                    // Found on-device: a tripsResult failure (e.g. a carrier
+                    // whose 'carrier' role is granted but has no
+                    // public.carriers row yet, so requireCarrierId() throws
+                    // NOT_A_CARRIER) used to wipe out a perfectly successful
+                    // board load and show a bare error instead -- a carrier
+                    // could see zero board listings for a reason entirely
+                    // unrelated to the board itself. eligibleTrips only
+                    // gates the accept-offer UI on each card, so a failure to
+                    // load "my trips" should leave it empty, never block the
+                    // board the same way a failed invites load already
+                    // doesn't (see invites below).
                     _state.update {
                         it.copy(
                             isLoading = false,
                             items = boardResult.data,
-                            eligibleTrips = tripsResult.data.filter { t ->
-                                t.status == TripStatus.ANNOUNCED || t.status == TripStatus.BOARDING
-                            },
+                            eligibleTrips = (tripsResult as? AppResult.Success)?.data
+                                ?.filter { t -> t.status == TripStatus.ANNOUNCED || t.status == TripStatus.BOARDING }
+                                ?: emptyList(),
                             nodeNames = nodeNames,
+                            invites = (invitesResult as? AppResult.Success)?.data ?: it.invites,
                         )
                     }
+            }
+        }
+    }
+
+    fun respondToInvite(inviteId: String) {
+        if (_state.value.respondingInviteId != null) return
+        viewModelScope.launch {
+            _state.update { it.copy(respondingInviteId = inviteId, error = null) }
+            when (val result = kirimRepo.respondToInvite(inviteId)) {
+                is AppResult.Success -> _state.update {
+                    it.copy(respondingInviteId = null, respondedInviteIds = it.respondedInviteIds + inviteId)
+                }
+                is AppResult.Failure -> _state.update { it.copy(respondingInviteId = null, error = result.error) }
             }
         }
     }

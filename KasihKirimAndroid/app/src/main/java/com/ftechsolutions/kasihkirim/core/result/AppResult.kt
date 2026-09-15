@@ -12,6 +12,10 @@ sealed interface AppResult<out T> {
 
 sealed interface AppError {
     data object InvalidCredentials : AppError
+    /** GoTrue's own "Email not confirmed" -- distinct from InvalidCredentials
+     *  so the UI can point the user at their inbox instead of the password
+     *  field. */
+    data object EmailNotConfirmed : AppError
     /** Authenticated, but the backend refused: RLS or a policy said no. */
     data object NotAuthorized : AppError
     data object SessionExpired : AppError

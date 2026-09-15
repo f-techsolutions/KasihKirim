@@ -9,13 +9,17 @@ data class AuthUser(
     val sellerId: String?,
     val accountStatus: String?,
 ) {
-    /** Navigation only. RLS decides what is actually readable. */
+    /** Navigation only. RLS decides what is actually readable.
+     *
+     *  Admin wins over carrier/seller: someone holding both is here to review
+     *  the queues, and every admin_* role resolves to the same tab set. */
     val primaryRole: UserRole
-        get() = when {
-            UserRole.CARRIER in roles -> UserRole.CARRIER
-            UserRole.SELLER in roles -> UserRole.SELLER
-            else -> UserRole.CUSTOMER
-        }
+        get() = roles.filter { it.isAdmin }.maxByOrNull { it.ordinal }
+            ?: when {
+                UserRole.CARRIER in roles -> UserRole.CARRIER
+                UserRole.SELLER in roles -> UserRole.SELLER
+                else -> UserRole.CUSTOMER
+            }
 }
 
 /** §14 requires an explicit four-state model. Initializing is distinct from

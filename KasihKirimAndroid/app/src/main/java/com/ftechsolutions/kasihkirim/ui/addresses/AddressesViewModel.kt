@@ -34,6 +34,13 @@ data class AddressFormState(
 ) {
     val isEditing: Boolean get() = editingId != null
 
+    /** True only once there's something to validate -- an empty field isn't
+     *  "wrong" yet, it just hasn't been filled in. Drives the phone field's
+     *  inline error so a malformed number is visible before Save is even
+     *  tapped, instead of the button just silently staying disabled. */
+    val phoneInvalid: Boolean
+        get() = recipientPhone.isNotEmpty() && !PHONE_PATTERN.matches(recipientPhone)
+
     val canSubmit: Boolean
         get() = label.isNotBlank() &&
             recipientName.isNotBlank() &&
@@ -84,6 +91,11 @@ class AddressesViewModel(private val repo: AddressRepository) : ViewModel() {
 
     fun onCommunitySelected(community: Community) =
         updateForm { it.copy(selectedCommunity = community, communityResults = emptyList(), communityQuery = community.name) }
+
+    /** Lets the user back out of a selection and search again -- the
+     *  "Tukar" (Change) action next to the locked community pill. */
+    fun onCommunityCleared() =
+        updateForm { it.copy(selectedCommunity = null, communityQuery = "", communityResults = emptyList()) }
 
     fun startEdit(address: Address) = updateForm {
         AddressFormState(

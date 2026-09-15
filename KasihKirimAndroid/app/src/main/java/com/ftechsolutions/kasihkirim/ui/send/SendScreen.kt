@@ -7,34 +7,40 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.ftechsolutions.kasihkirim.R
 import com.ftechsolutions.kasihkirim.domain.model.Address
-import com.ftechsolutions.kasihkirim.domain.model.Community
 import com.ftechsolutions.kasihkirim.domain.model.KirimCategory
 import com.ftechsolutions.kasihkirim.domain.model.KirimCreated
 import com.ftechsolutions.kasihkirim.domain.model.KirimQuote
 import com.ftechsolutions.kasihkirim.domain.model.KirimType
 import com.ftechsolutions.kasihkirim.ui.auth.messageRes
+import com.ftechsolutions.kasihkirim.ui.common.AppCard
+import com.ftechsolutions.kasihkirim.ui.common.CommunityPicker
+import com.ftechsolutions.kasihkirim.ui.common.GradientHeroCard
+import com.ftechsolutions.kasihkirim.ui.common.ScreenHeader
 
 @Composable
 fun SendScreen(vm: KirimQuoteViewModel) {
     val state by vm.state.collectAsState()
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp).verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp).verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Spacer(Modifier.height(16.dp))
-        Text(stringResource(R.string.kirim_title), style = MaterialTheme.typography.headlineSmall)
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(12.dp))
+        ScreenHeader(stringResource(R.string.kirim_title))
 
         val created = state.created
         if (created != null) {
@@ -51,80 +57,120 @@ fun SendScreen(vm: KirimQuoteViewModel) {
 private fun KirimForm(vm: KirimQuoteViewModel, state: KirimUiState) {
     val form = state.form
 
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            KirimType.entries.filter { it != KirimType.PASARAN }.forEach { type ->
-                FilterChip(
-                    selected = form.kirimType == type,
-                    onClick = { vm.onKirimTypeChange(type) },
-                    label = { Text(stringResource(if (type == KirimType.BELI) R.string.kirim_type_beli else R.string.kirim_type_hantar)) },
-                )
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        AppCard {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                // Found on-device: without fillMaxWidth()+weight(1f), a plain
+                // Row hands each chip a shrinking remaining-width budget, so
+                // whichever chip is measured second (Hantar) was squeezed
+                // into a few pixels and its unbounded-wrap label text
+                // rendered one character per line down the whole screen.
+                // maxLines/overflow is a second safeguard against the same
+                // failure mode for any future longer translation.
+                KirimType.entries.filter { it != KirimType.PASARAN }.forEach { type ->
+                    FilterChip(
+                        selected = form.kirimType == type,
+                        onClick = { vm.onKirimTypeChange(type) },
+                        modifier = Modifier.weight(1f),
+                        label = {
+                            Text(
+                                stringResource(if (type == KirimType.BELI) R.string.kirim_type_beli else R.string.kirim_type_hantar),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        },
+                    )
+                }
             }
-        }
 
-        Text(stringResource(R.string.kirim_category), style = MaterialTheme.typography.labelLarge)
-        FlowOfChips {
-            KirimCategory.entries.forEach { category ->
-                FilterChip(
-                    selected = form.category == category,
-                    onClick = { vm.onCategorySelected(category) },
-                    label = { Text(category.nameMs) },
-                )
+            Spacer(Modifier.height(14.dp))
+            Text(stringResource(R.string.kirim_category), style = MaterialTheme.typography.labelLarge)
+            Spacer(Modifier.height(6.dp))
+            FlowOfChips {
+                KirimCategory.entries.forEach { category ->
+                    FilterChip(
+                        selected = form.category == category,
+                        onClick = { vm.onCategorySelected(category) },
+                        label = { Text(category.nameMs) },
+                    )
+                }
             }
-        }
 
-        OutlinedTextField(
-            value = form.weightGrams,
-            onValueChange = vm::onWeightChange,
-            label = { Text(stringResource(R.string.kirim_weight)) },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            modifier = Modifier.fillMaxWidth(),
-        )
-
-        if (form.kirimType == KirimType.BELI) {
+            Spacer(Modifier.height(14.dp))
+            val weightInvalid = form.weightGrams.isNotEmpty() && !form.weightValid
             OutlinedTextField(
-                value = form.budgetRinggit,
-                onValueChange = vm::onBudgetChange,
-                label = { Text(stringResource(R.string.kirim_budget)) },
+                value = form.weightGrams,
+                onValueChange = vm::onWeightChange,
+                label = { Text(stringResource(R.string.kirim_weight)) },
                 singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                isError = weightInvalid,
+                supportingText = {
+                    Text(
+                        if (weightInvalid) {
+                            stringResource(R.string.kirim_weight_error)
+                        } else {
+                            stringResource(R.string.kirim_weight_hint)
+                        },
+                    )
+                },
+                shape = MaterialTheme.shapes.small,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.fillMaxWidth(),
             )
-        }
 
-        OutlinedTextField(
-            value = form.originQuery,
-            onValueChange = vm::onOriginQueryChange,
-            label = { Text(stringResource(R.string.serviceability_origin)) },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        if (form.originResults.isNotEmpty() && form.selectedOrigin == null) {
-            CommunityResults(form.originResults, onSelect = vm::onOriginSelected)
-        }
+            if (form.kirimType == KirimType.BELI) {
+                Spacer(Modifier.height(10.dp))
+                OutlinedTextField(
+                    value = form.budgetRinggit,
+                    onValueChange = vm::onBudgetChange,
+                    label = { Text(stringResource(R.string.kirim_budget)) },
+                    singleLine = true,
+                    shape = MaterialTheme.shapes.small,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
 
-        OutlinedTextField(
-            value = form.destQuery,
-            onValueChange = vm::onDestQueryChange,
-            label = { Text(stringResource(R.string.serviceability_destination)) },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        if (form.destResults.isNotEmpty() && form.selectedDest == null) {
-            CommunityResults(form.destResults, onSelect = vm::onDestSelected)
-        }
+            Spacer(Modifier.height(10.dp))
+            CommunityPicker(
+                label = stringResource(R.string.serviceability_origin),
+                hint = stringResource(R.string.picker_search_hint),
+                changeLabel = stringResource(R.string.picker_change),
+                notSelectedHint = stringResource(R.string.picker_not_selected),
+                query = form.originQuery,
+                selected = form.selectedOrigin,
+                results = form.originResults,
+                onQueryChange = vm::onOriginQueryChange,
+                onSelect = vm::onOriginSelected,
+                onClear = vm::onOriginCleared,
+            )
 
-        Spacer(Modifier.height(8.dp))
-        Button(
-            onClick = vm::quote,
-            enabled = form.canQuote && !state.isQuoting,
-            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-        ) {
-            if (state.isQuoting) {
-                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-            } else {
-                Text(stringResource(R.string.kirim_get_quote))
+            Spacer(Modifier.height(10.dp))
+            CommunityPicker(
+                label = stringResource(R.string.serviceability_destination),
+                hint = stringResource(R.string.picker_search_hint),
+                changeLabel = stringResource(R.string.picker_change),
+                notSelectedHint = stringResource(R.string.picker_not_selected),
+                query = form.destQuery,
+                selected = form.selectedDest,
+                results = form.destResults,
+                onQueryChange = vm::onDestQueryChange,
+                onSelect = vm::onDestSelected,
+                onClear = vm::onDestCleared,
+            )
+
+            Spacer(Modifier.height(16.dp))
+            Button(
+                onClick = vm::quote,
+                enabled = form.canQuote && !state.isQuoting,
+                shape = MaterialTheme.shapes.medium,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp),
+            ) {
+                if (state.isQuoting) {
+                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                } else {
+                    Text(stringResource(R.string.kirim_get_quote), style = MaterialTheme.typography.labelLarge)
+                }
             }
         }
 
@@ -135,8 +181,6 @@ private fun KirimForm(vm: KirimQuoteViewModel, state: KirimUiState) {
             QuoteResult(quote)
             SubmissionForm(vm, state.addresses)
         }
-
-        Spacer(Modifier.height(24.dp))
     }
 }
 
@@ -145,36 +189,46 @@ private fun SubmissionForm(vm: KirimQuoteViewModel, addresses: List<Address>) {
     val state by vm.state.collectAsState()
     val form = state.form
 
-    Spacer(Modifier.height(8.dp))
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    AppCard {
         OutlinedTextField(
             value = form.itemDescription,
             onValueChange = vm::onItemDescriptionChange,
             label = { Text(stringResource(R.string.kirim_item_description)) },
             minLines = 2,
+            shape = MaterialTheme.shapes.small,
             modifier = Modifier.fillMaxWidth(),
         )
 
         if (form.kirimType == KirimType.HANTAR) {
+            Spacer(Modifier.height(12.dp))
             Text(stringResource(R.string.kirim_origin_address), style = MaterialTheme.typography.labelLarge)
+            Spacer(Modifier.height(6.dp))
             AddressChips(addresses, form.selectedOriginAddress, vm::onOriginAddressSelected)
         }
 
+        Spacer(Modifier.height(12.dp))
         Text(stringResource(R.string.kirim_dest_address), style = MaterialTheme.typography.labelLarge)
+        Spacer(Modifier.height(6.dp))
         AddressChips(addresses, form.selectedDestAddress, vm::onDestAddressSelected)
         if (addresses.isEmpty()) {
-            Text(stringResource(R.string.kirim_no_addresses), style = MaterialTheme.typography.bodySmall)
+            Text(
+                stringResource(R.string.kirim_no_addresses),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
 
+        Spacer(Modifier.height(16.dp))
         Button(
             onClick = vm::submitKirim,
             enabled = form.canSubmit && !state.isSubmitting,
-            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+            shape = MaterialTheme.shapes.medium,
+            modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp),
         ) {
             if (state.isSubmitting) {
                 CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
             } else {
-                Text(stringResource(R.string.kirim_submit))
+                Text(stringResource(R.string.kirim_submit), style = MaterialTheme.typography.labelLarge)
             }
         }
     }
@@ -198,29 +252,57 @@ private fun AddressChips(addresses: List<Address>, selected: Address?, onSelect:
 
 @Composable
 private fun KirimCreatedResult(created: KirimCreated) {
-    ElevatedCard(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(stringResource(R.string.kirim_posted_title), style = MaterialTheme.typography.titleMedium)
-            Text(stringResource(R.string.kirim_posted_reference, created.referenceCode))
+    GradientHeroCard {
+        Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(40.dp))
+            Spacer(Modifier.height(12.dp))
+            Text(
+                stringResource(R.string.kirim_posted_title),
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onPrimary,
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                stringResource(R.string.kirim_posted_reference, created.referenceCode),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.85f),
+            )
         }
     }
 }
 
 @Composable
 private fun QuoteResult(quote: KirimQuote) {
-    ElevatedCard(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(stringResource(R.string.kirim_quote_title), style = MaterialTheme.typography.titleMedium)
-            Text(
-                stringResource(R.string.kirim_quote_corridor, quote.corridorKm, quote.corridorBand),
-                style = MaterialTheme.typography.bodySmall,
-            )
-            if (quote.goodsBudgetSen.value > 0) {
-                Text(stringResource(R.string.kirim_quote_goods, quote.goodsBudgetSen.format()))
-            }
-            Text(stringResource(R.string.kirim_quote_delivery, quote.deliveryFeeSen.format()))
-            Text(stringResource(R.string.kirim_quote_total, quote.orderTotalSen.format()), style = MaterialTheme.typography.titleMedium)
+    AppCard {
+        Text(stringResource(R.string.kirim_quote_title), style = MaterialTheme.typography.titleMedium)
+        Spacer(Modifier.height(8.dp))
+        Text(
+            stringResource(R.string.kirim_quote_corridor, quote.corridorKm, quote.corridorBand),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(8.dp))
+        if (quote.goodsBudgetSen.value > 0) {
+            QuoteLine(stringResource(R.string.kirim_quote_goods_label), quote.goodsBudgetSen.format())
         }
+        QuoteLine(stringResource(R.string.kirim_quote_delivery_label), quote.deliveryFeeSen.format())
+        HorizontalDivider(Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
+        Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+            Text(stringResource(R.string.kirim_quote_total_label), style = MaterialTheme.typography.titleMedium)
+            Text(
+                quote.orderTotalSen.format(),
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
+    }
+}
+
+@Composable
+private fun QuoteLine(label: String, value: String) {
+    Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(value, style = MaterialTheme.typography.bodyMedium)
     }
 }
 
@@ -232,20 +314,4 @@ private fun FlowOfChips(content: @Composable () -> Unit) {
         modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) { content() }
-}
-
-@Composable
-private fun CommunityResults(results: List<Community>, onSelect: (Community) -> Unit) {
-    ElevatedCard {
-        Column {
-            results.forEach { community ->
-                TextButton(
-                    onClick = { onSelect(community) },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text("${community.name}, ${community.district}", modifier = Modifier.fillMaxWidth())
-                }
-            }
-        }
-    }
 }

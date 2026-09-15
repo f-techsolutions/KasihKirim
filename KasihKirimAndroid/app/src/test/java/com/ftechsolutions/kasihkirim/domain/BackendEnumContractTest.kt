@@ -1,6 +1,7 @@
 package com.ftechsolutions.kasihkirim.domain
 
 import com.ftechsolutions.kasihkirim.domain.model.KirimStatus
+import com.ftechsolutions.kasihkirim.domain.model.NON_PROOF_DELIVERY_TRANSITIONS
 import com.ftechsolutions.kasihkirim.domain.model.TransportMode
 import com.ftechsolutions.kasihkirim.domain.model.UserRole
 import org.junit.Assert.*
@@ -53,5 +54,18 @@ class BackendEnumContractTest {
     @Test fun `admin roles are identified by prefix`() {
         assertTrue(UserRole.ADMIN_FINANCE.isAdmin)
         assertFalse(UserRole.CARRIER.isAdmin)
+    }
+
+    /** Found in review: seed.sql grants FAILED_DELIVERY -> RETURNING via
+     *  RETURN to the carrier for all three kirim types, but no Android
+     *  screen ever offered the button -- CONFIRM_RETURN (the proof step out
+     *  of RETURNING) was defined and permanently unreachable as a result. */
+    @Test fun `FAILED_DELIVERY offers a RETURN transition to the carrier, matching seed_sql`() {
+        val rule = NON_PROOF_DELIVERY_TRANSITIONS.singleOrNull {
+            it.fromStatus == KirimStatus.FAILED_DELIVERY && it.event == "RETURN"
+        }
+        assertNotNull("FAILED_DELIVERY -> RETURN must exist so RETURNING is reachable", rule)
+        assertEquals(KirimStatus.RETURNING, rule!!.toStatus)
+        assertEquals(setOf(UserRole.CARRIER), rule.allowedRoles)
     }
 }

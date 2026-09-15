@@ -21,4 +21,10 @@ data class KirimSummary(
     val deliveryFeeSen: Sen?,
     val commissionSen: Sen?,
     val createdAt: String,
+    /** rpc_board (0036) only -- the whole order total (goods + carriage) a
+     *  carrier will collect via COD for a PASARAN listing, the same figure
+     *  rpc_accept_offer charges them the instant they accept. Null for
+     *  BELI/HANTAR (no linked order) and for any reader of listMyKirims,
+     *  which still comes from the plain table select and never carries it. */
+    val codTotalSen: Sen? = null,
 )

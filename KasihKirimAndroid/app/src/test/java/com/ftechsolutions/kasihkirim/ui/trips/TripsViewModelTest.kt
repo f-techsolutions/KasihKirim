@@ -71,6 +71,7 @@ private class FakeTripRepository(
     }
 
     override suspend fun acceptOffer(tripId: String, kirimId: String): AppResult<Unit> = throw NotImplementedError()
+    override suspend fun sendCapacityInvite(tripId: String) = throw NotImplementedError()
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)

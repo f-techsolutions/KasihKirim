@@ -8,7 +8,6 @@ import com.ftechsolutions.kasihkirim.data.remote.dto.TripDto
 import com.ftechsolutions.kasihkirim.domain.model.NewTripDraft
 import com.ftechsolutions.kasihkirim.domain.model.Trip
 import com.ftechsolutions.kasihkirim.domain.repository.TripRepository
-import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
 import io.github.jan.supabase.postgrest.query.Order
@@ -78,8 +77,23 @@ class TripRepositoryImpl : TripRepository {
         Unit
     }
 
+    override suspend fun sendCapacityInvite(tripId: String): AppResult<Int> = runCatchingResult {
+        val json = SupabaseClientProvider.client.postgrest
+            .rpc(
+                "rpc_send_capacity_invite",
+                buildJsonObject {
+                    put("p_trip", tripId)
+                    put("p_audience", "past_senders")
+                },
+            )
+            .decodeAs<JsonObject>()
+        (json["sent"] as? JsonPrimitive)?.content?.toIntOrNull() ?: 0
+    }
+
+    /** carrier_id lives only in the JWT the hook mints, never in the SDK's
+     *  cached user object -- see SupabaseClientProvider.currentJwtAppMetadata(). */
     private fun requireCarrierId(): String {
-        val meta: JsonObject? = SupabaseClientProvider.client.auth.currentUserOrNull()?.appMetadata
+        val meta: JsonObject? = SupabaseClientProvider.currentJwtAppMetadata()
         return (meta?.get("carrier_id") as? JsonPrimitive)?.content?.takeIf { it.isNotBlank() && it != "null" }
             ?: throw IllegalStateException("NOT_A_CARRIER")
     }

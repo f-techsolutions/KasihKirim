@@ -25,6 +25,14 @@ const CATALOG: Record<string, [string, string, number, boolean]> = {
   PROOF_OTP_INVALID:        ['Wrong code. Please try again.', 'Kod salah. Sila cuba lagi.', 400, false],
   PROOF_OTP_LOCKED:         ['Too many attempts. Ask for a new code.', 'Terlalu banyak cubaan. Minta kod baharu.', 429, false],
   IDEMPOTENCY_KEY_REUSE:    ['Conflicting repeat request.', 'Permintaan berulang yang bercanggah.', 409, false],
+  AUTH_SESSION_EXPIRED:     ['Your session has expired. Please sign in again.', 'Sesi awak sudah tamat. Sila log masuk semula.', 401, false],
+  ORDER_NOT_FOUND:          ['This order could not be found.', 'Pesanan ini tidak dijumpai.', 404, false],
+  PAYMENT_METHOD_NOT_ENABLED: ['This payment method is not available yet.', 'Kaedah pembayaran ini belum tersedia.', 422, false],
+  PAYMENT_METHOD_UNKNOWN:   ['Unrecognised payment method.', 'Kaedah pembayaran tidak dikenali.', 422, false],
+  PAYMENT_METHOD_IS_COD:    ['This order is Cash on Delivery and needs no online payment.', 'Pesanan ini Bayar Semasa Terima dan tidak perlu bayaran dalam talian.', 422, false],
+  PAYMENT_NOT_PENDING:      ['This payment has already moved on and cannot be paid again.', 'Bayaran ini sudah berubah status dan tidak boleh dibayar semula.', 409, false],
+  PAYMENT_MISSING:          ['No payment record exists for this order.', 'Tiada rekod bayaran untuk pesanan ini.', 404, false],
+  BILLPLZ_CREATE_BILL_FAILED: ['Could not start the payment. Please try again shortly.', 'Tidak dapat memulakan bayaran. Sila cuba sebentar lagi.', 502, true],
   INTERNAL:                 ['Something went wrong. Please try again.', 'Ada masalah. Sila cuba lagi.', 500, true],
 };
 

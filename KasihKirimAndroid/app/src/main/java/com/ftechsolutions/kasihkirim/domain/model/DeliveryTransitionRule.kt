@@ -6,16 +6,21 @@ package com.ftechsolutions.kasihkirim.domain.model
  *
  * Deliberately absent:
  *   - CONFIRM_PICKUP, CONFIRM_DELIVERY, CONFIRM_RETURN (requires_proof=true).
- *     internal.fn_delivery_transition reads that flag but never enforces
- *     it -- offering these buttons today would let a client fake a
- *     handover with zero photo evidence. Deferred until proof capture and
- *     a storage bucket exist.
- *   - RECORD_PURCHASE. fn_delivery_transition never applies p_meta to
- *     kirim_requests.actual_goods_sen, so a form field for the actual
- *     purchase price would silently discard whatever the carrier typed.
+ *     See [PROOF_DELIVERY_TRANSITIONS] below -- these go through a photo
+ *     capture + rpc_submit_proof step first. (Correction: an earlier version
+ *     of this comment claimed internal.fn_delivery_transition never enforces
+ *     requires_proof; reading its live definition shows it does -- a
+ *     transition whose rule has requires_proof=true raises PROOF_REQUIRED if
+ *     no matching public.proofs row exists yet. The UI gap this comment
+ *     describes was real regardless: no button meant no way to create that
+ *     proofs row from the app at all.)
  *   - RAISE_VARIANCE. Not proof-gated by this table, but
  *     public.price_variances.evidence_photo_path is NOT NULL -- it needs a
  *     photo through a different mechanism, same storage blocker.
+ *   - RECORD_PURCHASE is NOT absent -- it needs an amount from the carrier
+ *     first (rpc_record_purchase, 0037), so it isn't a plain fire-and-forget
+ *     button like the rows below. See DeliveriesScreen's own
+ *     showRecordPurchase / RecordPurchaseDialog instead of this list.
  *
  * Android never DECIDES a transition -- the server re-validates every one
  * of these against ref.delivery_transition_rules itself (Android is not
@@ -62,6 +67,62 @@ val NON_PROOF_DELIVERY_TRANSITIONS = listOf(
         setOf(UserRole.CUSTOMER, UserRole.CARRIER), ALL_TYPES),
     DeliveryTransitionRule(KirimStatus.FAILED_DELIVERY, "RETRY", KirimStatus.OUT_FOR_DELIVERY,
         setOf(UserRole.CARRIER), ALL_TYPES),
+    // Found in review: seed.sql grants this (FAILED_DELIVERY -> RETURNING),
+    // but no button ever offered it, leaving the already-defined
+    // CONFIRM_RETURN proof step below permanently unreachable -- a carrier
+    // who genuinely cannot redeliver had no in-app way out of FAILED_DELIVERY
+    // beyond RETRY.
+    DeliveryTransitionRule(KirimStatus.FAILED_DELIVERY, "RETURN", KirimStatus.RETURNING,
+        setOf(UserRole.CARRIER), ALL_TYPES),
     DeliveryTransitionRule(KirimStatus.DELIVERED, "CONFIRM_RECEIPT", KirimStatus.COMPLETED,
         setOf(UserRole.CUSTOMER, UserRole.AGENT), ALL_TYPES),
 )
+
+/**
+ * The three requires_proof=true rows of ref.delivery_transition_rules,
+ * exactly as read from the live schema (proof_leg/allowed_roles included).
+ * [leg] mirrors ref.handover_leg's wire values ("pickup"/"dropoff") and is
+ * exactly what rpc_submit_proof's p_leg expects -- the app must call
+ * rpc_submit_proof for this leg before rpc_delivery_transition's own event,
+ * or the server rejects the transition with PROOF_REQUIRED.
+ */
+data class ProofDeliveryTransitionRule(
+    val fromStatus: KirimStatus,
+    val event: String,
+    val toStatus: KirimStatus,
+    val leg: String,
+    val allowedRoles: Set<UserRole>,
+)
+
+val PROOF_DELIVERY_TRANSITIONS = listOf(
+    ProofDeliveryTransitionRule(KirimStatus.AWAITING_PICKUP, "CONFIRM_PICKUP", KirimStatus.PICKED_UP,
+        "pickup", setOf(UserRole.CARRIER, UserRole.AGENT)),
+    ProofDeliveryTransitionRule(KirimStatus.OUT_FOR_DELIVERY, "CONFIRM_DELIVERY", KirimStatus.DELIVERED,
+        "dropoff", setOf(UserRole.CARRIER, UserRole.AGENT)),
+    ProofDeliveryTransitionRule(KirimStatus.RETURNING, "CONFIRM_RETURN", KirimStatus.RETURNED,
+        "dropoff", setOf(UserRole.CARRIER, UserRole.AGENT)),
+)
+
+/**
+ * Mirrors rpc_delivery_transition's own actor resolution (0030): holding a
+ * role isn't enough, the caller must be substantiated as that role ON THIS
+ * DELIVERY. A dual-role account (e.g. a customer who is also a carrier)
+ * holds UserRole.CARRIER account-wide, but that must not surface a carrier
+ * action on a delivery where they're the customer and someone else is
+ * carrying it -- the server would reject it as STATE_ACTOR_NOT_PERMITTED,
+ * this just keeps the button from ever being offered.
+ *
+ * AGENT/ADMIN stay account-wide, same as the server's own `ELSE true` --
+ * those roles are operational and hub-wide by design, not tied to a single
+ * delivery's parties.
+ */
+fun UserRole.appliesTo(
+    delivery: Delivery,
+    currentUserId: String,
+    myCarrierId: String?,
+    roles: Set<UserRole>,
+): Boolean = this in roles && when (this) {
+    UserRole.CUSTOMER -> delivery.requesterId == currentUserId
+    UserRole.CARRIER -> myCarrierId != null && myCarrierId == delivery.carrierId
+    else -> true
+}

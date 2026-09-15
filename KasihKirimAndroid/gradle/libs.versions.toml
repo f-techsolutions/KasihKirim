@@ -11,11 +11,12 @@ supabaseBom     = "3.5.0"
 ktor            = "3.0.3"
 coreKtx         = "1.15.0"
 activityCompose = "1.9.3"
-securityCrypto  = "1.1.0-alpha06"
-coroutines      = "1.9.0"
+coroutines      = "1.11.0"
 junit           = "4.13.2"
 androidxJunit   = "1.2.1"
-espresso        = "3.6.1"
+espresso        = "3.7.0"
+androidxBrowser = "1.8.0"
+playServicesLocation = "21.3.0"
 
 [libraries]
 androidx-core-ktx        = { module = "androidx.core:core-ktx",                       version.ref = "coreKtx" }
@@ -24,7 +25,6 @@ androidx-lifecycle-runtime= { module = "androidx.lifecycle:lifecycle-runtime-ktx
 androidx-lifecycle-compose= { module = "androidx.lifecycle:lifecycle-runtime-compose",version.ref = "lifecycle" }
 androidx-lifecycle-vm     = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycle" }
 androidx-navigation      = { module = "androidx.navigation:navigation-compose",       version.ref = "navigation" }
-androidx-security-crypto = { module = "androidx.security:security-crypto",            version.ref = "securityCrypto" }
 
 compose-bom       = { module = "androidx.compose:compose-bom",           version.ref = "composeBom" }
 compose-ui        = { module = "androidx.compose.ui:ui" }
@@ -32,13 +32,31 @@ compose-graphics  = { module = "androidx.compose.ui:ui-graphics" }
 compose-tooling   = { module = "androidx.compose.ui:ui-tooling" }
 compose-preview   = { module = "androidx.compose.ui:ui-tooling-preview" }
 compose-material3 = { module = "androidx.compose.material3:material3" }
+compose-icons     = { module = "androidx.compose.material:material-icons-extended" }
 compose-test-junit4 = { module = "androidx.compose.ui:ui-test-junit4" }
 compose-test-manifest = { module = "androidx.compose.ui:ui-test-manifest" }
 
 supabase-bom      = { module = "io.github.jan-tennert.supabase:bom",            version.ref = "supabaseBom" }
 supabase-auth     = { module = "io.github.jan-tennert.supabase:auth-kt" }
 supabase-postgrest= { module = "io.github.jan-tennert.supabase:postgrest-kt" }
+supabase-storage  = { module = "io.github.jan-tennert.supabase:storage-kt" }
+# P2-A: invokes payment-intent (Edge Function), the only non-Postgrest/Auth/
+# Storage server surface this app calls. Same BOM as the other supabase-kt
+# modules above, so its version always matches theirs.
+supabase-functions= { module = "io.github.jan-tennert.supabase:functions-kt" }
+# Phase 2 live delivery tracking: the Realtime websocket channel a customer's
+# tracking screen subscribes to (postgres_changes on public.delivery_locations).
+# Same BOM as the other supabase-kt modules above.
+supabase-realtime = { module = "io.github.jan-tennert.supabase:realtime-kt" }
 ktor-okhttp       = { module = "io.ktor:ktor-client-okhttp",                    version.ref = "ktor" }
+# Custom Tabs for the Billplz hosted payment page (P2-A) -- a WebView would
+# have to reimplement TLS/cert-pinning trust and cookie handling that the
+# device's own browser already does correctly.
+androidx-browser  = { module = "androidx.browser:browser",                     version.ref = "androidxBrowser" }
+# FusedLocationProviderClient for the carrier's own "share my location" while
+# a delivery is in transit (Phase 2 live delivery tracking). Free, no API key
+# -- distinct from the Maps/Places SDKs, which do need billing.
+play-services-location = { module = "com.google.android.gms:play-services-location", version.ref = "playServicesLocation" }
 
 coroutines-test   = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
 junit             = { module = "junit:junit",                                   version.ref = "junit" }

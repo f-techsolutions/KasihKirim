@@ -1,0 +1,20 @@
+-- ============================================================================
+-- KasihKirim — 0019_product_images_grants.sql
+--
+-- 0016_seller_onboarding.sql added product_images_write (an RLS POLICY) but
+-- never granted the underlying table privilege -- a POLICY only restricts
+-- an operation a role's base GRANT already permits; it cannot grant one on
+-- its own. Confirmed live on production the grant already exists there
+-- (from an out-of-band change, not any migration file), which is exactly
+-- why this was missed: rehearsing against the live database never
+-- exercised the gap. A fresh database built from this migration history
+-- alone -- which is exactly what CI does on every PR -- does not have it,
+-- and PR #32's "Database verification gate" caught it precisely:
+--   ERROR: permission denied for table product_images
+--   HINT: Grant the required privileges to the current role with:
+--     GRANT INSERT ON public.product_images TO authenticated;
+--
+-- This is idempotent and a no-op on the live database (already granted
+-- there); it is load-bearing for CI and for any future fresh environment.
+-- ============================================================================
+GRANT INSERT, UPDATE, DELETE ON public.product_images TO authenticated;

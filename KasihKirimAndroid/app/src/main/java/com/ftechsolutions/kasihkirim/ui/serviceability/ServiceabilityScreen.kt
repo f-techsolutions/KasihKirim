@@ -13,8 +13,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.ftechsolutions.kasihkirim.R
-import com.ftechsolutions.kasihkirim.domain.model.Community
 import com.ftechsolutions.kasihkirim.domain.model.Serviceability
+import com.ftechsolutions.kasihkirim.ui.common.AppCard
+import com.ftechsolutions.kasihkirim.ui.common.CommunityPicker
 
 @Composable
 fun ServiceabilityScreen(vm: ServiceabilityViewModel, onBack: () -> Unit) {
@@ -22,59 +23,71 @@ fun ServiceabilityScreen(vm: ServiceabilityViewModel, onBack: () -> Unit) {
     val form = state.form
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.serviceability_title)) },
                 navigationIcon = {
                     TextButton(onClick = onBack) { Text(stringResource(R.string.back)) }
                 },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
             )
         },
     ) { padding ->
         Column(
-            modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp).verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 20.dp).verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(4.dp))
 
-            OutlinedTextField(
-                value = form.originQuery,
-                onValueChange = vm::onOriginQueryChange,
-                label = { Text(stringResource(R.string.serviceability_origin)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            if (form.originResults.isNotEmpty() && form.selectedOrigin == null) {
-                CommunityResults(form.originResults, onSelect = vm::onOriginSelected)
-            }
+            AppCard {
+                CommunityPicker(
+                    label = stringResource(R.string.serviceability_origin),
+                    hint = stringResource(R.string.picker_search_hint),
+                    changeLabel = stringResource(R.string.picker_change),
+                    notSelectedHint = stringResource(R.string.picker_not_selected),
+                    query = form.originQuery,
+                    selected = form.selectedOrigin,
+                    results = form.originResults,
+                    onQueryChange = vm::onOriginQueryChange,
+                    onSelect = vm::onOriginSelected,
+                    onClear = vm::onOriginCleared,
+                )
 
-            OutlinedTextField(
-                value = form.destQuery,
-                onValueChange = vm::onDestQueryChange,
-                label = { Text(stringResource(R.string.serviceability_destination)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            if (form.destResults.isNotEmpty() && form.selectedDest == null) {
-                CommunityResults(form.destResults, onSelect = vm::onDestSelected)
-            }
+                Spacer(Modifier.height(10.dp))
 
-            if ((form.selectedOrigin != null && form.selectedOrigin.nodeId == null) ||
-                (form.selectedDest != null && form.selectedDest.nodeId == null)
-            ) {
-                Text(stringResource(R.string.serviceability_no_node), color = MaterialTheme.colorScheme.error)
-            }
+                CommunityPicker(
+                    label = stringResource(R.string.serviceability_destination),
+                    hint = stringResource(R.string.picker_search_hint),
+                    changeLabel = stringResource(R.string.picker_change),
+                    notSelectedHint = stringResource(R.string.picker_not_selected),
+                    query = form.destQuery,
+                    selected = form.selectedDest,
+                    results = form.destResults,
+                    onQueryChange = vm::onDestQueryChange,
+                    onSelect = vm::onDestSelected,
+                    onClear = vm::onDestCleared,
+                )
 
-            Spacer(Modifier.height(8.dp))
-            Button(
-                onClick = vm::check,
-                enabled = form.canCheck && !state.isChecking,
-                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-            ) {
-                if (state.isChecking) {
-                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                } else {
-                    Text(stringResource(R.string.serviceability_check))
+                if ((form.selectedOrigin != null && form.selectedOrigin.nodeId == null) ||
+                    (form.selectedDest != null && form.selectedDest.nodeId == null)
+                ) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(stringResource(R.string.serviceability_no_node), color = MaterialTheme.colorScheme.error)
+                }
+
+                Spacer(Modifier.height(14.dp))
+                Button(
+                    onClick = vm::check,
+                    enabled = form.canCheck && !state.isChecking,
+                    shape = MaterialTheme.shapes.medium,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp),
+                ) {
+                    if (state.isChecking) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                    } else {
+                        Text(stringResource(R.string.serviceability_check))
+                    }
                 }
             }
 
@@ -90,53 +103,40 @@ fun ServiceabilityScreen(vm: ServiceabilityViewModel, onBack: () -> Unit) {
 
 @Composable
 private fun ServiceabilityResult(result: Serviceability) {
-    ElevatedCard(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp)) {
-            when (result) {
-                is Serviceability.Serviceable -> {
-                    Text(stringResource(R.string.serviceability_ok), style = MaterialTheme.typography.titleMedium)
-                    Text("${result.originDistrict} → ${result.destDistrict}", style = MaterialTheme.typography.bodyMedium)
+    AppCard {
+        when (result) {
+            is Serviceability.Serviceable -> {
+                Text(stringResource(R.string.serviceability_ok), style = MaterialTheme.typography.titleMedium)
+                Text("${result.originDistrict} → ${result.destDistrict}", style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    stringResource(R.string.serviceability_distance, result.distanceKm, result.estMinutes),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (result.requiresWaterTransport) {
                     Text(
-                        stringResource(R.string.serviceability_distance, result.distanceKm, result.estMinutes),
+                        stringResource(R.string.serviceability_water),
                         style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    if (result.requiresWaterTransport) {
-                        Text(stringResource(R.string.serviceability_water), style = MaterialTheme.typography.bodySmall)
-                    }
-                }
-                is Serviceability.OriginNotActive -> Text(
-                    stringResource(R.string.serviceability_origin_not_active, result.district),
-                    color = MaterialTheme.colorScheme.error,
-                )
-                is Serviceability.DestinationNotActive -> Text(
-                    stringResource(R.string.serviceability_dest_not_active, result.district),
-                    color = MaterialTheme.colorScheme.error,
-                )
-                is Serviceability.NoRoute -> Text(
-                    stringResource(R.string.serviceability_no_route),
-                    color = MaterialTheme.colorScheme.error,
-                )
-                is Serviceability.GeographyUnknown -> Text(
-                    stringResource(R.string.serviceability_unknown),
-                    color = MaterialTheme.colorScheme.error,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun CommunityResults(results: List<Community>, onSelect: (Community) -> Unit) {
-    ElevatedCard {
-        Column {
-            results.forEach { community ->
-                TextButton(
-                    onClick = { onSelect(community) },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text("${community.name}, ${community.district}", modifier = Modifier.fillMaxWidth())
                 }
             }
+            is Serviceability.OriginNotActive -> Text(
+                stringResource(R.string.serviceability_origin_not_active, result.district),
+                color = MaterialTheme.colorScheme.error,
+            )
+            is Serviceability.DestinationNotActive -> Text(
+                stringResource(R.string.serviceability_dest_not_active, result.district),
+                color = MaterialTheme.colorScheme.error,
+            )
+            is Serviceability.NoRoute -> Text(
+                stringResource(R.string.serviceability_no_route),
+                color = MaterialTheme.colorScheme.error,
+            )
+            is Serviceability.GeographyUnknown -> Text(
+                stringResource(R.string.serviceability_unknown),
+                color = MaterialTheme.colorScheme.error,
+            )
         }
     }
 }

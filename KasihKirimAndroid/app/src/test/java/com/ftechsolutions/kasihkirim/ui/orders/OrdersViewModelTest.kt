@@ -44,6 +44,8 @@ private class FakeKirimRepository(var ordersResult: AppResult<List<KirimSummary>
     override suspend fun createKirim(submission: KirimSubmission) = throw NotImplementedError()
     override suspend fun listBoard() = throw NotImplementedError()
     override suspend fun listMyKirims(): AppResult<List<KirimSummary>> = ordersResult
+    override suspend fun listMyInvites() = throw NotImplementedError()
+    override suspend fun respondToInvite(inviteId: String) = throw NotImplementedError()
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)

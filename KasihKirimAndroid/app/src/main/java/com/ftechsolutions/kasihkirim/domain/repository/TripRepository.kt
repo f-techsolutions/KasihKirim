@@ -18,4 +18,12 @@ interface TripRepository {
      *  (rpc_accept_offer, 0005_rpc_surface.sql). Capacity is locked and
      *  re-checked server-side; a full trip fails with CAPACITY_EXCEEDED. */
     suspend fun acceptOffer(tripId: String, kirimId: String): AppResult<Unit>
+
+    /** Ajak Kirim (rpc_send_capacity_invite, 0006_carrier_commerce.sql).
+     *  Always targets 'past_senders' -- people who have sent through this
+     *  carrier before -- so sending an invite is a single tap with no
+     *  community picker or message form. Returns how many people it
+     *  actually reached (FR-404's own 24h-per-recipient cap can make this
+     *  0 even on success). */
+    suspend fun sendCapacityInvite(tripId: String): AppResult<Int>
 }

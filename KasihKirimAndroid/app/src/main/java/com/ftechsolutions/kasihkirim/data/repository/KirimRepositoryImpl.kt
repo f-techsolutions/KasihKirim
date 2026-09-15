@@ -4,19 +4,28 @@ import com.ftechsolutions.kasihkirim.core.result.AppError
 import com.ftechsolutions.kasihkirim.core.result.AppResult
 import com.ftechsolutions.kasihkirim.core.security.SafeLog
 import com.ftechsolutions.kasihkirim.data.remote.SupabaseClientProvider
+import com.ftechsolutions.kasihkirim.data.remote.dto.CapacityInviteDto
 import com.ftechsolutions.kasihkirim.data.remote.dto.KirimRequestDto
+import com.ftechsolutions.kasihkirim.data.remote.dto.NewInviteResponseDto
+import com.ftechsolutions.kasihkirim.domain.model.CapacityInvite
 import com.ftechsolutions.kasihkirim.domain.model.KirimCreated
 import com.ftechsolutions.kasihkirim.domain.model.KirimDraft
 import com.ftechsolutions.kasihkirim.domain.model.KirimQuote
+import com.ftechsolutions.kasihkirim.domain.model.KirimStatus
 import com.ftechsolutions.kasihkirim.domain.model.KirimSubmission
 import com.ftechsolutions.kasihkirim.domain.model.KirimSummary
+import com.ftechsolutions.kasihkirim.domain.model.KirimType
 import com.ftechsolutions.kasihkirim.domain.model.Sen
 import com.ftechsolutions.kasihkirim.domain.repository.KirimRepository
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
 import io.github.jan.supabase.postgrest.query.Order
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.double
 import kotlinx.serialization.json.int
@@ -75,17 +84,13 @@ class KirimRepositoryImpl : KirimRepository {
         }
 
     override suspend fun listBoard(): AppResult<List<KirimSummary>> = runCatchingResult {
-        SupabaseClientProvider.client.postgrest.from("kirim_requests")
-            .select(columns = Columns.raw(KIRIM_COLUMNS)) {
-                filter {
-                    eq("status", "POSTED")
-                    eq("visibility", "board")
-                    exact("deleted_at", null)
-                }
-                order("created_at", Order.DESCENDING)
-            }
-            .decodeList<KirimRequestDto>()
-            .map { it.toDomain() }
+        // rpc_board (0036), not a plain select: a PASARAN listing's true COD
+        // total lives on public.orders, which a browsing (not-yet-assigned)
+        // carrier has no RLS read on -- see the migration's own comment.
+        SupabaseClientProvider.client.postgrest
+            .rpc("rpc_board", buildJsonObject {})
+            .decodeAs<JsonArray>()
+            .map { (it as JsonObject).toKirimSummary() }
     }
 
     override suspend fun listMyKirims(): AppResult<List<KirimSummary>> = runCatchingResult {
@@ -101,6 +106,31 @@ class KirimRepositoryImpl : KirimRepository {
             }
             .decodeList<KirimRequestDto>()
             .map { it.toDomain() }
+    }
+
+    override suspend fun listMyInvites(): AppResult<List<CapacityInvite>> = runCatchingResult {
+        val now = java.time.Instant.now()
+        SupabaseClientProvider.client.postgrest.from("capacity_invites")
+            .select(columns = Columns.raw("id,message,expires_at,trips(origin_node_id,dest_node_id)")) {
+                order("expires_at", Order.ASCENDING)
+            }
+            .decodeList<CapacityInviteDto>()
+            // Filtered client-side (parsed, not a string compare -- Postgres'
+            // own ISO-8601 rendering and Instant.now().toString() do not
+            // share a format) rather than with a server-side gt() filter on
+            // a timestamp literal -- no proven example of that filter exists
+            // yet in this module (see BuyRepositoryImpl's own note on
+            // textSearch for why an unverified Postgrest-kt call is avoided).
+            .filter { java.time.Instant.parse(it.expiresAt).isAfter(now) }
+            .map { it.toDomain() }
+    }
+
+    override suspend fun respondToInvite(inviteId: String): AppResult<Unit> = runCatchingResult {
+        val userId = SupabaseClientProvider.client.auth.currentUserOrNull()?.id
+            ?: throw IllegalStateException("SESSION_EXPIRED")
+        SupabaseClientProvider.client.postgrest.from("invite_responses")
+            .insert(NewInviteResponseDto(inviteId = inviteId, userId = userId))
+        Unit
     }
 
     private inline fun <T> runCatchingResult(block: () -> T): AppResult<T> =
@@ -130,6 +160,31 @@ private fun JsonObject.toKirimCreated() = KirimCreated(
     referenceCode = getValue("reference_code").jsonPrimitive.content,
     expiresAt = getValue("expires_at").jsonPrimitive.content,
 )
+
+/** rpc_board's (0036) own row shape -- the same columns KirimRequestDto's
+ *  plain select decodes, by name, plus cod_total_sen. Mapped by hand rather
+ *  than through KirimRequestDto's own @Serializable annotations: this reads
+ *  a JsonArray already decoded off an rpc() call, not a table select, and
+ *  every other RPC response in this module (toKirimQuote, toKirimCreated,
+ *  SellerRepositoryImpl's own mappers) is unpacked the same way. */
+private fun JsonObject.toKirimSummary() = KirimSummary(
+    id = getValue("id").jsonPrimitive.content,
+    referenceCode = getValue("reference_code").jsonPrimitive.content,
+    kirimType = KirimType.fromWire(getValue("kirim_type").jsonPrimitive.content) ?: KirimType.HANTAR,
+    status = KirimStatus.fromWire(getValue("status").jsonPrimitive.content) ?: KirimStatus.DRAFT,
+    itemDescription = getValue("item_description").jsonPrimitive.content,
+    estWeightGrams = getValue("est_weight_grams").jsonPrimitive.int,
+    originNodeId = getValue("origin_node_id").jsonPrimitive.content,
+    destNodeId = getValue("dest_node_id").jsonPrimitive.content,
+    budgetCapSen = this["budget_cap_sen"]?.longOrNull()?.let(::Sen),
+    deliveryFeeSen = this["delivery_fee_sen"]?.longOrNull()?.let(::Sen),
+    commissionSen = this["commission_sen"]?.longOrNull()?.let(::Sen),
+    createdAt = getValue("created_at").jsonPrimitive.content,
+    codTotalSen = this["cod_total_sen"]?.longOrNull()?.let(::Sen),
+)
+
+private fun JsonElement.longOrNull(): Long? =
+    (this as? JsonPrimitive)?.takeIf { it !is JsonNull }?.long
 
 /** rpc_quote_kirim/rpc_create_kirim's named RAISE EXCEPTION codes
  *  (0005_rpc_surface.sql, 0012_kirim_trip_creation.sql), mapped the same way

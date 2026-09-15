@@ -15,10 +15,19 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ftechsolutions.kasihkirim.R
 import com.ftechsolutions.kasihkirim.domain.model.AuthState
 import com.ftechsolutions.kasihkirim.domain.repository.AddressRepository
+import com.ftechsolutions.kasihkirim.domain.repository.AdminRepository
+import com.ftechsolutions.kasihkirim.domain.repository.BadgeRepository
+import com.ftechsolutions.kasihkirim.domain.repository.BuyRepository
+import com.ftechsolutions.kasihkirim.domain.repository.CarrierLotRepository
+import com.ftechsolutions.kasihkirim.domain.repository.CarrierRepository
+import com.ftechsolutions.kasihkirim.domain.repository.DealsRepository
 import com.ftechsolutions.kasihkirim.domain.repository.DeliveryRepository
+import com.ftechsolutions.kasihkirim.domain.repository.DeliveryTrackingRepository
 import com.ftechsolutions.kasihkirim.domain.repository.EarningsRepository
 import com.ftechsolutions.kasihkirim.domain.repository.KirimRepository
 import com.ftechsolutions.kasihkirim.domain.repository.MuatanJualRepository
+import com.ftechsolutions.kasihkirim.domain.repository.PromotionRepository
+import com.ftechsolutions.kasihkirim.domain.repository.SellerRepository
 import com.ftechsolutions.kasihkirim.domain.repository.TripRepository
 import com.ftechsolutions.kasihkirim.domain.repository.VehicleRepository
 import com.ftechsolutions.kasihkirim.ui.auth.AuthScreen
@@ -40,7 +49,16 @@ fun App(
     vehicleRepository: VehicleRepository,
     tripRepository: TripRepository,
     deliveryRepository: DeliveryRepository,
+    deliveryTrackingRepository: DeliveryTrackingRepository,
     muatanJualRepository: MuatanJualRepository,
+    sellerRepository: SellerRepository,
+    carrierRepository: CarrierRepository,
+    carrierLotRepository: CarrierLotRepository,
+    buyRepository: BuyRepository,
+    badgeRepository: BadgeRepository,
+    adminRepository: AdminRepository,
+    promotionRepository: PromotionRepository,
+    dealsRepository: DealsRepository,
 ) {
     val state by vm.authState.collectAsStateWithLifecycle()
 
@@ -54,7 +72,9 @@ fun App(
             AuthState.Unauthenticated -> AuthScreen(vm)
             is AuthState.Authenticated -> AppNavHost(
                 s.user, vm, addressRepository, kirimRepository, earningsRepository,
-                vehicleRepository, tripRepository, deliveryRepository, muatanJualRepository,
+                vehicleRepository, tripRepository, deliveryRepository, deliveryTrackingRepository,
+                muatanJualRepository, sellerRepository, carrierRepository, carrierLotRepository,
+                buyRepository, badgeRepository, adminRepository, promotionRepository, dealsRepository,
             )
             is AuthState.Error -> Centered {
                 Text(stringResource(s.error.messageRes()),

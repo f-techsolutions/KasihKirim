@@ -11,7 +11,6 @@ import com.ftechsolutions.kasihkirim.data.remote.dto.toUpdateDto
 import com.ftechsolutions.kasihkirim.domain.model.NewVehicle
 import com.ftechsolutions.kasihkirim.domain.model.Vehicle
 import com.ftechsolutions.kasihkirim.domain.repository.VehicleRepository
-import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
 import io.github.jan.supabase.postgrest.query.Order
@@ -63,9 +62,13 @@ class VehicleRepositoryImpl : VehicleRepository {
     /** carrier_id is a JWT app_metadata claim (custom_access_token_hook),
      *  the same one authz.my_carrier_id() reads server-side -- never guessed
      *  or read from a table. Absent means the account isn't an approved
-     *  carrier, which the caller should not have reached this far without. */
+     *  carrier, which the caller should not have reached this far without.
+     *  Read via SupabaseClientProvider.currentJwtAppMetadata(), which decodes
+     *  the access token itself: the hook's enrichment never reaches the
+     *  SDK's cached user object (currentUserOrNull()?.appMetadata mirrors
+     *  auth.users.raw_app_meta_data, a column the hook doesn't write to). */
     private fun requireCarrierId(): String {
-        val meta: JsonObject? = SupabaseClientProvider.client.auth.currentUserOrNull()?.appMetadata
+        val meta: JsonObject? = SupabaseClientProvider.currentJwtAppMetadata()
         return (meta?.get("carrier_id") as? JsonPrimitive)?.content?.takeIf { it.isNotBlank() && it != "null" }
             ?: throw IllegalStateException("NOT_A_CARRIER")
     }

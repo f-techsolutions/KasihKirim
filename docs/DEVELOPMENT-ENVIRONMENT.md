@@ -251,6 +251,11 @@ cp apps/mobile/.env.example apps/mobile/.env
 | `OTP_PEPPER` | Supabase secret | `openssl rand -hex 32` |
 | `QR_PUBLIC_KEY` / `_PREVIOUS` | Supabase secret | Ed25519; two keys valid across a rotation window |
 | `PAYMENT_WEBHOOK_SECRET` | Supabase secret | From provider — **not yet obtained** |
+| `BILLPLZ_API_KEY` | Supabase secret | Billplz **sandbox** secret key. Never a production key in this repo's config. |
+| `BILLPLZ_COLLECTION_ID` | Supabase secret | Sandbox collection to bill against |
+| `BILLPLZ_X_SIGNATURE_KEY` | Supabase secret | Separate from the API key — verifies `payment-webhook`'s Billplz callbacks |
+| `BILLPLZ_BASE_URL` | Supabase secret | Optional. Defaults to the sandbox host; unset in every environment this repo controls |
+| `BILLPLZ_REDIRECT_URL` | Supabase secret | Optional. Where Billplz returns the buyer's browser after paying |
 
 ---
 
