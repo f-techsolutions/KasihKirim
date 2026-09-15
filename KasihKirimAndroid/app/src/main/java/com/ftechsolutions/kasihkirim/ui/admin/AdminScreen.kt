@@ -5,6 +5,7 @@ package com.ftechsolutions.kasihkirim.ui.admin
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -17,11 +18,20 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.ftechsolutions.kasihkirim.R
+import com.ftechsolutions.kasihkirim.domain.model.AccountStatus
+import com.ftechsolutions.kasihkirim.domain.model.AdminAccount
+import com.ftechsolutions.kasihkirim.domain.model.AdminDeliveryAttempt
+import com.ftechsolutions.kasihkirim.domain.model.AdminOrderSearchResult
+import com.ftechsolutions.kasihkirim.domain.model.AdminPayout
+import com.ftechsolutions.kasihkirim.domain.model.AdminPaymentRecord
+import com.ftechsolutions.kasihkirim.domain.model.CarrierApplication
 import com.ftechsolutions.kasihkirim.domain.model.Dispute
 import com.ftechsolutions.kasihkirim.domain.model.DisputeStatus
+import com.ftechsolutions.kasihkirim.domain.model.PayoutStatus
 import com.ftechsolutions.kasihkirim.domain.model.ProductReview
 import com.ftechsolutions.kasihkirim.domain.model.ProductStatus
 import com.ftechsolutions.kasihkirim.domain.model.SellerApplication
@@ -32,6 +42,9 @@ import com.ftechsolutions.kasihkirim.ui.common.BadgeTone
 import com.ftechsolutions.kasihkirim.ui.common.EmptyStateCard
 import com.ftechsolutions.kasihkirim.ui.common.ScreenHeader
 import com.ftechsolutions.kasihkirim.ui.common.StatusBadge
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 @Composable
 fun AdminScreen(vm: AdminViewModel) {
@@ -54,6 +67,11 @@ fun AdminScreen(vm: AdminViewModel) {
                 text = { Text(tabLabel(R.string.admin_tab_sellers, state.sellers.size)) },
             )
             Tab(
+                selected = state.queue == AdminQueue.CARRIERS,
+                onClick = { vm.selectQueue(AdminQueue.CARRIERS) },
+                text = { Text(tabLabel(R.string.admin_tab_carriers, state.carriers.size)) },
+            )
+            Tab(
                 selected = state.queue == AdminQueue.PRODUCTS,
                 onClick = { vm.selectQueue(AdminQueue.PRODUCTS) },
                 text = { Text(tabLabel(R.string.admin_tab_products, state.products.size)) },
@@ -63,6 +81,60 @@ fun AdminScreen(vm: AdminViewModel) {
                 onClick = { vm.selectQueue(AdminQueue.DISPUTES) },
                 text = { Text(tabLabel(R.string.admin_tab_disputes, state.disputes.size)) },
             )
+            Tab(
+                selected = state.queue == AdminQueue.ACCOUNTS,
+                onClick = { vm.selectQueue(AdminQueue.ACCOUNTS) },
+                text = { Text(stringResource(R.string.admin_tab_accounts)) },
+            )
+            Tab(
+                selected = state.queue == AdminQueue.PAYOUTS,
+                onClick = { vm.selectQueue(AdminQueue.PAYOUTS) },
+                text = { Text(tabLabel(R.string.admin_tab_payouts, state.payouts.size)) },
+            )
+            Tab(
+                selected = state.queue == AdminQueue.ORDER_SEARCH,
+                onClick = { vm.selectQueue(AdminQueue.ORDER_SEARCH) },
+                text = { Text(stringResource(R.string.admin_tab_order_search)) },
+            )
+            Tab(
+                selected = state.queue == AdminQueue.PAYMENTS,
+                onClick = { vm.selectQueue(AdminQueue.PAYMENTS) },
+                text = { Text(tabLabel(R.string.admin_tab_payments, state.recentPayments.size)) },
+            )
+        }
+
+        if (state.queue == AdminQueue.ACCOUNTS) {
+            Column(Modifier.padding(horizontal = 20.dp)) {
+                Spacer(Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = state.accountQuery,
+                    onValueChange = vm::onAccountQueryChange,
+                    label = { Text(stringResource(R.string.admin_account_search_label)) },
+                    placeholder = { Text(stringResource(R.string.admin_account_search_hint)) },
+                    singleLine = true,
+                    shape = MaterialTheme.shapes.small,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(onSearch = { vm.searchAccounts() }),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
+
+        if (state.queue == AdminQueue.ORDER_SEARCH) {
+            Column(Modifier.padding(horizontal = 20.dp)) {
+                Spacer(Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = state.orderQuery,
+                    onValueChange = vm::onOrderQueryChange,
+                    label = { Text(stringResource(R.string.admin_order_search_label)) },
+                    placeholder = { Text(stringResource(R.string.admin_order_search_hint)) },
+                    singleLine = true,
+                    shape = MaterialTheme.shapes.small,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(onSearch = { vm.searchOrder() }),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
         }
 
         Box(Modifier.weight(1f)) {
@@ -80,6 +152,8 @@ fun AdminScreen(vm: AdminViewModel) {
                                     when (notice) {
                                         AdminNotice.SELLER_APPROVED_MUST_RESIGN ->
                                             R.string.admin_notice_seller_must_resign
+                                        AdminNotice.CARRIER_APPROVED_MUST_RESIGN ->
+                                            R.string.admin_notice_carrier_must_resign
                                     },
                                 ),
                                 style = MaterialTheme.typography.bodyMedium,
@@ -103,6 +177,22 @@ fun AdminScreen(vm: AdminViewModel) {
                                 onApprove = { vm.decideSeller(application.id, SellerStatus.APPROVED) },
                                 onReject = { reason ->
                                     vm.decideSeller(application.id, SellerStatus.REJECTED, reason)
+                                },
+                            )
+                        }
+                    }
+
+                    AdminQueue.CARRIERS -> {
+                        if (state.carriers.isEmpty() && !state.isLoading && state.error == null) {
+                            item { EmptyStateCard(stringResource(R.string.admin_no_carriers)) }
+                        }
+                        items(state.carriers, key = { it.id }) { application ->
+                            CarrierApplicationCard(
+                                application = application,
+                                isDeciding = state.decidingId == application.id,
+                                onApprove = { vm.decideCarrier(application.id, SellerStatus.APPROVED) },
+                                onReject = { reason ->
+                                    vm.decideCarrier(application.id, SellerStatus.REJECTED, reason)
                                 },
                             )
                         }
@@ -136,6 +226,57 @@ fun AdminScreen(vm: AdminViewModel) {
                                     vm.resolveDispute(dispute.id, status, note, refundSen)
                                 },
                             )
+                        }
+                    }
+
+                    AdminQueue.ACCOUNTS -> {
+                        if (state.accounts.isEmpty() && !state.isSearchingAccounts && state.error == null &&
+                            state.accountQuery.isNotBlank()
+                        ) {
+                            item { EmptyStateCard(stringResource(R.string.admin_no_accounts)) }
+                        }
+                        items(state.accounts, key = { it.id }) { account ->
+                            AccountCard(
+                                account = account,
+                                isDeciding = state.decidingId == account.id,
+                                onSetStatus = { status, reason -> vm.setAccountStatus(account.id, status, reason) },
+                            )
+                        }
+                    }
+
+                    AdminQueue.PAYOUTS -> {
+                        if (state.payouts.isEmpty() && !state.isLoading && state.error == null) {
+                            item { EmptyStateCard(stringResource(R.string.admin_no_payouts)) }
+                        }
+                        items(state.payouts, key = { it.id }) { payout ->
+                            PayoutCard(
+                                payout = payout,
+                                isDeciding = state.decidingId == payout.id,
+                                onReview = { approve, reason -> vm.reviewPayout(payout.id, approve, reason) },
+                                onApprove = { approve, reason -> vm.approvePayout(payout.id, approve, reason) },
+                                onMarkPaid = { providerRef -> vm.markPayoutPaid(payout.id, providerRef) },
+                                onMarkFailed = { reason -> vm.markPayoutFailed(payout.id, reason) },
+                            )
+                        }
+                    }
+
+                    AdminQueue.ORDER_SEARCH -> {
+                        val result = state.orderResult
+                        if (result != null) {
+                            item { OrderSearchResultCard(result) }
+                        } else if (state.searchedOrder && !state.isSearchingOrder) {
+                            item { EmptyStateCard(stringResource(R.string.admin_order_search_not_found)) }
+                        } else if (!state.isSearchingOrder && state.orderQuery.isBlank()) {
+                            item { EmptyStateCard(stringResource(R.string.admin_order_search_hint)) }
+                        }
+                    }
+
+                    AdminQueue.PAYMENTS -> {
+                        if (state.recentPayments.isEmpty() && !state.isLoading && state.error == null) {
+                            item { EmptyStateCard(stringResource(R.string.admin_no_payments)) }
+                        }
+                        items(state.recentPayments, key = { it.id }) { payment ->
+                            PaymentRecordCard(payment)
                         }
                     }
                 }
@@ -176,6 +317,36 @@ private fun SellerApplicationCard(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        }
+        application.reviewNote?.let {
+            Spacer(Modifier.height(4.dp))
+            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        DecisionRow(
+            isDeciding = isDeciding,
+            approveLabel = stringResource(R.string.admin_approve),
+            rejectLabel = stringResource(R.string.admin_reject),
+            onApprove = onApprove,
+            onReject = onReject,
+        )
+    }
+}
+
+@Composable
+private fun CarrierApplicationCard(
+    application: CarrierApplication,
+    isDeciding: Boolean,
+    onApprove: () -> Unit,
+    onReject: (String?) -> Unit,
+) {
+    AppCard {
+        Row(verticalAlignment = Alignment.Top) {
+            Text(
+                application.homeCommunityName ?: stringResource(R.string.admin_carrier_unknown_community),
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.weight(1f),
+            )
+            StatusBadge(application.status.labelMs, tone = BadgeTone.WARNING)
         }
         application.reviewNote?.let {
             Spacer(Modifier.height(4.dp))
@@ -314,6 +485,368 @@ private fun DisputeCard(
             }
         }
     }
+}
+
+/** Unlike the review queues above, this isn't a binary approve/reject decision
+ *  and the row never leaves the list on its own -- a search result stays
+ *  visible after a status change, just re-labelled, since the admin may act
+ *  on it again (e.g. restore right after a mistaken suspend). */
+@Composable
+private fun AccountCard(
+    account: AdminAccount,
+    isDeciding: Boolean,
+    onSetStatus: (AccountStatus, String?) -> Unit,
+) {
+    var pendingAction by remember(account.id) { mutableStateOf<AccountStatus?>(null) }
+    var reason by remember(account.id) { mutableStateOf("") }
+
+    AppCard {
+        Row(verticalAlignment = Alignment.Top) {
+            Text(
+                account.displayName ?: account.fullName ?: account.phone,
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.weight(1f),
+            )
+            StatusBadge(
+                account.status.labelMs,
+                tone = when (account.status) {
+                    AccountStatus.ACTIVE -> BadgeTone.POSITIVE
+                    AccountStatus.SUSPENDED, AccountStatus.BANNED -> BadgeTone.ERROR
+                    AccountStatus.PENDING, AccountStatus.DELETED -> BadgeTone.WARNING
+                },
+            )
+        }
+        Spacer(Modifier.height(4.dp))
+        Text(account.phone, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        account.suspendedReason?.let {
+            Spacer(Modifier.height(4.dp))
+            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+
+        Spacer(Modifier.height(10.dp))
+        val action = pendingAction
+        if (action != null) {
+            OutlinedTextField(
+                value = reason,
+                onValueChange = { reason = it },
+                label = {
+                    Text(
+                        stringResource(
+                            if (action == AccountStatus.BANNED) R.string.admin_account_ban_reason
+                            else R.string.admin_account_suspend_reason,
+                        ),
+                    )
+                },
+                shape = MaterialTheme.shapes.small,
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 2,
+            )
+            Spacer(Modifier.height(6.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = {
+                        onSetStatus(action, reason.trim().takeIf { it.isNotEmpty() })
+                        pendingAction = null
+                        reason = ""
+                    },
+                    enabled = !isDeciding,
+                    shape = MaterialTheme.shapes.medium,
+                ) { Text(stringResource(R.string.admin_account_confirm)) }
+                TextButton(onClick = { pendingAction = null; reason = "" }) {
+                    Text(stringResource(R.string.admin_cancel))
+                }
+            }
+        } else {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (account.status == AccountStatus.SUSPENDED || account.status == AccountStatus.BANNED) {
+                    Button(
+                        onClick = { onSetStatus(AccountStatus.ACTIVE, null) },
+                        enabled = !isDeciding,
+                        shape = MaterialTheme.shapes.medium,
+                    ) {
+                        if (isDeciding) {
+                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                        } else {
+                            Text(stringResource(R.string.admin_account_restore))
+                        }
+                    }
+                } else {
+                    OutlinedButton(
+                        onClick = { pendingAction = AccountStatus.SUSPENDED },
+                        enabled = !isDeciding,
+                        shape = MaterialTheme.shapes.medium,
+                    ) { Text(stringResource(R.string.admin_account_suspend)) }
+                    TextButton(onClick = { pendingAction = AccountStatus.BANNED }, enabled = !isDeciding) {
+                        Text(stringResource(R.string.admin_account_ban))
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** One card, three different action shapes depending on status --
+ *  REQUESTED/UNDER_REVIEW are still a review/approve decision (DecisionRow
+ *  fits), but APPROVED becomes "pay or fail", which isn't an approve/reject
+ *  choice at all, so it gets its own row instead of forcing DecisionRow's
+ *  labels to mean something they don't. */
+@Composable
+private fun PayoutCard(
+    payout: AdminPayout,
+    isDeciding: Boolean,
+    onReview: (Boolean, String?) -> Unit,
+    onApprove: (Boolean, String?) -> Unit,
+    onMarkPaid: (String?) -> Unit,
+    onMarkFailed: (String) -> Unit,
+) {
+    var failing by remember(payout.id) { mutableStateOf(false) }
+    var reason by remember(payout.id) { mutableStateOf("") }
+    var providerRef by remember(payout.id) { mutableStateOf("") }
+
+    AppCard {
+        Row(verticalAlignment = Alignment.Top) {
+            Text(
+                payout.payeeLabel ?: payout.payeeType,
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.weight(1f),
+            )
+            StatusBadge(payout.status.labelMs, tone = BadgeTone.WARNING)
+        }
+        Spacer(Modifier.height(4.dp))
+        Text(payout.amountSen.format(), style = MaterialTheme.typography.bodyMedium)
+        Text(
+            "${payout.bankCode} •••• ${payout.accountNoLast4} (${payout.holderName})",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        when (payout.status) {
+            PayoutStatus.REQUESTED -> DecisionRow(
+                isDeciding = isDeciding,
+                approveLabel = stringResource(R.string.admin_payout_send_to_review),
+                rejectLabel = stringResource(R.string.admin_reject),
+                onApprove = { onReview(true, null) },
+                onReject = { r -> onReview(false, r) },
+            )
+
+            PayoutStatus.UNDER_REVIEW -> DecisionRow(
+                isDeciding = isDeciding,
+                approveLabel = stringResource(R.string.admin_approve),
+                rejectLabel = stringResource(R.string.admin_reject),
+                onApprove = { onApprove(true, null) },
+                onReject = { r -> onApprove(false, r) },
+            )
+
+            PayoutStatus.APPROVED -> {
+                Spacer(Modifier.height(10.dp))
+                if (failing) {
+                    OutlinedTextField(
+                        value = reason,
+                        onValueChange = { reason = it },
+                        label = { Text(stringResource(R.string.admin_payout_fail_reason)) },
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 2,
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = { onMarkFailed(reason.trim()); failing = false },
+                            enabled = !isDeciding && reason.isNotBlank(),
+                            shape = MaterialTheme.shapes.medium,
+                        ) { Text(stringResource(R.string.admin_confirm_reject)) }
+                        TextButton(onClick = { failing = false }) { Text(stringResource(R.string.admin_cancel)) }
+                    }
+                } else {
+                    OutlinedTextField(
+                        value = providerRef,
+                        onValueChange = { providerRef = it },
+                        label = { Text(stringResource(R.string.admin_payout_provider_ref)) },
+                        singleLine = true,
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Button(
+                            onClick = { onMarkPaid(providerRef.trim().takeIf { it.isNotEmpty() }) },
+                            enabled = !isDeciding,
+                            shape = MaterialTheme.shapes.medium,
+                        ) {
+                            if (isDeciding) {
+                                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                            } else {
+                                Text(stringResource(R.string.admin_payout_mark_paid))
+                            }
+                        }
+                        TextButton(onClick = { failing = true }, enabled = !isDeciding) {
+                            Text(stringResource(R.string.admin_payout_mark_failed))
+                        }
+                    }
+                }
+            }
+
+            else -> Unit
+        }
+    }
+}
+
+/** rpc_admin_search_order's result -- everything an admin support agent needs
+ *  for one lookup: the kirim itself, its wrapping order if it's PASARAN, its
+ *  payment intent if one exists, and every delivery attempt made against it.
+ *  Read-only: there is no decision to make here, unlike every other card in
+ *  this screen. */
+@Composable
+private fun OrderSearchResultCard(result: AdminOrderSearchResult) {
+    AppCard {
+        Row(verticalAlignment = Alignment.Top) {
+            Column(Modifier.weight(1f)) {
+                Text(result.referenceCode, style = MaterialTheme.typography.titleMedium)
+                Text(
+                    result.itemDescription,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                StatusBadge(result.kirimType.wire, tone = BadgeTone.NEUTRAL)
+                Spacer(Modifier.height(4.dp))
+                StatusBadge(result.status?.labelMs ?: "-", tone = BadgeTone.INFO)
+            }
+        }
+
+        Spacer(Modifier.height(8.dp))
+        (result.requesterName ?: result.requesterPhone)?.let {
+            Text(
+                stringResource(R.string.admin_order_requester_prefix, it),
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+        result.budgetCapSen?.let {
+            Text(
+                stringResource(R.string.admin_order_budget_prefix, it.format()),
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+        result.totalEscrowSen?.let {
+            Text(
+                stringResource(R.string.admin_order_escrow_prefix, it.format()),
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+
+        result.order?.let { order ->
+            Spacer(Modifier.height(10.dp))
+            HorizontalDivider()
+            Spacer(Modifier.height(10.dp))
+            Text(stringResource(R.string.admin_order_section_order), style = MaterialTheme.typography.titleSmall)
+            Text("${order.referenceCode} · ${order.status}", style = MaterialTheme.typography.bodySmall)
+            Text(
+                stringResource(R.string.admin_order_total_prefix, order.totalSen.format()),
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+
+        result.payment?.let { payment ->
+            Spacer(Modifier.height(10.dp))
+            HorizontalDivider()
+            Spacer(Modifier.height(10.dp))
+            Text(stringResource(R.string.admin_order_section_payment), style = MaterialTheme.typography.titleSmall)
+            Text(
+                "${payment.method} · ${payment.status} · ${payment.amountSen.format()}",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            payment.failureCode?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+            }
+        } ?: Text(
+            stringResource(R.string.admin_order_no_payment),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        if (result.deliveries.isNotEmpty()) {
+            Spacer(Modifier.height(10.dp))
+            HorizontalDivider()
+            Spacer(Modifier.height(10.dp))
+            Text(
+                stringResource(R.string.admin_order_section_deliveries),
+                style = MaterialTheme.typography.titleSmall,
+            )
+            result.deliveries.forEach { attempt ->
+                Spacer(Modifier.height(6.dp))
+                DeliveryAttemptRow(attempt)
+            }
+        }
+    }
+}
+
+@Composable
+private fun DeliveryAttemptRow(attempt: AdminDeliveryAttempt) {
+    Column {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                stringResource(R.string.admin_order_attempt_prefix, attempt.attemptNo),
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1f),
+            )
+            StatusBadge(
+                attempt.status?.labelMs ?: "-",
+                tone = if (attempt.hasOpenDispute) BadgeTone.ERROR else BadgeTone.NEUTRAL,
+            )
+        }
+        (attempt.carrierName ?: attempt.carrierPhone)?.let {
+            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        attempt.failureReason?.let {
+            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+        }
+        if (attempt.hasOpenDispute) {
+            Text(
+                stringResource(R.string.admin_order_open_dispute),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
+    }
+}
+
+/** rpc_admin_recent_payments' own row -- deliberately basic per the roadmap:
+ *  did this go through, who paid, how much. Read-only, no decisions here. */
+@Composable
+private fun PaymentRecordCard(payment: AdminPaymentRecord) {
+    AppCard {
+        Row(verticalAlignment = Alignment.Top) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    payment.payerName ?: payment.payerPhone ?: payment.referenceType,
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                Text(
+                    formatTimestamp(payment.createdAt),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            StatusBadge(payment.status, tone = BadgeTone.NEUTRAL)
+        }
+        Spacer(Modifier.height(4.dp))
+        Text(payment.amountSen.format(), style = MaterialTheme.typography.bodyMedium)
+        Text(
+            "${payment.provider} · ${payment.method} · ${payment.referenceType}",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        payment.failureCode?.let {
+            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+        }
+    }
+}
+
+private fun formatTimestamp(iso: String): String = try {
+    DateTimeFormatter.ofPattern("d MMM yyyy, HH:mm").withZone(ZoneId.systemDefault()).format(Instant.parse(iso))
+} catch (e: Exception) {
+    iso
 }
 
 /** Approve is one tap; rejecting asks why first, so the applicant is told

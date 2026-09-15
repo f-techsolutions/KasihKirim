@@ -10,8 +10,10 @@ import com.ftechsolutions.kasihkirim.domain.model.CartLine
 import com.ftechsolutions.kasihkirim.domain.model.CheckoutResult
 import com.ftechsolutions.kasihkirim.domain.model.BuyListing
 import com.ftechsolutions.kasihkirim.domain.model.PaymentStatusInfo
+import com.ftechsolutions.kasihkirim.domain.model.PromotionSubjectType
 import com.ftechsolutions.kasihkirim.domain.repository.AddressRepository
 import com.ftechsolutions.kasihkirim.domain.repository.BuyRepository
+import com.ftechsolutions.kasihkirim.domain.repository.PromotionRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -51,6 +53,12 @@ data class BuyUiState(
     val isPreparingPayment: Boolean = false,
     val isPollingPayment: Boolean = false,
     val paymentStatus: PaymentStatusInfo? = null,
+    /** A share-sheet request to launch, if any -- a one-shot event, consumed
+     *  by BuyScreen's LaunchedEffect then cleared, the same pattern as
+     *  pendingPaymentUrl above. Null both before a share is requested and
+     *  after it's been launched. */
+    val pendingShare: ShareRequest? = null,
+    val isSharingProductId: String? = null,
     val error: AppError? = null,
 ) {
     val cartCount: Int get() = cart.sumOf { it.quantity }
@@ -58,12 +66,18 @@ data class BuyUiState(
     val cartSpansMultipleSellers: Boolean get() = cart.map { it.sellerId }.distinct().size > 1
 }
 
+/** Kongsi & Untung: what BuyScreen needs to build the Android share sheet
+ *  message for a just-created promotion code. */
+data class ShareRequest(val productTitle: String, val shareLink: String)
+
 class BuyViewModel(
     private val buyRepo: BuyRepository,
     private val addressRepo: AddressRepository,
+    private val promotionRepo: PromotionRepository,
+    initialQuery: String = "",
 ) : ViewModel() {
 
-    private val _state = MutableStateFlow(BuyUiState())
+    private val _state = MutableStateFlow(BuyUiState(searchQuery = initialQuery))
     val state: StateFlow<BuyUiState> = _state.asStateFlow()
 
     private var pollingJob: Job? = null
@@ -256,17 +270,46 @@ class BuyViewModel(
 
     fun clearError() = _state.update { it.copy(error = null) }
 
+    /** Kongsi & Untung: mint (or re-fetch) this buyer's own share code for a
+     *  product and hand the resulting link to BuyScreen as a one-shot share-
+     *  sheet event. A no-op-with-error while the feature is off -- surfaced
+     *  the same way any other RPC error is (KONGSI_UNTUNG_DISABLED). */
+    fun shareProduct(listing: BuyListing) {
+        if (_state.value.isSharingProductId != null) return
+        viewModelScope.launch {
+            _state.update { it.copy(isSharingProductId = listing.id, error = null) }
+            when (val result = promotionRepo.createPromotion(PromotionSubjectType.PRODUCT, listing.id)) {
+                is AppResult.Success -> _state.update {
+                    it.copy(
+                        isSharingProductId = null,
+                        pendingShare = ShareRequest(listing.title, result.data.shareLink),
+                    )
+                }
+                is AppResult.Failure -> _state.update { it.copy(isSharingProductId = null, error = result.error) }
+            }
+        }
+    }
+
+    /** Consumes the one-shot share-sheet launch so recomposition never
+     *  re-opens it -- mirrors onPaymentUrlLaunched() above. */
+    fun onShareLaunched() = _state.update { it.copy(pendingShare = null) }
+
     override fun onCleared() {
         pollingJob?.cancel()
         super.onCleared()
     }
 
-    /** Manual DI, matching SalesViewModel.Factory (§9). */
+    /** Manual DI, matching SalesViewModel.Factory (§9). initialQuery lets
+     *  DealsGalleryScreen deep-link a tapped deal straight to its own
+     *  product -- see BUY_ROUTE's own "?query={query}" argument. */
     class Factory(
         private val buyRepo: BuyRepository,
         private val addressRepo: AddressRepository,
+        private val promotionRepo: PromotionRepository,
+        private val initialQuery: String = "",
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
-        override fun <T : ViewModel> create(modelClass: Class<T>): T = BuyViewModel(buyRepo, addressRepo) as T
+        override fun <T : ViewModel> create(modelClass: Class<T>): T =
+            BuyViewModel(buyRepo, addressRepo, promotionRepo, initialQuery) as T
     }
 }

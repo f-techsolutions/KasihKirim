@@ -2,8 +2,17 @@ package com.ftechsolutions.kasihkirim.ui.admin
 
 import com.ftechsolutions.kasihkirim.core.result.AppError
 import com.ftechsolutions.kasihkirim.core.result.AppResult
+import com.ftechsolutions.kasihkirim.domain.model.AccountStatus
+import com.ftechsolutions.kasihkirim.domain.model.AdminAccount
+import com.ftechsolutions.kasihkirim.domain.model.AdminOrderSearchResult
+import com.ftechsolutions.kasihkirim.domain.model.AdminPayout
+import com.ftechsolutions.kasihkirim.domain.model.AdminPaymentRecord
+import com.ftechsolutions.kasihkirim.domain.model.CarrierApplication
 import com.ftechsolutions.kasihkirim.domain.model.Dispute
 import com.ftechsolutions.kasihkirim.domain.model.DisputeStatus
+import com.ftechsolutions.kasihkirim.domain.model.KirimStatus
+import com.ftechsolutions.kasihkirim.domain.model.KirimType
+import com.ftechsolutions.kasihkirim.domain.model.PayoutStatus
 import com.ftechsolutions.kasihkirim.domain.model.ProductReview
 import com.ftechsolutions.kasihkirim.domain.model.ProductStatus
 import com.ftechsolutions.kasihkirim.domain.model.Sen
@@ -23,6 +32,11 @@ private val PENDING_SELLER = SellerApplication(
     status = SellerStatus.SUBMITTED, reviewNote = null, createdAt = "2026-09-10T00:00:00Z",
 )
 
+private val PENDING_CARRIER = CarrierApplication(
+    id = "c1", status = SellerStatus.SUBMITTED, homeCommunityName = "Kg Kepayan Baru",
+    reviewNote = null, createdAt = "2026-09-10T00:00:00Z",
+)
+
 private val PENDING_PRODUCT = ProductReview(
     id = "p1", title = "Ikan Pari", description = null, status = ProductStatus.PENDING_REVIEW,
     priceSen = Sen(800), unit = "kg", sellerName = "Kedai Aisyah", createdAt = "2026-09-10T00:00:00Z",
@@ -34,15 +48,59 @@ private val OPEN_DISPUTE = Dispute(
     resolutionNote = null, slaDueAt = "2026-09-13T00:00:00Z", createdAt = "2026-09-10T00:00:00Z",
 )
 
+private val ACTIVE_ACCOUNT = AdminAccount(
+    id = "u1", phone = "+60191234567", fullName = "Aisyah Rahman", displayName = null,
+    status = AccountStatus.ACTIVE, suspendedReason = null, createdAt = "2026-09-10T00:00:00Z",
+)
+
+private val REQUESTED_PAYOUT = AdminPayout(
+    id = "pay1", payeeType = "carrier", payeeLabel = "Rahman bin Ahmad", amountSen = Sen(5000),
+    status = PayoutStatus.REQUESTED, bankCode = "MBB", accountNoLast4 = "1234", holderName = "Rahman",
+    reviewedBy = null, approvedBy = null, requestedAt = "2026-09-10T00:00:00Z",
+)
+
+private val ORDER_PAYMENT = AdminPaymentRecord(
+    id = "pay-1", referenceType = "order", referenceId = "order-1", payerName = "Aisyah Rahman",
+    payerPhone = "+60128880001", provider = "cod", method = "COD", amountSen = Sen(3000),
+    status = "COD_PENDING", failureCode = null, createdAt = "2026-09-14T00:00:00Z",
+)
+
+private val FOUND_KIRIM = AdminOrderSearchResult(
+    kirimId = "kirim-1", referenceCode = "KK-2609-000001", kirimType = KirimType.BELI,
+    status = KirimStatus.POSTED, itemDescription = "Udang Galah", estWeightGrams = 2000,
+    budgetCapSen = Sen(3500), deliveryFeeSen = null, commissionSen = null, totalEscrowSen = Sen(5000),
+    paymentMethod = null, createdAt = "2026-09-14T00:00:00Z", requesterName = "Aisyah Rahman",
+    requesterPhone = "+60128880001", order = null, payment = null, deliveries = emptyList(),
+)
+
 private class FakeAdminRepository(
     var sellers: List<SellerApplication> = emptyList(),
+    var carriers: List<CarrierApplication> = emptyList(),
     var products: List<ProductReview> = emptyList(),
     var disputes: List<Dispute> = emptyList(),
+    var accounts: List<AdminAccount> = emptyList(),
+    var payouts: List<AdminPayout> = emptyList(),
     var sellerResult: AppResult<Unit> = AppResult.Success(Unit),
+    var carrierResult: AppResult<Unit> = AppResult.Success(Unit),
+    var accountStatusResult: AppResult<Unit> = AppResult.Success(Unit),
+    var reviewPayoutResult: AppResult<Unit> = AppResult.Success(Unit),
+    var approvePayoutResult: AppResult<Unit> = AppResult.Success(Unit),
+    var markPayoutPaidResult: AppResult<Unit> = AppResult.Success(Unit),
+    var markPayoutFailedResult: AppResult<Unit> = AppResult.Success(Unit),
+    var orderSearchResult: AppResult<AdminOrderSearchResult?> = AppResult.Success(null),
+    var recentPayments: List<AdminPaymentRecord> = emptyList(),
 ) : AdminRepository {
     var sellerCalls = mutableListOf<Triple<String, SellerStatus, String?>>()
+    var carrierCalls = mutableListOf<Triple<String, SellerStatus, String?>>()
     var productCalls = mutableListOf<Triple<String, ProductStatus, String?>>()
     var disputeCalls = mutableListOf<Triple<String, DisputeStatus, Long>>()
+    var accountStatusCalls = mutableListOf<Triple<String, AccountStatus, String?>>()
+    var searchCalls = mutableListOf<String>()
+    var reviewPayoutCalls = mutableListOf<Triple<String, Boolean, String?>>()
+    var approvePayoutCalls = mutableListOf<Triple<String, Boolean, String?>>()
+    var markPayoutPaidCalls = mutableListOf<Pair<String, String?>>()
+    var markPayoutFailedCalls = mutableListOf<Pair<String, String>>()
+    var orderSearchCalls = mutableListOf<String>()
     var listCalls = 0
 
     override suspend fun listSellerApplications(): AppResult<List<SellerApplication>> {
@@ -53,6 +111,13 @@ private class FakeAdminRepository(
     override suspend fun setSellerStatus(sellerId: String, status: SellerStatus, reason: String?): AppResult<Unit> {
         sellerCalls += Triple(sellerId, status, reason)
         return sellerResult
+    }
+
+    override suspend fun listCarrierApplications(): AppResult<List<CarrierApplication>> = AppResult.Success(carriers)
+
+    override suspend fun setCarrierStatus(carrierId: String, status: SellerStatus, reason: String?): AppResult<Unit> {
+        carrierCalls += Triple(carrierId, status, reason)
+        return carrierResult
     }
 
     override suspend fun listProductReviews(): AppResult<List<ProductReview>> = AppResult.Success(products)
@@ -77,6 +142,46 @@ private class FakeAdminRepository(
         disputeCalls += Triple(disputeId, status, refundSen)
         return AppResult.Success(Unit)
     }
+
+    override suspend fun searchAccounts(query: String): AppResult<List<AdminAccount>> {
+        searchCalls += query
+        return AppResult.Success(accounts)
+    }
+
+    override suspend fun setAccountStatus(userId: String, status: AccountStatus, reason: String?): AppResult<Unit> {
+        accountStatusCalls += Triple(userId, status, reason)
+        return accountStatusResult
+    }
+
+    override suspend fun listPayouts(): AppResult<List<AdminPayout>> = AppResult.Success(payouts)
+
+    override suspend fun reviewPayout(payoutId: String, approve: Boolean, reason: String?): AppResult<Unit> {
+        reviewPayoutCalls += Triple(payoutId, approve, reason)
+        return reviewPayoutResult
+    }
+
+    override suspend fun approvePayout(payoutId: String, approve: Boolean, reason: String?): AppResult<Unit> {
+        approvePayoutCalls += Triple(payoutId, approve, reason)
+        return approvePayoutResult
+    }
+
+    override suspend fun markPayoutPaid(payoutId: String, providerRef: String?): AppResult<Unit> {
+        markPayoutPaidCalls += payoutId to providerRef
+        return markPayoutPaidResult
+    }
+
+    override suspend fun markPayoutFailed(payoutId: String, reason: String): AppResult<Unit> {
+        markPayoutFailedCalls += payoutId to reason
+        return markPayoutFailedResult
+    }
+
+    override suspend fun searchOrder(query: String): AppResult<AdminOrderSearchResult?> {
+        orderSearchCalls += query
+        return orderSearchResult
+    }
+
+    override suspend fun listRecentPayments(limit: Int): AppResult<List<AdminPaymentRecord>> =
+        AppResult.Success(recentPayments)
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -87,10 +192,11 @@ class AdminViewModelTest {
     @Before fun setUp() = Dispatchers.setMain(dispatcher)
     @After fun tearDown() = Dispatchers.resetMain()
 
-    @Test fun `all three queues load on construction, sellers first`() = runTest(dispatcher) {
+    @Test fun `all four queues load on construction, sellers first`() = runTest(dispatcher) {
         val vm = AdminViewModel(
             FakeAdminRepository(
                 sellers = listOf(PENDING_SELLER),
+                carriers = listOf(PENDING_CARRIER),
                 products = listOf(PENDING_PRODUCT),
                 disputes = listOf(OPEN_DISPUTE),
             ),
@@ -99,6 +205,7 @@ class AdminViewModelTest {
 
         assertEquals(AdminQueue.SELLERS, vm.state.value.queue)
         assertEquals(1, vm.state.value.sellers.size)
+        assertEquals(1, vm.state.value.carriers.size)
         assertEquals(1, vm.state.value.products.size)
         assertEquals(1, vm.state.value.disputes.size)
         assertFalse(vm.state.value.isLoading)
@@ -143,6 +250,45 @@ class AdminViewModelTest {
         assertNull("a rejection is not an approval, so no re-sign-in notice", vm.state.value.notice)
     }
 
+    @Test fun `approving a carrier sends APPROVED and reloads the queues`() = runTest(dispatcher) {
+        val repo = FakeAdminRepository(carriers = listOf(PENDING_CARRIER))
+        val vm = AdminViewModel(repo)
+        advanceUntilIdle()
+        val loadsAfterInit = repo.listCalls
+
+        vm.decideCarrier("c1", SellerStatus.APPROVED); advanceUntilIdle()
+
+        assertEquals(listOf(Triple("c1", SellerStatus.APPROVED, null)), repo.carrierCalls)
+        assertTrue("queue is re-read from the server, not patched locally", repo.listCalls > loadsAfterInit)
+        assertNull(vm.state.value.decidingId)
+    }
+
+    @Test fun `approving a carrier warns that the role only lands at next sign-in`() = runTest(dispatcher) {
+        val vm = AdminViewModel(FakeAdminRepository(carriers = listOf(PENDING_CARRIER)))
+        advanceUntilIdle()
+
+        vm.decideCarrier("c1", SellerStatus.APPROVED); advanceUntilIdle()
+
+        assertEquals(AdminNotice.CARRIER_APPROVED_MUST_RESIGN, vm.state.value.notice)
+
+        vm.dismissNotice()
+        assertNull(vm.state.value.notice)
+    }
+
+    @Test fun `rejecting a carrier carries the reason through, with no re-sign-in notice`() = runTest(dispatcher) {
+        val repo = FakeAdminRepository(carriers = listOf(PENDING_CARRIER))
+        val vm = AdminViewModel(repo)
+        advanceUntilIdle()
+
+        vm.decideCarrier("c1", SellerStatus.REJECTED, "Vehicle documents incomplete."); advanceUntilIdle()
+
+        assertEquals(
+            listOf(Triple("c1", SellerStatus.REJECTED, "Vehicle documents incomplete.")),
+            repo.carrierCalls,
+        )
+        assertNull(vm.state.value.notice)
+    }
+
     @Test fun `publishing a product sends ACTIVE`() = runTest(dispatcher) {
         val repo = FakeAdminRepository(products = listOf(PENDING_PRODUCT))
         val vm = AdminViewModel(repo)
@@ -177,6 +323,183 @@ class AdminViewModelTest {
         assertEquals(AppError.NotAuthorized, vm.state.value.error)
         assertNull(vm.state.value.decidingId)
         assertNull(vm.state.value.notice)
+    }
+
+    @Test fun `a blank account query is refused client-side, no repository call`() = runTest(dispatcher) {
+        val repo = FakeAdminRepository()
+        val vm = AdminViewModel(repo)
+        advanceUntilIdle()
+
+        vm.onAccountQueryChange("   ")
+        vm.searchAccounts(); advanceUntilIdle()
+
+        assertTrue(repo.searchCalls.isEmpty())
+        assertTrue(vm.state.value.accounts.isEmpty())
+    }
+
+    @Test fun `searching accounts populates the accounts list`() = runTest(dispatcher) {
+        val repo = FakeAdminRepository(accounts = listOf(ACTIVE_ACCOUNT))
+        val vm = AdminViewModel(repo)
+        advanceUntilIdle()
+
+        vm.onAccountQueryChange("aisyah")
+        vm.searchAccounts(); advanceUntilIdle()
+
+        assertEquals(listOf("aisyah"), repo.searchCalls)
+        assertEquals(listOf(ACTIVE_ACCOUNT), vm.state.value.accounts)
+        assertFalse(vm.state.value.isSearchingAccounts)
+    }
+
+    @Test fun `suspending an account carries the reason and re-runs the search`() = runTest(dispatcher) {
+        val repo = FakeAdminRepository(accounts = listOf(ACTIVE_ACCOUNT))
+        val vm = AdminViewModel(repo)
+        advanceUntilIdle()
+        vm.onAccountQueryChange("aisyah")
+        vm.searchAccounts(); advanceUntilIdle()
+        val searchesAfterFirst = repo.searchCalls.size
+
+        vm.setAccountStatus("u1", AccountStatus.SUSPENDED, "reported by another user")
+        advanceUntilIdle()
+
+        assertEquals(
+            listOf(Triple("u1", AccountStatus.SUSPENDED, "reported by another user")),
+            repo.accountStatusCalls,
+        )
+        assertTrue("a successful status change re-runs the same search", repo.searchCalls.size > searchesAfterFirst)
+        assertNull(vm.state.value.decidingId)
+    }
+
+    @Test fun `a failed account status change surfaces the error and clears the busy row`() = runTest(dispatcher) {
+        val repo = FakeAdminRepository(
+            accounts = listOf(ACTIVE_ACCOUNT),
+            accountStatusResult = AppResult.Failure(AppError.Server("CANNOT_ACT_ON_SELF")),
+        )
+        val vm = AdminViewModel(repo)
+        advanceUntilIdle()
+
+        vm.setAccountStatus("u1", AccountStatus.SUSPENDED, null); advanceUntilIdle()
+
+        assertEquals(AppError.Server("CANNOT_ACT_ON_SELF"), vm.state.value.error)
+        assertNull(vm.state.value.decidingId)
+    }
+
+    @Test fun `payouts load alongside the other four queues`() = runTest(dispatcher) {
+        val vm = AdminViewModel(FakeAdminRepository(payouts = listOf(REQUESTED_PAYOUT)))
+        advanceUntilIdle()
+
+        assertEquals(1, vm.state.value.payouts.size)
+    }
+
+    @Test fun `reviewing a payout carries the decision through and reloads`() = runTest(dispatcher) {
+        val repo = FakeAdminRepository(payouts = listOf(REQUESTED_PAYOUT))
+        val vm = AdminViewModel(repo)
+        advanceUntilIdle()
+        val loadsAfterInit = repo.listCalls
+
+        vm.reviewPayout("pay1", true); advanceUntilIdle()
+
+        assertEquals(listOf(Triple("pay1", true, null)), repo.reviewPayoutCalls)
+        assertTrue("queue is re-read from the server, not patched locally", repo.listCalls > loadsAfterInit)
+        assertNull(vm.state.value.decidingId)
+    }
+
+    @Test fun `rejecting at the review step carries the reason through`() = runTest(dispatcher) {
+        val repo = FakeAdminRepository(payouts = listOf(REQUESTED_PAYOUT))
+        val vm = AdminViewModel(repo)
+        advanceUntilIdle()
+
+        vm.reviewPayout("pay1", false, "duplicate request"); advanceUntilIdle()
+
+        assertEquals(listOf(Triple("pay1", false, "duplicate request")), repo.reviewPayoutCalls)
+    }
+
+    @Test fun `approving a payout carries the decision through`() = runTest(dispatcher) {
+        val repo = FakeAdminRepository(payouts = listOf(REQUESTED_PAYOUT))
+        val vm = AdminViewModel(repo)
+        advanceUntilIdle()
+
+        vm.approvePayout("pay1", true); advanceUntilIdle()
+
+        assertEquals(listOf(Triple("pay1", true, null)), repo.approvePayoutCalls)
+    }
+
+    @Test fun `a maker-checker rejection surfaces as an ordinary error`() = runTest(dispatcher) {
+        val repo = FakeAdminRepository(
+            payouts = listOf(REQUESTED_PAYOUT),
+            approvePayoutResult = AppResult.Failure(AppError.Server("CANNOT_APPROVE_OWN_REVIEW")),
+        )
+        val vm = AdminViewModel(repo)
+        advanceUntilIdle()
+
+        vm.approvePayout("pay1", true); advanceUntilIdle()
+
+        assertEquals(AppError.Server("CANNOT_APPROVE_OWN_REVIEW"), vm.state.value.error)
+        assertNull(vm.state.value.decidingId)
+    }
+
+    @Test fun `marking a payout paid carries the provider ref through`() = runTest(dispatcher) {
+        val repo = FakeAdminRepository(payouts = listOf(REQUESTED_PAYOUT))
+        val vm = AdminViewModel(repo)
+        advanceUntilIdle()
+
+        vm.markPayoutPaid("pay1", "MANUAL-REF-1"); advanceUntilIdle()
+
+        assertEquals(listOf("pay1" to "MANUAL-REF-1"), repo.markPayoutPaidCalls)
+    }
+
+    @Test fun `marking a payout failed carries the reason through`() = runTest(dispatcher) {
+        val repo = FakeAdminRepository(payouts = listOf(REQUESTED_PAYOUT))
+        val vm = AdminViewModel(repo)
+        advanceUntilIdle()
+
+        vm.markPayoutFailed("pay1", "bank rejected the account details"); advanceUntilIdle()
+
+        assertEquals(listOf("pay1" to "bank rejected the account details"), repo.markPayoutFailedCalls)
+    }
+
+    @Test fun `recent payments load alongside the other queues`() = runTest(dispatcher) {
+        val vm = AdminViewModel(FakeAdminRepository(recentPayments = listOf(ORDER_PAYMENT)))
+        advanceUntilIdle()
+
+        assertEquals(1, vm.state.value.recentPayments.size)
+    }
+
+    @Test fun `a blank order query is refused client-side, same as account search`() = runTest(dispatcher) {
+        val repo = FakeAdminRepository()
+        val vm = AdminViewModel(repo)
+        advanceUntilIdle()
+
+        vm.searchOrder(); advanceUntilIdle()
+
+        assertTrue("an empty query never reaches the repository", repo.orderSearchCalls.isEmpty())
+        assertNull(vm.state.value.orderResult)
+        assertFalse(vm.state.value.searchedOrder)
+    }
+
+    @Test fun `searching an order carries the query through and stores the result`() = runTest(dispatcher) {
+        val repo = FakeAdminRepository(orderSearchResult = AppResult.Success(FOUND_KIRIM))
+        val vm = AdminViewModel(repo)
+        advanceUntilIdle()
+
+        vm.onOrderQueryChange("KK-2609-000001")
+        vm.searchOrder(); advanceUntilIdle()
+
+        assertEquals(listOf("KK-2609-000001"), repo.orderSearchCalls)
+        assertEquals(FOUND_KIRIM, vm.state.value.orderResult)
+        assertTrue(vm.state.value.searchedOrder)
+        assertFalse(vm.state.value.isSearchingOrder)
+    }
+
+    @Test fun `a search that finds nothing is distinct from one that never ran`() = runTest(dispatcher) {
+        val repo = FakeAdminRepository(orderSearchResult = AppResult.Success(null))
+        val vm = AdminViewModel(repo)
+        advanceUntilIdle()
+
+        vm.onOrderQueryChange("no-such-reference")
+        vm.searchOrder(); advanceUntilIdle()
+
+        assertNull(vm.state.value.orderResult)
+        assertTrue("a search that ran and found nothing is still marked as searched", vm.state.value.searchedOrder)
     }
 
     @Test fun `only final dispute statuses are treated as resolving`() {

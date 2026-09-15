@@ -1,5 +1,8 @@
 package com.ftechsolutions.kasihkirim.data.remote.dto
 
+import com.ftechsolutions.kasihkirim.domain.model.AccountStatus
+import com.ftechsolutions.kasihkirim.domain.model.AdminAccount
+import com.ftechsolutions.kasihkirim.domain.model.CarrierApplication
 import com.ftechsolutions.kasihkirim.domain.model.Dispute
 import com.ftechsolutions.kasihkirim.domain.model.DisputeStatus
 import com.ftechsolutions.kasihkirim.domain.model.ProductReview
@@ -26,6 +29,55 @@ data class SellerApplicationDto(
         ssmRegNo = ssmRegNo,
         status = SellerStatus.fromWire(status) ?: SellerStatus.NOT_STARTED,
         reviewNote = reviewNote,
+        createdAt = createdAt,
+    )
+}
+
+/** public.carriers read as a reviewer, with its home community embedded --
+ *  mirrors ProductReviewDto's own sellers(business_name) pattern, so an
+ *  admin sees a place name instead of a bare UUID. review_note added in 0040. */
+@Serializable
+data class CarrierApplicationDto(
+    val id: String,
+    val status: String,
+    @SerialName("review_note") val reviewNote: String? = null,
+    @SerialName("created_at") val createdAt: String,
+    val communities: CarrierApplicationCommunityDto? = null,
+) {
+    fun toDomain() = CarrierApplication(
+        id = id,
+        status = SellerStatus.fromWire(status) ?: SellerStatus.NOT_STARTED,
+        homeCommunityName = communities?.name,
+        reviewNote = reviewNote,
+        createdAt = createdAt,
+    )
+}
+
+@Serializable
+data class CarrierApplicationCommunityDto(
+    val name: String,
+)
+
+/** public.profiles read as a reviewer, per profiles_select's own
+ *  is_admin() clause (0003). suspended_reason added in 0001, only ever
+ *  meaningful once 0041 gave it a write path. */
+@Serializable
+data class AdminAccountDto(
+    val id: String,
+    val phone: String,
+    @SerialName("full_name") val fullName: String? = null,
+    @SerialName("display_name") val displayName: String? = null,
+    val status: String,
+    @SerialName("suspended_reason") val suspendedReason: String? = null,
+    @SerialName("created_at") val createdAt: String,
+) {
+    fun toDomain() = AdminAccount(
+        id = id,
+        phone = phone,
+        fullName = fullName,
+        displayName = displayName,
+        status = AccountStatus.fromWire(status) ?: AccountStatus.PENDING,
+        suspendedReason = suspendedReason,
         createdAt = createdAt,
     )
 }

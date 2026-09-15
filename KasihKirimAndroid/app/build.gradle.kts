@@ -121,8 +121,10 @@ dependencies {
     implementation(libs.supabase.postgrest)
     implementation(libs.supabase.storage)
     implementation(libs.supabase.functions)
+    implementation(libs.supabase.realtime)
     implementation(libs.ktor.okhttp)
     implementation(libs.androidx.browser)
+    implementation(libs.play.services.location)
 
     testImplementation(libs.junit)
     testImplementation(libs.coroutines.test)

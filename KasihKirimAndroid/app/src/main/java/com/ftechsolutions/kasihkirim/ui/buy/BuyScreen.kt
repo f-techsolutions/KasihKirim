@@ -2,6 +2,7 @@
 
 package com.ftechsolutions.kasihkirim.ui.buy
 
+import android.content.Intent
 import android.net.Uri
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.foundation.layout.*
@@ -11,6 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.Store
 import androidx.compose.material3.*
@@ -45,6 +47,19 @@ fun BuyScreen(vm: BuyViewModel, onBack: () -> Unit, onOpenOrders: () -> Unit) {
         val url = state.pendingPaymentUrl ?: return@LaunchedEffect
         CustomTabsIntent.Builder().build().launchUrl(context, Uri.parse(url))
         vm.onPaymentUrlLaunched()
+    }
+
+    // Kongsi & Untung: the same one-shot pattern as pendingPaymentUrl above,
+    // launching Android's own share sheet instead of a Custom Tab.
+    val shareMessageTemplate = stringResource(R.string.buy_share_earn_message)
+    LaunchedEffect(state.pendingShare) {
+        val share = state.pendingShare ?: return@LaunchedEffect
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, shareMessageTemplate.format(share.productTitle, share.shareLink))
+        }
+        context.startActivity(Intent.createChooser(intent, null))
+        vm.onShareLaunched()
     }
 
     Scaffold(
@@ -98,7 +113,9 @@ fun BuyScreen(vm: BuyViewModel, onBack: () -> Unit, onOpenOrders: () -> Unit) {
                     ListingCard(
                         listing = listing,
                         isAdding = state.addingToCartProductId == listing.id,
+                        isSharing = state.isSharingProductId == listing.id,
                         onAdd = { vm.addToCart(listing.id) },
+                        onShare = { vm.shareProduct(listing) },
                     )
                 }
                 state.error?.let { item { Text(stringResource(it.messageRes()), color = MaterialTheme.colorScheme.error) } }
@@ -113,7 +130,13 @@ fun BuyScreen(vm: BuyViewModel, onBack: () -> Unit, onOpenOrders: () -> Unit) {
 }
 
 @Composable
-private fun ListingCard(listing: BuyListing, isAdding: Boolean, onAdd: () -> Unit) {
+private fun ListingCard(
+    listing: BuyListing,
+    isAdding: Boolean,
+    isSharing: Boolean,
+    onAdd: () -> Unit,
+    onShare: () -> Unit,
+) {
     AppCard {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
@@ -135,6 +158,18 @@ private fun ListingCard(listing: BuyListing, isAdding: Boolean, onAdd: () -> Uni
                 }
                 Spacer(Modifier.height(4.dp))
                 Text("${listing.priceSen.format()} / ${listing.unit}", style = MaterialTheme.typography.bodyMedium)
+            }
+            // Kongsi & Untung (0045): mints (or re-fetches) this buyer's own
+            // share code for the product and opens the Android share sheet.
+            // A no-op-with-error while the feature is off, surfaced the same
+            // way any other RPC error is -- not hidden behind a role check,
+            // since anyone can be a promoter.
+            IconButton(onClick = onShare, enabled = !isSharing) {
+                if (isSharing) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                } else {
+                    Icon(Icons.Filled.Share, contentDescription = stringResource(R.string.buy_share_earn))
+                }
             }
             FilledIconButton(onClick = onAdd, enabled = !isAdding) {
                 if (isAdding) {

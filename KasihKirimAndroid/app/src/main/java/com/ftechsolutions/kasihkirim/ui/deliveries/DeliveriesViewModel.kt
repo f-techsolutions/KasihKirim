@@ -6,7 +6,9 @@ import androidx.lifecycle.viewModelScope
 import com.ftechsolutions.kasihkirim.core.result.AppError
 import com.ftechsolutions.kasihkirim.core.result.AppResult
 import com.ftechsolutions.kasihkirim.domain.model.Delivery
+import com.ftechsolutions.kasihkirim.domain.model.DisputeCategory
 import com.ftechsolutions.kasihkirim.domain.repository.DeliveryRepository
+import com.ftechsolutions.kasihkirim.domain.repository.DeliveryTrackingRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -24,11 +26,36 @@ data class DeliveriesUiState(
      *  transition is open, so the screen knows which delivery/leg/event a
      *  captured photo belongs to once the camera returns. */
     val pendingProof: PendingProof? = null,
+    /** Non-null while the "record purchase" amount dialog is open for this
+     *  BELI delivery. */
+    val recordPurchaseDeliveryId: String? = null,
+    /** Non-null while the carrier's "report a problem" dialog is open for
+     *  this DELIVERED delivery (rpc_open_carrier_dispute, 0039). */
+    val openDisputeDeliveryId: String? = null,
+    val disputeCategory: DisputeCategory = DisputeCategory.OTHER,
+    val disputeDescription: String = "",
+    /** Ids of deliveries the caller has already reviewed -- loaded alongside
+     *  [deliveries] so a COMPLETED delivery already rated doesn't show the
+     *  Rate button again. */
+    val reviewedDeliveryIds: Set<String> = emptySet(),
+    /** Non-null while the rating dialog is open for this COMPLETED delivery
+     *  (rpc_submit_review, 0044). */
+    val rateDeliveryId: String? = null,
+    val ratingValue: Int = 5,
+    val ratingComment: String = "",
+    /** Non-null while the carrier is broadcasting their position for this
+     *  delivery (rpc_update_delivery_location, 0046) -- the screen owns the
+     *  actual FusedLocationProviderClient updates and calls [postLocation]
+     *  as they arrive; this is just which delivery, if any, they belong to. */
+    val sharingLocationDeliveryId: String? = null,
 )
 
 data class PendingProof(val deliveryId: String, val leg: String, val event: String)
 
-class DeliveriesViewModel(private val repo: DeliveryRepository) : ViewModel() {
+class DeliveriesViewModel(
+    private val repo: DeliveryRepository,
+    private val trackingRepo: DeliveryTrackingRepository,
+) : ViewModel() {
 
     private val _state = MutableStateFlow(DeliveriesUiState())
     val state: StateFlow<DeliveriesUiState> = _state.asStateFlow()
@@ -38,9 +65,20 @@ class DeliveriesViewModel(private val repo: DeliveryRepository) : ViewModel() {
     fun load() {
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true, error = null) }
-            when (val result = repo.listMyDeliveries()) {
-                is AppResult.Success -> _state.update { it.copy(isLoading = false, deliveries = result.data) }
-                is AppResult.Failure -> _state.update { it.copy(isLoading = false, error = result.error) }
+            val deliveries = repo.listMyDeliveries()
+            val reviewed = repo.listMyReviewedDeliveryIds()
+            // Same reasoning as AdminViewModel's own load(): one failure is
+            // reported, but whatever did load still renders -- a broken
+            // reviewed-ids read shouldn't hide the delivery list itself.
+            _state.update {
+                it.copy(
+                    isLoading = false,
+                    deliveries = (deliveries as? AppResult.Success)?.data ?: it.deliveries,
+                    reviewedDeliveryIds = (reviewed as? AppResult.Success)?.data ?: it.reviewedDeliveryIds,
+                    error = listOf(deliveries, reviewed)
+                        .filterIsInstance<AppResult.Failure>()
+                        .firstOrNull()?.error,
+                )
             }
         }
     }
@@ -90,9 +128,137 @@ class DeliveriesViewModel(private val repo: DeliveryRepository) : ViewModel() {
         }
     }
 
+    /** Opens the amount-entry dialog for recording a BELI purchase. */
+    fun requestRecordPurchase(deliveryId: String) {
+        _state.update { it.copy(recordPurchaseDeliveryId = deliveryId, error = null) }
+    }
+
+    fun cancelRecordPurchase() {
+        _state.update { it.copy(recordPurchaseDeliveryId = null) }
+    }
+
+    /** The carrier confirmed how much they actually spent -- record it and
+     *  advance the delivery out of PROCURING. */
+    fun recordPurchase(actualGoodsSen: Long) {
+        val deliveryId = _state.value.recordPurchaseDeliveryId ?: return
+        viewModelScope.launch {
+            _state.update { it.copy(transitioningId = deliveryId, recordPurchaseDeliveryId = null, error = null) }
+            when (val result = repo.recordPurchase(deliveryId, actualGoodsSen)) {
+                is AppResult.Success -> {
+                    _state.update { it.copy(transitioningId = null) }
+                    load()
+                }
+                is AppResult.Failure -> _state.update { it.copy(transitioningId = null, error = result.error) }
+            }
+        }
+    }
+
+    /** Opens the "report a problem" dialog for a DELIVERED delivery. */
+    fun requestOpenDispute(deliveryId: String) {
+        _state.update {
+            it.copy(
+                openDisputeDeliveryId = deliveryId, error = null,
+                disputeCategory = DisputeCategory.OTHER, disputeDescription = "",
+            )
+        }
+    }
+
+    fun cancelOpenDispute() = _state.update { it.copy(openDisputeDeliveryId = null) }
+
+    fun onDisputeCategorySelected(category: DisputeCategory) = _state.update { it.copy(disputeCategory = category) }
+    fun onDisputeDescriptionChange(text: String) = _state.update { it.copy(disputeDescription = text) }
+
+    /** rpc_open_carrier_dispute (0039). */
+    fun submitDispute() {
+        val deliveryId = _state.value.openDisputeDeliveryId ?: return
+        val category = _state.value.disputeCategory
+        val description = _state.value.disputeDescription.trim()
+        viewModelScope.launch {
+            _state.update { it.copy(transitioningId = deliveryId, openDisputeDeliveryId = null, error = null) }
+            when (val result = repo.openDispute(deliveryId, category.wire, description)) {
+                is AppResult.Success -> {
+                    _state.update { it.copy(transitioningId = null) }
+                    load()
+                }
+                is AppResult.Failure -> _state.update { it.copy(transitioningId = null, error = result.error) }
+            }
+        }
+    }
+
+    /** Opens the rating dialog for a COMPLETED delivery. */
+    fun requestRate(deliveryId: String) {
+        _state.update { it.copy(rateDeliveryId = deliveryId, error = null, ratingValue = 5, ratingComment = "") }
+    }
+
+    fun cancelRate() = _state.update { it.copy(rateDeliveryId = null) }
+
+    fun onRatingValueChange(value: Int) = _state.update { it.copy(ratingValue = value) }
+    fun onRatingCommentChange(text: String) = _state.update { it.copy(ratingComment = text) }
+
+    /** rpc_submit_review (0044). Not routed through [decide]: a rated
+     *  delivery never leaves [DeliveriesUiState.deliveries] the way a queue
+     *  row leaves a review queue -- only [reviewedDeliveryIds] needs to
+     *  reflect the change, so [load] (not a full reload elsewhere) is enough. */
+    fun submitRating() {
+        val deliveryId = _state.value.rateDeliveryId ?: return
+        val rating = _state.value.ratingValue
+        val comment = _state.value.ratingComment.trim().takeIf { it.isNotEmpty() }
+        viewModelScope.launch {
+            _state.update { it.copy(transitioningId = deliveryId, rateDeliveryId = null, error = null) }
+            when (val result = repo.submitReview(deliveryId, rating, comment)) {
+                is AppResult.Success -> {
+                    _state.update { it.copy(transitioningId = null) }
+                    load()
+                }
+                is AppResult.Failure -> _state.update { it.copy(transitioningId = null, error = result.error) }
+            }
+        }
+    }
+
+    /** The screen's permission/FusedLocationProviderClient plumbing decided
+     *  to start sharing for [deliveryId] -- this only flips the state the
+     *  screen's own effect watches to actually request location updates. */
+    fun startSharingLocation(deliveryId: String) {
+        _state.update { it.copy(sharingLocationDeliveryId = deliveryId, error = null) }
+    }
+
+    fun stopSharingLocation() {
+        _state.update { it.copy(sharingLocationDeliveryId = null) }
+    }
+
+    /** A fresh device location arrived while sharing is on -- forward it.
+     *  DELIVERY_NOT_IN_TRANSIT means the delivery left the trackable window
+     *  (e.g. it was just delivered) while sharing was still on, so sharing
+     *  is turned off rather than retrying forever against a write the
+     *  server will keep refusing. */
+    fun postLocation(
+        deliveryId: String,
+        lat: Double,
+        lng: Double,
+        headingDeg: Double?,
+        speedKmh: Double?,
+        accuracyM: Double?,
+    ) {
+        viewModelScope.launch {
+            when (val result = trackingRepo.updateMyLocation(deliveryId, lat, lng, headingDeg, speedKmh, accuracyM)) {
+                is AppResult.Success -> Unit
+                is AppResult.Failure -> _state.update {
+                    val stillTracked = (result.error as? AppError.Server)?.code != "DELIVERY_NOT_IN_TRANSIT"
+                    it.copy(
+                        sharingLocationDeliveryId = if (stillTracked) it.sharingLocationDeliveryId else null,
+                        error = result.error,
+                    )
+                }
+            }
+        }
+    }
+
     /** Manual DI, matching AuthViewModel.Factory (§9). */
-    class Factory(private val repo: DeliveryRepository) : ViewModelProvider.Factory {
+    class Factory(
+        private val repo: DeliveryRepository,
+        private val trackingRepo: DeliveryTrackingRepository,
+    ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
-        override fun <T : ViewModel> create(modelClass: Class<T>): T = DeliveriesViewModel(repo) as T
+        override fun <T : ViewModel> create(modelClass: Class<T>): T = DeliveriesViewModel(repo, trackingRepo) as T
     }
 }

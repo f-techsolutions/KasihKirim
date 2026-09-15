@@ -22,6 +22,7 @@ import com.ftechsolutions.kasihkirim.domain.model.CapacityInvite
 import com.ftechsolutions.kasihkirim.domain.model.KirimSummary
 import com.ftechsolutions.kasihkirim.domain.model.KirimType
 import com.ftechsolutions.kasihkirim.domain.model.Trip
+import com.ftechsolutions.kasihkirim.domain.model.formatGrams
 import com.ftechsolutions.kasihkirim.ui.auth.messageRes
 import com.ftechsolutions.kasihkirim.ui.common.AppCard
 import com.ftechsolutions.kasihkirim.ui.common.BadgeTone
@@ -104,7 +105,7 @@ private fun BoardCard(
             color = MaterialTheme.colorScheme.onSurface,
         )
         Text(
-            "${kirim.estWeightGrams / 1000}kg",
+            kirim.estWeightGrams.formatGrams(),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

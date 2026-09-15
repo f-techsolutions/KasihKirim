@@ -29,6 +29,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.ftechsolutions.kasihkirim.R
+import com.ftechsolutions.kasihkirim.domain.model.DisputeCategory
 import com.ftechsolutions.kasihkirim.domain.model.HandlingFlag
 import com.ftechsolutions.kasihkirim.domain.model.KirimCategory
 import com.ftechsolutions.kasihkirim.domain.model.OrderStatus
@@ -437,10 +438,22 @@ private fun OrderDetailSheet(vm: SalesViewModel) {
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    Spacer(Modifier.height(10.dp))
+                    Text(stringResource(R.string.sales_order_dispute_category), style = MaterialTheme.typography.labelLarge)
+                    Spacer(Modifier.height(4.dp))
+                    DisputeCategoryChips(state.disputeCategory, vm::onDisputeCategorySelected)
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = state.disputeDescription,
+                        onValueChange = vm::onDisputeDescriptionChange,
+                        label = { Text(stringResource(R.string.sales_order_dispute_description)) },
+                        minLines = 3,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                     Spacer(Modifier.height(8.dp))
                     Button(
                         onClick = vm::confirmDispute,
-                        enabled = !state.isFilingDispute,
+                        enabled = !state.isFilingDispute && state.disputeDescription.trim().length >= 10,
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                         shape = MaterialTheme.shapes.medium,
                         modifier = Modifier.fillMaxWidth().heightIn(min = 46.dp),
@@ -469,6 +482,35 @@ private fun OrderDetailSheet(vm: SalesViewModel) {
                 shape = MaterialTheme.shapes.medium,
                 modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp),
             ) { Text(stringResource(R.string.sales_close)) }
+        }
+    }
+}
+
+/** Mirrors BuyOrdersScreen's own FlowRowChips for the buyer's rpc_open_dispute
+ *  form -- same DisputeCategory enum, same two-row wrapping layout, now also
+ *  offered to a seller filing via rpc_open_seller_dispute (0038). */
+@Composable
+private fun DisputeCategoryChips(selected: DisputeCategory, onSelect: (DisputeCategory) -> Unit) {
+    val categories = DisputeCategory.entries
+    val (first, second) = categories.chunked((categories.size + 1) / 2).let { it[0] to (it.getOrNull(1) ?: emptyList()) }
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            first.forEach { category ->
+                FilterChip(
+                    selected = selected == category,
+                    onClick = { onSelect(category) },
+                    label = { Text(category.labelMs) },
+                )
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            second.forEach { category ->
+                FilterChip(
+                    selected = selected == category,
+                    onClick = { onSelect(category) },
+                    label = { Text(category.labelMs) },
+                )
+            }
         }
     }
 }

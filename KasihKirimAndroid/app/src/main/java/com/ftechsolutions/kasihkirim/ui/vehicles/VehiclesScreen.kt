@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import com.ftechsolutions.kasihkirim.R
 import com.ftechsolutions.kasihkirim.domain.model.Vehicle
 import com.ftechsolutions.kasihkirim.domain.model.VehicleType
+import com.ftechsolutions.kasihkirim.domain.model.formatGrams
 import com.ftechsolutions.kasihkirim.ui.auth.messageRes
 import com.ftechsolutions.kasihkirim.ui.common.AppCard
 import com.ftechsolutions.kasihkirim.ui.common.BadgeTone
@@ -91,7 +92,7 @@ private fun VehicleCard(vehicle: Vehicle, onEdit: () -> Unit, onToggleActive: ()
         }
         Spacer(Modifier.height(2.dp))
         Text(
-            "${vehicle.capacityWeightGrams / 1000}kg · ${vehicle.capacityVolumeCm3}cm³ · ${vehicle.capacityParcels}x",
+            "${vehicle.capacityWeightGrams.formatGrams()} · ${vehicle.capacityVolumeCm3}cm³ · ${vehicle.capacityParcels}x",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

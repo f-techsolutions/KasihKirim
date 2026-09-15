@@ -211,6 +211,7 @@ internal fun AppError.messageRes(): Int = when (this) {
         "PHOTO_PATH_REQUIRED" -> R.string.err_photo_path_required
         "PROOF_REQUIRED" -> R.string.err_proof_required
         "SELLER_APPLICATION_EXISTS" -> R.string.err_seller_application_exists
+        "CARRIER_APPLICATION_EXISTS" -> R.string.err_carrier_application_exists
         "COMMUNITY_NOT_FOUND" -> R.string.err_community_not_found
         "BUSINESS_NAME_TOO_SHORT" -> R.string.err_business_name_too_short
         "PRODUCT_NOT_FOUND" -> R.string.err_product_not_found
@@ -241,6 +242,46 @@ internal fun AppError.messageRes(): Int = when (this) {
         "STOCK_NEGATIVE" -> R.string.err_stock_negative
         "STOCK_BELOW_RESERVED" -> R.string.err_stock_below_reserved
         "STOCK_DELTA_ZERO" -> R.string.err_stock_delta_zero
+        "BUDGET_EXCEEDED_NEEDS_VARIANCE" -> R.string.err_budget_exceeded_needs_variance
+        "INVALID_AMOUNT" -> R.string.err_invalid_amount
+        "CANNOT_ACT_ON_SELF" -> R.string.err_cannot_act_on_self
+        "USER_NOT_FOUND" -> R.string.err_user_not_found
+        "NOT_A_PAYEE" -> R.string.err_not_a_payee
+        "INVALID_BANK_CODE" -> R.string.err_invalid_bank_code
+        "INVALID_HOLDER_NAME" -> R.string.err_invalid_holder_name
+        "INVALID_ACCOUNT_NO" -> R.string.err_invalid_account_no
+        "BANK_ACCOUNT_ENC_KEY_NOT_CONFIGURED" -> R.string.err_bank_account_enc_key_not_configured
+        "BANK_ACCOUNT_NOT_FOUND" -> R.string.err_bank_account_not_found
+        "INSUFFICIENT_BALANCE" -> R.string.err_insufficient_balance
+        "NOT_A_CARRIER" -> R.string.err_not_a_carrier
+        "NOT_A_SELLER" -> R.string.err_not_a_seller
+        "CANNOT_APPROVE_OWN_REVIEW" -> R.string.err_cannot_approve_own_review
+        "INVALID_PAYOUT_STATE" -> R.string.err_invalid_payout_state
+        "ALREADY_PAID" -> R.string.err_already_paid
+        "INSUFFICIENT_BALANCE_AT_SETTLEMENT" -> R.string.err_insufficient_balance_at_settlement
+        "PAYOUT_NOT_FOUND" -> R.string.err_payout_not_found
+        "INVALID_RATING" -> R.string.err_invalid_rating
+        "DELIVERY_NOT_COMPLETED" -> R.string.err_delivery_not_completed
+        "EDIT_WINDOW_CLOSED" -> R.string.err_edit_window_closed
+        "KONGSI_UNTUNG_DISABLED" -> R.string.err_kongsi_untung_disabled
+        "INVALID_SUBJECT_TYPE" -> R.string.err_invalid_subject_type
+        "SELLER_NOT_FOUND" -> R.string.err_seller_not_found
+        "DELIVERY_NOT_IN_TRANSIT" -> R.string.err_delivery_not_in_transit
+        "INVALID_COORDINATES" -> R.string.err_invalid_coordinates
+        "SELLER_APPLICATION_REQUIRED" -> R.string.err_seller_application_required
+        "MARKETPLACE_NOT_ACTIVE" -> R.string.err_marketplace_not_active
+        "MARKETPLACE_DISABLED" -> R.string.err_marketplace_not_active
+        "CATEGORY_NOT_PERMITTED" -> R.string.err_category_not_permitted
+        "SELLER_NOT_ACTIVE" -> R.string.err_seller_not_active
+        "SELLER_LICENCE_MISSING_OR_EXPIRED" -> R.string.err_seller_licence_missing_or_expired
+        "TITLE_TOO_SHORT" -> R.string.err_title_too_short
+        "INVALID_QUANTITY" -> R.string.err_invalid_quantity
+        "COST_RECEIPT_REQUIRED" -> R.string.err_cost_receipt_required
+        "LOT_HISTORY_REQUIRED" -> R.string.err_lot_history_required
+        "LOT_VALUE_EXCEEDS_LIMIT" -> R.string.err_lot_value_exceeds_limit
+        "LOT_NOT_FOUND" -> R.string.err_lot_not_found
+        "LOT_NOT_DRAFT" -> R.string.err_lot_not_draft
+        "LOT_NOT_WITHDRAWABLE" -> R.string.err_lot_not_withdrawable
         else -> R.string.err_unexpected
     }
     else -> R.string.err_unexpected

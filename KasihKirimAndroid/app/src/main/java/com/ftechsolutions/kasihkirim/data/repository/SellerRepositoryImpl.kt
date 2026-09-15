@@ -14,6 +14,7 @@ import com.ftechsolutions.kasihkirim.data.remote.dto.SellerDto
 import com.ftechsolutions.kasihkirim.data.remote.dto.SellerOrderDto
 import com.ftechsolutions.kasihkirim.domain.model.Inventory
 import com.ftechsolutions.kasihkirim.domain.model.InventoryMovement
+import com.ftechsolutions.kasihkirim.domain.model.MuatanJualOnboardingStatus
 import com.ftechsolutions.kasihkirim.domain.model.NewProduct
 import com.ftechsolutions.kasihkirim.domain.model.NewSeller
 import com.ftechsolutions.kasihkirim.domain.model.OrderStatus
@@ -86,6 +87,7 @@ class SellerRepositoryImpl : SellerRepository {
                     put("p_business_name", draft.businessName)
                     put("p_community_id", draft.communityId)
                     put("p_ssm_reg_no", draft.ssmRegNo)
+                    put("p_seller_kind", draft.sellerKind)
                 },
             )
             .decodeAs<JsonObject>()
@@ -95,7 +97,16 @@ class SellerRepositoryImpl : SellerRepository {
             status = SellerStatus.fromWire(json.getValue("status").jsonPrimitive.content) ?: SellerStatus.NOT_STARTED,
             communityId = draft.communityId,
             ssmRegNo = draft.ssmRegNo,
+            sellerKind = draft.sellerKind,
+            onboardingStatus = MuatanJualOnboardingStatus.fromWire(
+                json["onboarding_status"]?.jsonPrimitive?.content ?: "PENDING",
+            ) ?: MuatanJualOnboardingStatus.PENDING,
         )
+    }
+
+    override suspend fun acceptMuatanJualTerms(): AppResult<Unit> = runCatchingResult {
+        SupabaseClientProvider.client.postgrest.rpc("rpc_accept_muatan_jual_terms")
+        Unit
     }
 
     override suspend fun listMyProducts(sellerId: String): AppResult<List<Product>> = runCatchingResult {
@@ -242,12 +253,17 @@ class SellerRepositoryImpl : SellerRepository {
         )
     }
 
-    override suspend fun openOrderDispute(deliveryId: String): AppResult<Unit> = runCatchingResult {
+    override suspend fun openOrderDispute(
+        deliveryId: String,
+        category: String,
+        description: String,
+    ): AppResult<Unit> = runCatchingResult {
         SupabaseClientProvider.client.postgrest.rpc(
-            "rpc_delivery_transition",
+            "rpc_open_seller_dispute",
             buildJsonObject {
                 put("p_delivery", deliveryId)
-                put("p_event", "OPEN_DISPUTE")
+                put("p_category", category)
+                put("p_description", description)
             },
         )
         Unit
@@ -325,6 +341,10 @@ private fun Throwable.toSellerAppError(): AppError = when {
     message?.contains("STATE_ACTOR_NOT_PERMITTED", true) == true -> AppError.Server("STATE_ACTOR_NOT_PERMITTED")
     message?.contains("STATE_INVALID_TRANSITION", true) == true -> AppError.Server("STATE_INVALID_TRANSITION")
     message?.contains("DELIVERY_NOT_FOUND", true) == true -> AppError.Server("DELIVERY_NOT_FOUND")
+    // Seller dispute filing (0038, via rpc_open_seller_dispute).
+    message?.contains("INVALID_CATEGORY", true) == true -> AppError.Server("INVALID_CATEGORY")
+    message?.contains("DESCRIPTION_TOO_SHORT", true) == true -> AppError.Server("DESCRIPTION_TOO_SHORT")
+    message?.contains("DISPUTE_ALREADY_OPEN", true) == true -> AppError.Server("DISPUTE_ALREADY_OPEN")
     this is IOException -> AppError.Network
     message?.contains("timeout", true) == true -> AppError.Timeout
     message?.contains("JWT", true) == true -> AppError.SessionExpired
