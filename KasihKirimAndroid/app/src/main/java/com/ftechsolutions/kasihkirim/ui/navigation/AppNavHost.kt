@@ -19,6 +19,7 @@ import com.ftechsolutions.kasihkirim.domain.repository.AddressRepository
 import com.ftechsolutions.kasihkirim.domain.repository.AdminRepository
 import com.ftechsolutions.kasihkirim.domain.repository.BadgeRepository
 import com.ftechsolutions.kasihkirim.domain.repository.BuyRepository
+import com.ftechsolutions.kasihkirim.domain.repository.CarrierLotRepository
 import com.ftechsolutions.kasihkirim.domain.repository.CarrierRepository
 import com.ftechsolutions.kasihkirim.domain.repository.DeliveryRepository
 import com.ftechsolutions.kasihkirim.domain.repository.DeliveryTrackingRepository
@@ -46,6 +47,8 @@ import com.ftechsolutions.kasihkirim.ui.deliveries.DeliveriesScreen
 import com.ftechsolutions.kasihkirim.ui.deliveries.DeliveriesViewModel
 import com.ftechsolutions.kasihkirim.ui.deliveries.DeliveryTrackingScreen
 import com.ftechsolutions.kasihkirim.ui.deliveries.DeliveryTrackingViewModel
+import com.ftechsolutions.kasihkirim.ui.muatanjual.CarrierLotsScreen
+import com.ftechsolutions.kasihkirim.ui.muatanjual.CarrierLotsViewModel
 import com.ftechsolutions.kasihkirim.ui.earnings.EarningsScreen
 import com.ftechsolutions.kasihkirim.ui.earnings.EarningsViewModel
 import com.ftechsolutions.kasihkirim.ui.home.HomeScreen
@@ -77,6 +80,7 @@ private const val BUY_ROUTE = "buy"
 private const val BUY_ORDERS_ROUTE = "buy_orders"
 private const val CARRIER_APPLICATION_ROUTE = "carrier_application"
 private const val PROMOTIONS_ROUTE = "promotions"
+private const val CARRIER_LOTS_ROUTE = "carrier_lots"
 
 @Composable
 fun AppNavHost(
@@ -92,6 +96,7 @@ fun AppNavHost(
     muatanJualRepository: MuatanJualRepository,
     sellerRepository: SellerRepository,
     carrierRepository: CarrierRepository,
+    carrierLotRepository: CarrierLotRepository,
     buyRepository: BuyRepository,
     badgeRepository: BadgeRepository,
     adminRepository: AdminRepository,
@@ -141,6 +146,20 @@ fun AppNavHost(
                     onOpenSales = { nav.navigate(Destination.SALES.route) },
                     onOpenCarrierApplication = { nav.navigate(CARRIER_APPLICATION_ROUTE) },
                     onOpenPromotions = { nav.navigate(PROMOTIONS_ROUTE) },
+                    onOpenCarrierLots = { nav.navigate(CARRIER_LOTS_ROUTE) },
+                )
+            }
+            composable(CARRIER_LOTS_ROUTE) {
+                val vm: CarrierLotsViewModel = viewModel(
+                    factory = CarrierLotsViewModel.Factory(
+                        carrierLotRepository, sellerRepository, tripRepository,
+                        carrierId = user.carrierId.orEmpty(),
+                    ),
+                )
+                CarrierLotsScreen(
+                    vm,
+                    onBack = { nav.popBackStack() },
+                    onApplyAsSeller = { nav.navigate(Destination.SALES.route) },
                 )
             }
             composable(CARRIER_APPLICATION_ROUTE) {

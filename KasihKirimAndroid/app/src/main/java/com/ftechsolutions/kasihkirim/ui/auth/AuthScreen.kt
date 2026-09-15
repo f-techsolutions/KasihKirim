@@ -268,6 +268,20 @@ internal fun AppError.messageRes(): Int = when (this) {
         "SELLER_NOT_FOUND" -> R.string.err_seller_not_found
         "DELIVERY_NOT_IN_TRANSIT" -> R.string.err_delivery_not_in_transit
         "INVALID_COORDINATES" -> R.string.err_invalid_coordinates
+        "SELLER_APPLICATION_REQUIRED" -> R.string.err_seller_application_required
+        "MARKETPLACE_NOT_ACTIVE" -> R.string.err_marketplace_not_active
+        "MARKETPLACE_DISABLED" -> R.string.err_marketplace_not_active
+        "CATEGORY_NOT_PERMITTED" -> R.string.err_category_not_permitted
+        "SELLER_NOT_ACTIVE" -> R.string.err_seller_not_active
+        "SELLER_LICENCE_MISSING_OR_EXPIRED" -> R.string.err_seller_licence_missing_or_expired
+        "TITLE_TOO_SHORT" -> R.string.err_title_too_short
+        "INVALID_QUANTITY" -> R.string.err_invalid_quantity
+        "COST_RECEIPT_REQUIRED" -> R.string.err_cost_receipt_required
+        "LOT_HISTORY_REQUIRED" -> R.string.err_lot_history_required
+        "LOT_VALUE_EXCEEDS_LIMIT" -> R.string.err_lot_value_exceeds_limit
+        "LOT_NOT_FOUND" -> R.string.err_lot_not_found
+        "LOT_NOT_DRAFT" -> R.string.err_lot_not_draft
+        "LOT_NOT_WITHDRAWABLE" -> R.string.err_lot_not_withdrawable
         else -> R.string.err_unexpected
     }
     else -> R.string.err_unexpected

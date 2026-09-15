@@ -35,6 +35,12 @@ interface SellerRepository {
      *  row, at any status. */
     suspend fun applySeller(draft: NewSeller): AppResult<Seller>
 
+    /** rpc_accept_muatan_jual_terms (0047) -- the seller's own acceptance
+     *  step, only valid once an admin has moved onboardingStatus to
+     *  APPROVED (rpc_admin_review_muatan_jual_seller, console-side).
+     *  Moves APPROVED -> ACTIVE, the state rpc_create_lot requires. */
+    suspend fun acceptMuatanJualTerms(): AppResult<Unit>
+
     suspend fun listMyProducts(sellerId: String): AppResult<List<Product>>
 
     /** rpc_create_product (0017) -- always creates status='draft' server-side;

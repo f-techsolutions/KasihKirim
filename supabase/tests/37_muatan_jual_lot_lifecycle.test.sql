@@ -46,7 +46,7 @@ SELECT is(
 -- ── the gates, off by default, each proven independently ────────────────────
 SELECT tests.authenticate_as('rahman');
 SELECT throws_ok(
-  $$SELECT public.rpc_create_lot('Ikan kering', (SELECT id FROM ref.categories WHERE slug='kraf'),
+  $$SELECT public.rpc_create_lot('Ikan kering', 'kraf',
       5, 10000, 'lot-receipts/x/y.jpg', 3000)$$,
   NULL, NULL, 'MARKETPLACE_NOT_ACTIVE: ref.compliance_state is NOT_READY by default');
 SELECT tests.clear_auth();
@@ -55,7 +55,7 @@ UPDATE ref.compliance_state SET status = 'PRODUCTION_ACTIVE' WHERE id;
 
 SELECT tests.authenticate_as('rahman');
 SELECT throws_ok(
-  $$SELECT public.rpc_create_lot('Ikan kering', (SELECT id FROM ref.categories WHERE slug='kraf'),
+  $$SELECT public.rpc_create_lot('Ikan kering', 'kraf',
       5, 10000, 'lot-receipts/x/y.jpg', 3000)$$,
   NULL, NULL, 'MARKETPLACE_DISABLED: muatan_jual_enabled is still false');
 SELECT tests.clear_auth();
@@ -64,7 +64,7 @@ UPDATE ref.feature_gates SET enabled = true WHERE key = 'muatan_jual_enabled';
 
 SELECT tests.authenticate_as('rahman');
 SELECT throws_ok(
-  $$SELECT public.rpc_create_lot('Ikan kering', (SELECT id FROM ref.categories WHERE slug='kraf'),
+  $$SELECT public.rpc_create_lot('Ikan kering', 'kraf',
       5, 10000, 'lot-receipts/x/y.jpg', 3000)$$,
   NULL, NULL, 'CATEGORY_NOT_PERMITTED: kraf is not marketplace_enabled yet');
 SELECT tests.clear_auth();
@@ -74,7 +74,7 @@ UPDATE ref.category_compliance SET marketplace_enabled = true
 
 SELECT tests.authenticate_as('rahman');
 SELECT throws_ok(
-  $$SELECT public.rpc_create_lot('Ikan kering', (SELECT id FROM ref.categories WHERE slug='kraf'),
+  $$SELECT public.rpc_create_lot('Ikan kering', 'kraf',
       5, 10000, 'lot-receipts/x/y.jpg', 3000)$$,
   NULL, NULL, 'SELLER_NOT_ACTIVE: onboarding_status is still PENDING');
 SELECT tests.clear_auth();
@@ -108,7 +108,7 @@ SELECT throws_ok(
 
 -- ── R-1: history required before selling ────────────────────────────────────
 SELECT throws_ok(
-  $$SELECT public.rpc_create_lot('Ikan kering', (SELECT id FROM ref.categories WHERE slug='kraf'),
+  $$SELECT public.rpc_create_lot('Ikan kering', 'kraf',
       5, 10000, 'lot-receipts/x/y.jpg', 3000)$$,
   NULL, NULL, 'LOT_HISTORY_REQUIRED: rahman has 0 completed deliveries, needs 20');
 
@@ -116,11 +116,11 @@ UPDATE public.carriers SET completed_count = 20 WHERE id = tests.uid('_carrier')
 
 -- ── R-1: the RM200 ceiling, and basic input validation ──────────────────────
 SELECT throws_ok(
-  $$SELECT public.rpc_create_lot('Ikan kering', (SELECT id FROM ref.categories WHERE slug='kraf'),
+  $$SELECT public.rpc_create_lot('Ikan kering', 'kraf',
       5, 25000, 'lot-receipts/x/y.jpg', 3000)$$,
   NULL, NULL, 'a cost basis above lot_max_value_sen (RM200) is refused');
 SELECT throws_ok(
-  $$SELECT public.rpc_create_lot('Ikan kering', (SELECT id FROM ref.categories WHERE slug='kraf'),
+  $$SELECT public.rpc_create_lot('Ikan kering', 'kraf',
       5, 10000, NULL, 3000)$$,
   NULL, NULL, 'a lot with no cost receipt path is refused -- FR-441''s own requirement');
 
@@ -130,7 +130,7 @@ DECLARE v_result JSONB;
 BEGIN
   PERFORM tests.authenticate_as('rahman');
   v_result := public.rpc_create_lot(
-    'Ikan Kering Beluran', (SELECT id FROM ref.categories WHERE slug='kraf'),
+    'Ikan Kering Beluran', 'kraf',
     10, 15000, 'lot-receipts/rahman/receipt.jpg', 2500, 'kg', ARRAY['PERISHABLE'], ARRAY[]::text[],
     now() + interval '3 days');
   INSERT INTO tests.handles(handle,user_id)
@@ -152,7 +152,7 @@ SELECT ok(
 -- ── the float-limit exposure check (ck_carrier_exposure, 0006) ──────────────
 UPDATE public.carriers SET cod_held_sen = 40000 WHERE id = tests.uid('_carrier');
 SELECT throws_ok(
-  $$SELECT public.rpc_create_lot('Another lot', (SELECT id FROM ref.categories WHERE slug='kraf'),
+  $$SELECT public.rpc_create_lot('Another lot', 'kraf',
       5, 15000, 'lot-receipts/rahman/receipt2.jpg', 3000)$$,
   NULL, NULL, 'FLOAT_LIMIT_EXCEEDED: COD + procurement advance + inventory risk already exceeds float_limit_sen');
 UPDATE public.carriers SET cod_held_sen = 0 WHERE id = tests.uid('_carrier');

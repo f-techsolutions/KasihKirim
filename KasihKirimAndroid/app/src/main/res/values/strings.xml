@@ -323,6 +323,7 @@
     <string name="earnings_cancel">Batal</string>
 
     <string name="profile_kongsi_untung">Kongsi &amp; Untung</string>
+    <string name="profile_muatan_jual_lots">Lot Muatan Jual Saya</string>
     <string name="promo_title">Kongsi &amp; Untung</string>
     <string name="promo_redeem_title">Ada Kod Rujukan?</string>
     <string name="promo_redeem_code_label">Kod</string>
@@ -501,6 +502,19 @@
     <string name="err_seller_not_found">Penjual tidak dijumpai atau belum diluluskan.</string>
     <string name="err_delivery_not_in_transit">Lokasi hanya boleh dikongsi semasa penghantaran dalam perjalanan.</string>
     <string name="err_invalid_coordinates">Lokasi peranti tidak sah.</string>
+    <string name="err_seller_application_required">Sila mohon menjadi penjual dahulu.</string>
+    <string name="err_marketplace_not_active">Muatan Jual belum dibuka lagi.</string>
+    <string name="err_category_not_permitted">Kategori ini belum dibenarkan untuk Muatan Jual.</string>
+    <string name="err_seller_not_active">Permohonan Muatan Jual anda belum aktif.</string>
+    <string name="err_seller_licence_missing_or_expired">Lesen diperlukan untuk kategori ini tiada atau telah tamat tempoh.</string>
+    <string name="err_title_too_short">Tajuk mesti antara 3 hingga 120 aksara.</string>
+    <string name="err_invalid_quantity">Kuantiti tidak sah.</string>
+    <string name="err_cost_receipt_required">Sila muat naik resit pembelian.</string>
+    <string name="err_lot_history_required">Anda perlu lebih banyak penghantaran selesai sebelum boleh menjual.</string>
+    <string name="err_lot_value_exceeds_limit">Nilai lot melebihi had yang dibenarkan.</string>
+    <string name="err_lot_not_found">Lot tidak dijumpai.</string>
+    <string name="err_lot_not_draft">Lot ini sudah tidak dalam draf.</string>
+    <string name="err_lot_not_withdrawable">Lot ini tidak boleh ditarik balik.</string>
 
     <string name="profile_badges_title">Lencana</string>
 
@@ -516,4 +530,33 @@
     <string name="tracking_updated_at">Dikemaskini: %1$s</string>
     <string name="tracking_speed">Kelajuan: %1$.0f km/j</string>
     <string name="tracking_open_maps">Buka dalam Peta</string>
+
+    <string name="carrier_lots_title">Lot Muatan Jual Saya</string>
+    <string name="carrier_lots_apply_title">Mohon Jadi Penjual</string>
+    <string name="carrier_lots_apply_body">Anda perlu mempunyai akaun penjual sebelum boleh mencipta lot Muatan Jual.</string>
+    <string name="carrier_lots_apply_action">Mohon Sekarang</string>
+    <string name="carrier_lots_accept_title">Permohonan Diluluskan</string>
+    <string name="carrier_lots_accept_body">Sila terima terma Muatan Jual untuk mengaktifkan akaun penjual anda.</string>
+    <string name="carrier_lots_accept_action">Terima Terma</string>
+    <string name="carrier_lots_waiting_hint">Semakan sedang dijalankan. Sila semak semula kemudian.</string>
+    <string name="carrier_lots_create">+ Cipta Lot</string>
+    <string name="carrier_lots_empty">Tiada lot lagi.</string>
+    <string name="carrier_lots_price_and_qty">%1$s / %2$s · %3$s %2$s tinggal</string>
+    <string name="carrier_lots_cost_basis">Kos: %1$s (peribadi)</string>
+    <string name="carrier_lots_attach">Lekatkan pada Perjalanan</string>
+    <string name="carrier_lots_withdraw">Tarik Balik</string>
+    <string name="carrier_lots_create_title">Cipta Lot Baharu</string>
+    <string name="carrier_lots_field_title">Tajuk</string>
+    <string name="carrier_lots_field_category">Kategori</string>
+    <string name="carrier_lots_field_qty">Kuantiti</string>
+    <string name="carrier_lots_field_unit">Unit</string>
+    <string name="carrier_lots_field_cost_basis">Kos Pembelian (RM)</string>
+    <string name="carrier_lots_field_price">Harga Jualan Seunit (RM)</string>
+    <string name="carrier_lots_field_handling">Pengendalian</string>
+    <string name="carrier_lots_receipt_capture">Ambil Gambar Resit</string>
+    <string name="carrier_lots_receipt_captured">Resit Sudah Diambil</string>
+    <string name="carrier_lots_create_submit">Cipta</string>
+    <string name="carrier_lots_create_cancel">Batal</string>
+    <string name="carrier_lots_attach_title">Pilih Perjalanan</string>
+    <string name="carrier_lots_attach_empty">Tiada perjalanan sesuai. Cipta perjalanan dahulu.</string>
 </resources>

@@ -275,7 +275,7 @@ GRANT EXECUTE ON FUNCTION public.rpc_admin_verify_seller_licence(UUID,BOOLEAN,TE
  *  so a carrier already deep in COD exposure cannot also stack unlimited
  *  inventory risk on top of it. */
 CREATE OR REPLACE FUNCTION public.rpc_create_lot(
-  p_title TEXT, p_category_id UUID, p_qty_total NUMERIC,
+  p_title TEXT, p_category_slug TEXT, p_qty_total NUMERIC,
   p_cost_basis_sen BIGINT, p_cost_receipt_path TEXT, p_price_per_unit_sen BIGINT,
   p_unit TEXT DEFAULT 'kg', p_handling_flags TEXT[] DEFAULT '{}',
   p_photo_paths TEXT[] DEFAULT '{}', p_sell_by TIMESTAMPTZ DEFAULT NULL)
@@ -284,6 +284,7 @@ DECLARE
   v_uid UUID := (SELECT auth.uid());
   v_carrier public.carriers;
   v_seller public.sellers;
+  v_category_id UUID;
   v_min_deliveries INT;
   v_max_value_sen BIGINT;
   v_lot public.carrier_stock_lots;
@@ -295,6 +296,13 @@ BEGIN
   SELECT * INTO v_seller FROM public.sellers WHERE user_id = v_uid;
   IF NOT FOUND THEN RAISE EXCEPTION 'SELLER_APPLICATION_REQUIRED'; END IF;
 
+  -- ref.categories is not PostgREST-exposed (supabase/config.toml) and its
+  -- ids are random uuidv7() with no pinned literal anywhere a client could
+  -- read -- the same reason rpc_create_product/rpc_quote_kirim (0012/0017)
+  -- both take a slug and resolve it server-side instead of a raw category id.
+  SELECT id INTO v_category_id FROM ref.categories WHERE slug = p_category_slug;
+  IF NOT FOUND THEN RAISE EXCEPTION 'CATEGORY_NOT_FOUND'; END IF;
+
   -- Same gate rpc_buy_from_lot enforces at purchase time (0013), and checked
   -- in the same relative position: eligibility before field-level validation,
   -- so a marketplace that is not even live yet fails fast rather than
@@ -303,7 +311,7 @@ BEGIN
   -- compliance has not cleared, nor without their own onboarding_status
   -- (checked via p_seller) reaching ACTIVE.
   PERFORM internal.fn_marketplace_gate(
-    p_category := p_category_id, p_seller := v_seller.id, p_checkout := false);
+    p_category := v_category_id, p_seller := v_seller.id, p_checkout := false);
 
   IF length(trim(p_title)) NOT BETWEEN 3 AND 120 THEN RAISE EXCEPTION 'TITLE_TOO_SHORT'; END IF;
   IF p_qty_total <= 0 THEN RAISE EXCEPTION 'INVALID_QUANTITY'; END IF;
@@ -334,7 +342,7 @@ BEGIN
      qty_total, cost_basis_sen, cost_receipt_path, price_per_unit_sen,
      photo_paths, status, sell_by)
   VALUES
-    (v_carrier.id, v_seller.id, trim(p_title), p_category_id,
+    (v_carrier.id, v_seller.id, trim(p_title), v_category_id,
      p_handling_flags::ref.handling_flag[], p_unit, p_qty_total,
      p_cost_basis_sen, p_cost_receipt_path, p_price_per_unit_sen,
      p_photo_paths, 'DRAFT', p_sell_by)
@@ -358,9 +366,9 @@ BEGIN
 END $$;
 
 REVOKE ALL ON FUNCTION public.rpc_create_lot(
-  TEXT,UUID,NUMERIC,BIGINT,TEXT,BIGINT,TEXT,TEXT[],TEXT[],TIMESTAMPTZ) FROM PUBLIC, anon;
+  TEXT,TEXT,NUMERIC,BIGINT,TEXT,BIGINT,TEXT,TEXT[],TEXT[],TIMESTAMPTZ) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.rpc_create_lot(
-  TEXT,UUID,NUMERIC,BIGINT,TEXT,BIGINT,TEXT,TEXT[],TEXT[],TIMESTAMPTZ) TO authenticated;
+  TEXT,TEXT,NUMERIC,BIGINT,TEXT,BIGINT,TEXT,TEXT[],TEXT[],TIMESTAMPTZ) TO authenticated;
 
 /** FR-442: attach a DRAFT lot to a trip -- it becomes visible on Papan Kirim
  *  along that corridor (trip_listings, from/to resolved from the trip's own

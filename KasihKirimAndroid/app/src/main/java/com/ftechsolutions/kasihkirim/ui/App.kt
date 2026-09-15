@@ -18,6 +18,7 @@ import com.ftechsolutions.kasihkirim.domain.repository.AddressRepository
 import com.ftechsolutions.kasihkirim.domain.repository.AdminRepository
 import com.ftechsolutions.kasihkirim.domain.repository.BadgeRepository
 import com.ftechsolutions.kasihkirim.domain.repository.BuyRepository
+import com.ftechsolutions.kasihkirim.domain.repository.CarrierLotRepository
 import com.ftechsolutions.kasihkirim.domain.repository.CarrierRepository
 import com.ftechsolutions.kasihkirim.domain.repository.DeliveryRepository
 import com.ftechsolutions.kasihkirim.domain.repository.DeliveryTrackingRepository
@@ -51,6 +52,7 @@ fun App(
     muatanJualRepository: MuatanJualRepository,
     sellerRepository: SellerRepository,
     carrierRepository: CarrierRepository,
+    carrierLotRepository: CarrierLotRepository,
     buyRepository: BuyRepository,
     badgeRepository: BadgeRepository,
     adminRepository: AdminRepository,
@@ -69,8 +71,8 @@ fun App(
             is AuthState.Authenticated -> AppNavHost(
                 s.user, vm, addressRepository, kirimRepository, earningsRepository,
                 vehicleRepository, tripRepository, deliveryRepository, deliveryTrackingRepository,
-                muatanJualRepository, sellerRepository, carrierRepository, buyRepository, badgeRepository,
-                adminRepository, promotionRepository,
+                muatanJualRepository, sellerRepository, carrierRepository, carrierLotRepository,
+                buyRepository, badgeRepository, adminRepository, promotionRepository,
             )
             is AuthState.Error -> Centered {
                 Text(stringResource(s.error.messageRes()),
