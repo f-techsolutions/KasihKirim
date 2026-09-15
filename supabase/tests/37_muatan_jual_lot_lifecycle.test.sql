@@ -105,16 +105,24 @@ SELECT is(
 SELECT throws_ok(
   'SELECT public.rpc_accept_muatan_jual_terms()',
   NULL, NULL, 'accepting again is refused -- onboarding_status is no longer APPROVED');
+SELECT tests.clear_auth();
 
 -- ── R-1: history required before selling ────────────────────────────────────
+SELECT tests.authenticate_as('rahman');
 SELECT throws_ok(
   $$SELECT public.rpc_create_lot('Ikan kering', 'kraf',
       5, 10000, 'lot-receipts/x/y.jpg', 3000)$$,
   NULL, NULL, 'LOT_HISTORY_REQUIRED: rahman has 0 completed deliveries, needs 20');
+SELECT tests.clear_auth();
 
+-- Raw fixture setup, same as every other test file's direct UPDATEs
+-- against carriers/sellers/etc. -- runs as postgres (tests.clear_auth
+-- above), not as rahman, since a carrier cannot write their own
+-- completed_count via RLS (nor should they be able to).
 UPDATE public.carriers SET completed_count = 20 WHERE id = tests.uid('_carrier');
 
 -- ── R-1: the RM200 ceiling, and basic input validation ──────────────────────
+SELECT tests.authenticate_as('rahman');
 SELECT throws_ok(
   $$SELECT public.rpc_create_lot('Ikan kering', 'kraf',
       5, 25000, 'lot-receipts/x/y.jpg', 3000)$$,
@@ -123,6 +131,7 @@ SELECT throws_ok(
   $$SELECT public.rpc_create_lot('Ikan kering', 'kraf',
       5, 10000, NULL, 3000)$$,
   NULL, NULL, 'a lot with no cost receipt path is refused -- FR-441''s own requirement');
+SELECT tests.clear_auth();
 
 -- ── the real creation ────────────────────────────────────────────────────────
 DO $$
@@ -133,6 +142,7 @@ BEGIN
     'Ikan Kering Beluran', 'kraf',
     10, 15000, 'lot-receipts/rahman/receipt.jpg', 2500, 'kg', ARRAY['PERISHABLE'], ARRAY[]::text[],
     now() + interval '3 days');
+  PERFORM tests.clear_auth();
   INSERT INTO tests.handles(handle,user_id)
   VALUES ('_lot37', (v_result->>'lot_id')::uuid)
   ON CONFLICT (handle) DO UPDATE SET user_id=EXCLUDED.user_id;
@@ -151,12 +161,13 @@ SELECT ok(
 
 -- ── the float-limit exposure check (ck_carrier_exposure, 0006) ──────────────
 UPDATE public.carriers SET cod_held_sen = 40000 WHERE id = tests.uid('_carrier');
+SELECT tests.authenticate_as('rahman');
 SELECT throws_ok(
   $$SELECT public.rpc_create_lot('Another lot', 'kraf',
       5, 15000, 'lot-receipts/rahman/receipt2.jpg', 3000)$$,
   NULL, NULL, 'FLOAT_LIMIT_EXCEEDED: COD + procurement advance + inventory risk already exceeds float_limit_sen');
-UPDATE public.carriers SET cod_held_sen = 0 WHERE id = tests.uid('_carrier');
 SELECT tests.clear_auth();
+UPDATE public.carriers SET cod_held_sen = 0 WHERE id = tests.uid('_carrier');
 
 -- ── the actual security fix: a raw client write no longer works ────────────
 SELECT tests.authenticate_as('rahman');
@@ -241,7 +252,13 @@ SELECT is(
     p_legal_review_status := 'CLEARED', p_compliance_note := 'Reviewed for this test'
   ))->>'legal_review_status',
   'CLEARED', 'an admin can move a category''s legal_review_status');
+SELECT tests.clear_auth();
 
+-- Raw fixture insert, same reasoning as every other direct INSERT in this
+-- file -- runs as postgres, not as any authenticated actor: a licence row
+-- for _mjseller inserted while authenticated as anyone else would violate
+-- seller_licences_insert's own WITH CHECK (seller_id must match the
+-- caller's own sellers row).
 DO $$
 DECLARE v_licence UUID;
 BEGIN
@@ -254,6 +271,7 @@ BEGIN
   ON CONFLICT (handle) DO UPDATE SET user_id=EXCLUDED.user_id;
 END $$;
 
+SELECT tests.authenticate_as('admin');
 SELECT is(
   (public.rpc_admin_verify_seller_licence(tests.uid('_licence37'), true))->>'verification_status',
   'VERIFIED', 'an admin can verify a submitted licence');

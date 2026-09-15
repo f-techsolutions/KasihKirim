@@ -49,6 +49,7 @@ CREATE POLICY delivery_locations_select ON public.delivery_locations FOR SELECT 
          OR requester_id = (SELECT auth.uid())
          OR authz.is_admin());
 REVOKE INSERT, UPDATE, DELETE ON public.delivery_locations FROM authenticated, anon;
+GRANT SELECT ON public.delivery_locations TO authenticated;
 
 ALTER PUBLICATION supabase_realtime ADD TABLE public.delivery_locations;
 

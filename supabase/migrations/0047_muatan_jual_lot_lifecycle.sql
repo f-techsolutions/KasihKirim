@@ -71,6 +71,17 @@ REVOKE INSERT, UPDATE, DELETE ON public.carrier_stock_lots FROM authenticated, a
 -- (plain Jualan sellers, who pass none of them) is unaffected. FR-440: "no
 -- new identity model" -- a carrier applying for Muatan Jual is this same
 -- RPC with seller_kind='carrier_trader', not a parallel application path.
+--
+-- The old 3-arg signature must be DROPped, not just CREATE OR REPLACEd:
+-- Postgres identifies a function by its argument TYPE list, and
+-- (TEXT,UUID,TEXT) is a different type list from (TEXT,UUID,TEXT,TEXT,TEXT,
+-- UUID) even though the three new params carry defaults -- CREATE OR
+-- REPLACE would have created a second overload alongside the original
+-- rather than replacing it, and a 3-argument call (every existing caller)
+-- would then match both, failing with "is not unique" -- caught by
+-- 13_seller_onboarding.test.sql's own pre-existing coverage.
+DROP FUNCTION IF EXISTS public.rpc_apply_seller(TEXT, UUID, TEXT);
+
 CREATE OR REPLACE FUNCTION public.rpc_apply_seller(
   p_business_name TEXT, p_community_id UUID, p_ssm_reg_no TEXT DEFAULT NULL,
   p_seller_kind TEXT DEFAULT 'individual', p_operating_address TEXT DEFAULT NULL,
