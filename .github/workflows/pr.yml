@@ -41,8 +41,28 @@ jobs:
             -v ON_ERROR_STOP=1 \
             -f supabase/test_helpers/00_helpers.sql
 
+      # See kasihkirim-verification.yml's own "GATE — supabase test db" step
+      # for why this retries: pg_prove runs in a short-lived Docker
+      # container the Supabase CLI pulls fresh every time, and an
+      # anonymous-pull registry rate limit there is infra flakiness, not a
+      # test failure (confirmed via Dependabot PR #13's own CI log).
       - name: pgTAP
-        run: supabase test db
+        run: |
+          set -euo pipefail
+          attempt=1
+          max_attempts=3
+          while true; do
+            if supabase test db 2>&1 | tee pgtap.log; then
+              break
+            fi
+            if [ "$attempt" -lt "$max_attempts" ] && grep -q "toomanyrequests" pgtap.log; then
+              attempt=$((attempt + 1))
+              echo "::warning::Docker registry rate-limited the pg_prove pull -- retrying ($attempt/$max_attempts)"
+              sleep $((attempt * 15))
+              continue
+            fi
+            exit 1
+          done
 
       # A table without policies is a data breach waiting to happen, so an
       # unprotected table fails the build rather than shipping.
