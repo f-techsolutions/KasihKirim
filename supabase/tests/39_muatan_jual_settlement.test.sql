@@ -51,6 +51,11 @@ BEGIN
   v_lot := (public.rpc_create_lot(
     'Ikan Kering Beluran', 'kraf', 10, 15000, 'lot-receipts/rahman/receipt.jpg', 2500
   )->>'lot_id')::uuid;
+  -- A new lot starts DRAFT (37_muatan_jual_lot_lifecycle.test.sql's own
+  -- comment) -- rpc_buy_from_lot refuses anything but ACTIVE, so it has to
+  -- be attached to the carrier's own _trip fixture (seed_fixture, BOARDING)
+  -- before aisyah can buy from it.
+  PERFORM public.rpc_attach_lot_to_trip(v_lot, tests.uid('_trip'));
   PERFORM tests.clear_auth();
 
   INSERT INTO tests.handles(handle,user_id) VALUES ('_seller39', v_seller), ('_lot39', v_lot)
