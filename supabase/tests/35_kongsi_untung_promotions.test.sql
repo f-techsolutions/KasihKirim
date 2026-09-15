@@ -188,9 +188,16 @@ SELECT is(
 SELECT tests.clear_auth();
 
 -- ── settlement attributed and paid the promoter, capped per commission_rules ─
+-- internal.fn_attribute_promotion (0006) posts the ledger entries
+-- synchronously at attribution time and never itself transitions the
+-- attribution row's own status away from its DEFAULT 'PENDING' -- nothing
+-- in 0006 ever does (SETTLED/REVERSED exist on the CHECK for a future
+-- admin/reconciliation action). The money has already moved by this point
+-- regardless of this row's status; PROMOTER_PAYABLE below is what's
+-- actually authoritative and withdrawable.
 SELECT is(
   (SELECT status FROM public.promotion_attributions WHERE order_id = tests.uid('_order35')),
-  'SETTLED', 'the click resolved at checkout produced a SETTLED attribution');
+  'PENDING', 'the attribution row itself stays PENDING -- 0006 never sweeps it to SETTLED');
 SELECT is(
   (SELECT promoter_sen FROM public.promotion_attributions WHERE order_id = tests.uid('_order35')),
   (SELECT LEAST(plat.amount_sen * cr.rate_bps / 10000, cr.max_commission_sen)
@@ -247,9 +254,9 @@ SELECT is(
   (public.rpc_my_promotions()->'promotions'->0->>'code'),
   current_setting('tests.p35_code'), 'the dashboard lists the promoter''s own code');
 SELECT is(
-  (public.rpc_my_promotions()->'promotions'->0->>'settled_sen')::bigint,
+  (public.rpc_my_promotions()->'promotions'->0->>'pending_sen')::bigint,
   (SELECT promoter_sen FROM public.promotion_attributions WHERE order_id = tests.uid('_order35')),
-  'the dashboard reports the settled earnings from aisyah''s order');
+  'the dashboard reports aisyah''s order under pending_sen -- the row''s own status never leaves PENDING');
 SELECT is(
   (public.rpc_my_promotions()->>'available_sen')::bigint,
   (SELECT promoter_sen FROM public.promotion_attributions WHERE order_id = tests.uid('_order35')),
