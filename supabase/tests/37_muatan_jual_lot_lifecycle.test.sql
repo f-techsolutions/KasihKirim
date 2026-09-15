@@ -227,9 +227,18 @@ SELECT tests.authenticate_as('rahman');
 SELECT is(
   (public.rpc_withdraw_lot(tests.uid('_lot37')))->>'status',
   'WITHDRAWN', 'the carrier can withdraw their own lot from sale');
+SELECT tests.clear_auth();
+
+-- listings_select (0006) is `is_active OR authz.is_admin()' -- once
+-- deactivated, even the owning carrier can no longer see the row through
+-- plain SELECT, so this check needs an admin.
+SELECT tests.authenticate_as('admin');
 SELECT is(
   (SELECT is_active FROM public.trip_listings WHERE lot_id = tests.uid('_lot37')),
   false, 'withdrawing deactivates the trip listing');
+SELECT tests.clear_auth();
+
+SELECT tests.authenticate_as('rahman');
 SELECT is(
   (SELECT inventory_at_risk_sen FROM public.carriers WHERE id = tests.uid('_carrier')),
   15000::bigint, 'withdrawing does NOT relieve inventory_at_risk_sen -- the carrier still holds the physical stock');
