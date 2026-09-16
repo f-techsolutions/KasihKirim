@@ -1,12 +1,17 @@
 package com.ftechsolutions.kasihkirim.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -33,6 +38,7 @@ import com.ftechsolutions.kasihkirim.domain.repository.VehicleRepository
 import com.ftechsolutions.kasihkirim.ui.auth.AuthScreen
 import com.ftechsolutions.kasihkirim.ui.auth.AuthViewModel
 import com.ftechsolutions.kasihkirim.ui.auth.messageRes
+import com.ftechsolutions.kasihkirim.ui.landing.LandingScreen
 import com.ftechsolutions.kasihkirim.ui.navigation.AppNavHost
 
 /**
@@ -61,6 +67,13 @@ fun App(
     dealsRepository: DealsRepository,
 ) {
     val state by vm.authState.collectAsStateWithLifecycle()
+    // Landing is what an unauthenticated user sees first -- AuthScreen only
+    // once they tap "Mula Hantar". Reset if they ever land back on
+    // Unauthenticated from a signed-in session (e.g. sign out), rather than
+    // reopening straight onto a stale sign-in form.
+    var showAuth by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(state) { if (state !is AuthState.Unauthenticated) showAuth = false }
+    BackHandler(enabled = state == AuthState.Unauthenticated && showAuth) { showAuth = false }
 
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         when (val s = state) {
@@ -69,7 +82,8 @@ fun App(
                 Spacer(Modifier.height(12.dp))
                 Text(stringResource(R.string.auth_checking))
             }
-            AuthState.Unauthenticated -> AuthScreen(vm)
+            AuthState.Unauthenticated ->
+                if (showAuth) AuthScreen(vm) else LandingScreen(onMulaHantar = { showAuth = true })
             is AuthState.Authenticated -> AppNavHost(
                 s.user, vm, addressRepository, kirimRepository, earningsRepository,
                 vehicleRepository, tripRepository, deliveryRepository, deliveryTrackingRepository,

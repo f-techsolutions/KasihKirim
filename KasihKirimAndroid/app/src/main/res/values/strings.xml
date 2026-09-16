@@ -2,6 +2,12 @@
     <string name="app_name">KasihKirim</string>
     <string name="tagline">Kirim dengan kasih, dari kampung ke bandar</string>
 
+    <string name="landing_intro">KasihKirim menghubungkan penghantar, pemandu dan peniaga di seluruh Sabah dalam satu aplikasi -- hantar bungkusan, beli-belah hasil tempatan, dan jejak penghantaran anda dari kampung ke bandar.</string>
+    <string name="landing_feature_send">Hantar bungkusan melalui pemandu yang dipercayai di laluan anda</string>
+    <string name="landing_feature_shop">Beli-belah terus daripada peniaga tempatan (Muatan Jual)</string>
+    <string name="landing_feature_track">Jejak penghantaran anda secara langsung, dari mula hingga sampai</string>
+    <string name="landing_mula_hantar">Mula Hantar</string>
+
     <string name="auth_sign_in">Log Masuk</string>
     <string name="auth_sign_up">Daftar</string>
     <string name="auth_email">E-mel</string>

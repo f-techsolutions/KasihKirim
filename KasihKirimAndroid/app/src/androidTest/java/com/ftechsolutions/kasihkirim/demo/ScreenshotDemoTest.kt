@@ -38,6 +38,7 @@ import com.ftechsolutions.kasihkirim.ui.board.BoardScreen
 import com.ftechsolutions.kasihkirim.ui.board.BoardViewModel
 import com.ftechsolutions.kasihkirim.ui.deliveries.DeliveriesScreen
 import com.ftechsolutions.kasihkirim.ui.deliveries.DeliveriesViewModel
+import com.ftechsolutions.kasihkirim.ui.landing.LandingScreen
 import com.ftechsolutions.kasihkirim.ui.muatanjual.MuatanJualScreen
 import com.ftechsolutions.kasihkirim.ui.muatanjual.MuatanJualViewModel
 import com.ftechsolutions.kasihkirim.ui.orders.OrdersScreen
@@ -212,6 +213,11 @@ class ScreenshotDemoTest {
         FileOutputStream(File(dir, "$name.png")).use { out ->
             bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
         }
+    }
+
+    @Test fun landing() {
+        composeRule.setContent { KasihKirimTheme { LandingScreen(onMulaHantar = {}) } }
+        capture("00-landing")
     }
 
     @Test fun auth() {
