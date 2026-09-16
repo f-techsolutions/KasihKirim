@@ -60,7 +60,13 @@ fun AdminScreen(vm: AdminViewModel) {
             ScreenHeader(stringResource(R.string.admin_title))
         }
 
-        TabRow(selectedTabIndex = state.queue.ordinal) {
+        // ScrollableTabRow, not TabRow: a fixed TabRow splits its width
+        // equally across all tabs regardless of content, and with 8 tabs of
+        // long Malay labels ("Pengeluaran", "Cari Pesanan") that starves each
+        // one down to a handful of dp -- found on-device as every label
+        // wrapping to one character per line, not just overflowing. Scrolling
+        // lets each tab take the width its own label actually needs.
+        ScrollableTabRow(selectedTabIndex = state.queue.ordinal, edgePadding = 20.dp) {
             Tab(
                 selected = state.queue == AdminQueue.SELLERS,
                 onClick = { vm.selectQueue(AdminQueue.SELLERS) },
