@@ -1,0 +1,30 @@
+-- ============================================================================
+-- KasihKirim — 0051_auth_hook_ref_schema_grant.sql
+--
+-- Production incident: every sign-in and token refresh started failing with
+-- a 500 ("permission denied for schema ref", SQLSTATE 42501). Root cause:
+-- 0041_account_management.sql added `v_status ref.account_status;` to
+-- public.custom_access_token_hook's DECLARE block -- the first time this
+-- hook ever referenced anything in schema ref. GoTrue invokes the hook as
+-- supabase_auth_admin, and 0000_prelude.sql's own comment on that role
+-- ("the access-token hook calls none of these [ref-touching functions]")
+-- was true when written but never revisited when 0041 made it false --
+-- supabase_auth_admin was only ever granted USAGE on schema public (0003),
+-- never on schema ref. Resolving the ref.account_status type at hook
+-- invocation time needs schema-level USAGE regardless of table grants,
+-- so every password grant and token refresh hit this and failed closed.
+--
+-- Confirmed live in auth_logs before this fix: "Hook errored out" / request
+-- status 500 / error_code unexpected_failure on every /token call, for
+-- every account, not just one user's.
+--
+-- 41_auth_hook_role_grants.test.sql (new) closes the actual test gap that
+-- let this ship: every existing custom_access_token_hook assertion (11, 31)
+-- runs after tests.clear_auth(), which leaves the session as postgres -- a
+-- superuser that bypasses schema ACLs entirely. None of them could ever
+-- have caught a missing supabase_auth_admin grant. The new test calls the
+-- hook as supabase_auth_admin specifically, the same way GoTrue really
+-- does.
+-- ============================================================================
+
+GRANT USAGE ON SCHEMA ref TO supabase_auth_admin;
