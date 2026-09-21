@@ -13,8 +13,9 @@
 -- commission -- plus the payout/withdrawal path and the pre-existing
 -- self-referral trigger, neither ever exercised by any test until now.
 --
--- kongsi_untung_enabled is false in production; this file proves that first,
--- then flips it on for the rest of the run. ROLLBACK at the end means
+-- kongsi_untung_enabled is on in production (0052_enable_kongsi_untung.sql).
+-- This file pins the gate off first to prove the disabled path still works,
+-- then flips it back on for the rest of the run. ROLLBACK at the end means
 -- production is never actually touched.
 -- ============================================================================
 BEGIN;
@@ -58,6 +59,11 @@ SELECT tests.clear_auth();
 UPDATE public.inventory SET on_hand = 20 WHERE product_id = tests.uid('_p35');
 
 -- ── production default: the gate is OFF ─────────────────────────────────────
+-- 0052_enable_kongsi_untung.sql turned this on in production (and therefore
+-- in every fresh migration replay, this fixture included), so pin it back
+-- off here to keep exercising the disabled path below. ROLLBACK at the end
+-- leaves production's row untouched.
+UPDATE ref.feature_gates SET enabled = false WHERE key = 'kongsi_untung_enabled';
 SELECT tests.authenticate_as('p35_promoter');
 SELECT throws_ok(
   format($$SELECT public.rpc_create_promotion('product', %L)$$, tests.uid('_p35')),
