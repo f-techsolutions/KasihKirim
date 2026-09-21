@@ -33,6 +33,13 @@ SELECT tests.clear_auth();
 SELECT tests.seed_fixture();
 SELECT tests.create_user('admin2', '+60128880099', ARRAY['admin_ops']);
 
+-- 0052_enable_kongsi_untung.sql made this gate on by default in production
+-- and therefore in every fresh migration replay (this fixture included).
+-- The assertion below is about payouts before Kongsi & Untung exists, not
+-- about that feature itself, so pin the gate off for this scope. ROLLBACK
+-- at the end leaves production's row untouched.
+UPDATE ref.feature_gates SET enabled = false WHERE key = 'kongsi_untung_enabled';
+
 DO $seed$
 DECLARE v_txn UUID;
 BEGIN
