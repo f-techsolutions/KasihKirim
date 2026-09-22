@@ -45,7 +45,7 @@ jobs:
     steps:
       # ── 1. Source ────────────────────────────────────────────────────────
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # ── 2. Node 20 — .nvmrc is authoritative ─────────────────────────────
       - name: Set up Node from .nvmrc

@@ -28,7 +28,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       # First (and, so far, only) real run of this workflow failed here:
       # "FATAL | Not enough space to create userdata partition. Available:
